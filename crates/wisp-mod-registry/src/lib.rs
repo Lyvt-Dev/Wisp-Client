@@ -1262,11 +1262,11 @@ mod tests {
         // An `Origin` has no path, though REGISTRY_PUBLIC_URL may: the site's
         // pages are below its root (#6159).
         assert_eq!(
-            url_origin("https://github.com/Lyvt-Dev/Wisp-Client/mods"),
+            url_origin("https://github.com/Lyvt-Dev/Wisp-Client/blob/main/docs/mods.md"),
             "https://github.com/Lyvt-Dev/Wisp-Client"
         );
         assert_eq!(
-            url_origin("https://github.com/Lyvt-Dev/Wisp-Client/mods/submit/"),
+            url_origin("https://github.com/Lyvt-Dev/Wisp-Client/blob/main/docs/mods.md"),
             "https://github.com/Lyvt-Dev/Wisp-Client"
         );
         assert_eq!(
@@ -1280,11 +1280,11 @@ mod tests {
         // The configured site's origin, path or no path, and a host name's
         // case folded as a browser folds it.
         assert!(from_the_site(
-            "https://github.com/Lyvt-Dev/Wisp-Client/mods",
+            "https://github.com/Lyvt-Dev/Wisp-Client/blob/main/docs/mods.md",
             Some("https://github.com/Lyvt-Dev/Wisp-Client")
         ));
         assert!(from_the_site(
-            "https://github.com/Lyvt-Dev/Wisp-Client/hub/",
+            "https://github.com/Lyvt-Dev/Wisp-Client/blob/main/ROADMAP.md",
             Some("https://PlayWisp.dev")
         ));
         // The scheme, the host and the port are all the origin's.

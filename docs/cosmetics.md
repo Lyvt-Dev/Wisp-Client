@@ -200,7 +200,7 @@ from any angle.
 
 The launcher talks to the same service for the player's own items: the catalogue, what the account
 owns, its purchase history, what each slot wears and whether other players see it. Buying and
-claiming the founder set happen on the website's shop (https://github.com/Lyvt-Dev/Wisp-Client/shop), never in the
+claiming the founder set happen on the website's shop (https://github.com/Lyvt-Dev/Wisp-Client/blob/main/docs/cosmetics.md), never in the
 launcher.
 
 - **Who the player is**: the service hands out a one-time server id (`POST /v1/auth/start`), the
@@ -239,7 +239,7 @@ page stays hidden.
   it, with your name tag style over the head (`wisp_cosmetics::preview`); **what you own for the
   chosen slot**, "Nothing" first. Equipping shows at once.
 - **The shop is on the website**: an *Open the shop* button by the page's title opens
-  `https://github.com/Lyvt-Dev/Wisp-Client/shop` in the browser (browsing, prices, the founder claim, purchases through
+  `https://github.com/Lyvt-Dev/Wisp-Client/blob/main/docs/cosmetics.md` in the browser (browsing, prices, the founder claim, purchases through
   Paddle). An account that owns nothing yet sees "You don't own any cosmetics yet." with that button
   instead. **Your purchases** lists the account's orders (date, item, price, state, order number).
 - **Three switches**: *Show my cosmetics* (the account's, on the service: off, everyone sees you

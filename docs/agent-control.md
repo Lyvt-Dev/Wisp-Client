@@ -3,7 +3,7 @@
 A player's own AI agent (Claude Code, Codex, Cursor, any MCP client) or a script can do
 everything a player does with the mouse and keyboard, in the launcher and in the game. This page
 covers developers: the surfaces, the full inventory, and the rules every new command follows.
-Players read [Control Wisp with your AI agent](https://github.com/Lyvt-Dev/Wisp-Client/docs/agents)
+Players read [Control Wisp with your AI agent](https://github.com/Lyvt-Dev/Wisp-Client/blob/main/docs/agent-control.md)
 (github.com/Lyvt-Dev/Wisp-Client/docs/agents).
 
 The command lists are generated, so they can't drift:

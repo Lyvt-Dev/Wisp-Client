@@ -8,7 +8,7 @@ This repository holds the game and the launcher, plus the tools, tests and docs 
 The website (github.com/Lyvt-Dev/Wisp-Client) is built in a separate repository from this one's README, `docs/api/` and roadmap. Anything
 else (videos, Discord and other community material) lives elsewhere.
 
-**Where to start: [github.com/Lyvt-Dev/Wisp-Client/hub](https://github.com/Lyvt-Dev/Wisp-Client/hub).** It shows what is being done now and next
+**Where to start: [github.com/Lyvt-Dev/Wisp-Client/hub](https://github.com/Lyvt-Dev/Wisp-Client/blob/main/ROADMAP.md).** It shows what is being done now and next
 ([ROADMAP.md](ROADMAP.md) in the repository), the work board, good first tasks, and the forms to report a bug or
 suggest something. A pull request for a roadmap item carries its `roadmap:<id>` label; ideas go to the suggestion
 queue (the hub, or `/suggest` on Discord) rather than to issues, which are for bugs.

@@ -1,9 +1,8 @@
 # Wisp's mark and icons
 
-**The mark.** An H whose crossbar is the wisp: the line runs edge to edge in Wisp's violet,
-the stems above it in full strength and their reflection below at a third. It is drawn on whole
-units of a 16-unit grid, so it is sharp at 16 px and holds at 1024 px. `docs/design-system.md`
-places it in the design system; `candidates/` keeps the two alternatives that were shown with it.
+**The mark.** A white feather on black, set diagonally, its tip up and to the right: a curved
+shaft, splits in the vane and a few downy wisps at its foot. Black and white only.
+`packaging/windows/draw-feather.ps1` draws it (`wisp-logo.png` and every SVG below).
 
 ## Masters (edit these)
 
@@ -12,8 +11,8 @@ places it in the design system; `candidates/` keeps the two alternatives that we
 | `icon.svg` | the app icon on the 16 grid: the full square with 22 % corners (Windows, Linux, favicons) |
 | `icon-macos.svg` | the same tile on Apple's 1024 grid (824 px tile, 185 px corners, transparent margin) |
 | `avatar.svg` | full-bleed square for services that round or crop the image (GitHub, Discord) |
-| `mark.svg`, `mark-dark.svg` | the mark alone, for light and for dark backgrounds |
-| `social/card.html` | the GitHub social preview, as a page |
+| `mark.svg`, `mark-dark.svg` | the feather alone, for light and for dark backgrounds |
+| `wisp-logo.png` | the 1254 px master `packaging/windows/generate-icons.ps1` cuts every icon from |
 
 ## Generated (don't edit)
 
@@ -30,26 +29,21 @@ places it in the design system; `candidates/` keeps the two alternatives that we
 | `icon-1024.png`, `icon-macos-1024.png` | previews, store listings |
 | `social/github-avatar-500.png` | GitHub: the organisation or account avatar |
 
-The page in `social/` is a screenshot, at their exact size, with Playwright, from the repository's root:
+## The README banner and the social images
 
-```sh
-d=$(mktemp -d) && npm install --prefix "$d" playwright && npx --prefix "$d" playwright install chromium
-NODE_PATH="$d/node_modules" node -e 'const {chromium}=require("playwright");(async()=>{const b=await chromium.launch();for(const[f,w,h,o]of[["card",1280,640,"github-social-1280x640"]]){const p=await b.newPage({viewport:{width:w,height:h}});await p.goto("file://"+require("path").resolve("docs/media/brand/social/"+f+".html"));await p.waitForTimeout(300);await p.screenshot({path:"docs/media/brand/social/"+o+".png"})}await b.close()})()'
+`docs/media/banner.png` (1600x600), `docs/media/social-preview.jpg` and
+`docs/media/brand/social/github-social-1280x640.png` (1280x640) are the feather and "Wisp Client"
+on black; `github-avatar-500.png` is the feather alone. `packaging/windows/brand-art.ps1` draws
+them from `wisp-logo.png` and the 256 px icon:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File packaging/windows/brand-art.ps1 -Repo .
 ```
 
-## The README banner
-
-`docs/media/banner.webp` (1600x600) is the website's hero, a screenshot of github.com/Lyvt-Dev/Wisp-Client in its
-dark theme. The navbar, the hero's buttons, its version line and its lede are hidden first, so the
-banner carries no launcher version and no harness count (the README's prose owns the count), and
-nothing in it goes stale. The crop starts 56 px above the kicker and ends at the hero's bottom
-edge. With Playwright, from the repository's root:
-
-```sh
-d=$(mktemp -d) && npm install --prefix "$d" playwright && npx --prefix "$d" playwright install chromium
-NODE_PATH="$d/node_modules" node -e 'const {chromium}=require("playwright");(async()=>{const b=await chromium.launch();const p=await b.newPage({viewport:{width:1600,height:1000}});await p.goto("https://github.com/Lyvt-Dev/Wisp-Client/",{waitUntil:"networkidle"});await p.click(".theme-toggle");await p.waitForTimeout(1200);await p.evaluate(()=>{for(const s of ["header",".hero-actions",".download-meta",".lede"]){const e=document.querySelector(s);if(e)e.style.display="none"}});await p.waitForTimeout(400);await p.screenshot({path:"docs/media/banner.webp",clip:{x:0,y:136,width:1600,height:600}});await b.close()})()'
-```
-
+The feather itself (`wisp-logo.png` and `icon.svg`) is drawn by `packaging/windows/draw-feather.ps1`.
+The launcher screenshots (`docs/media/launcher-{home,shop,settings}.png`) are its development
+build on an empty data folder, not signed in (`WISP_LAUNCHER_PAGE` picks the page), captured with
+`PrintWindow` at 1280x800.
 ## Drawn in code
 
 | Where | What |

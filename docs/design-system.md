@@ -36,7 +36,8 @@ almost nothing but type. What we take from it is its restraint rather than its c
 
 ### Colour
 
-Cool, slightly blue neutrals in two appearances with the same restraint, and Wisp's violet.
+Cool, slightly blue neutrals in two appearances with the same restraint, and black and white
+accents: black on light, near white with dark text on dark.
 Every text colour passes WCAG AA (4.5:1) on every background it is used on; the tests in
 `wisp-theme` check each pair in both palettes.
 
@@ -345,14 +346,11 @@ as `--glass-*`.
 
 ## The mark
 
-**Wisp line.** A sun half set below a wisp, drawn as three horizontal bars of 4, 8 and
-10 units over a 12 unit line, on a 16 unit grid. The bars are the sun cut by the wisp into
-slices, which also reads as layers of terrain and as a nod to voxels without drawing a block. It
-is built on whole units of the 16 px grid so it stays sharp at 16 px, and it scales without
-detail to 1024 px.
+**The feather.** A white feather set diagonally, its tip up and to the right: a curved shaft,
+splits in the vane and a few downy wisps at its foot.
 
-- Monochrome: the mark in `ink` on light, in `ink` (dark) on dark; the line can take the accent.
-- App icon: the mark in `#ecedf3` with the line in `#9a86ff`, on a `#16181f` rounded square
+- Monochrome: `mark.svg` (dark feather) on light, `mark-dark.svg` (white feather) on dark.
+- App icon: the white feather on black with a faint grey glow behind it, on a rounded square
   (macOS grid: 824 px tile with 185 px corners in a 1024 canvas; Windows and Linux use the full
   square with 22 % corners).
 - Exports and where they go: `docs/media/brand/README.md`.

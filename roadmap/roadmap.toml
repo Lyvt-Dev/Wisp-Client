@@ -368,7 +368,7 @@ dev = """Partly done: an opt-in 60 FPS cap with fewer workers on battery, Far De
 animated textures on the GPU (both shipped). Left: measured targets and fixes per class of machine (memory \
 use, worker counts, startup) on a Steam Deck, old Intel and Apple Silicon Macs and 8 GB computers, reported \
 on the Benchmarks page."""
-links = ["docs/benchmark.md", "https://github.com/Lyvt-Dev/Wisp-Client/docs/performance"]
+links = ["docs/benchmark.md", "https://github.com/Lyvt-Dev/Wisp-Client/tree/main/docs"]
 
 [[item]]
 id = "upscaling"
@@ -1014,7 +1014,7 @@ dev = """A player runs their own agent locally with `wisp-ctl` and the MCP serve
 wisp-mod`, `wisp-port-pack` and the parity harnesses as the check. Wisp writes the guide \
 (github.com/Lyvt-Dev/Wisp-Client/docs/agents, docs/modpacks.md) and runs no agents, accounts or keys for players. The No AI \
 switch turns all of it off."""
-links = ["https://github.com/Lyvt-Dev/Wisp-Client/docs/agents", "docs/modpacks.md", "docs/agent-control.md"]
+links = ["https://github.com/Lyvt-Dev/Wisp-Client/blob/main/docs/agent-control.md", "docs/modpacks.md", "docs/agent-control.md"]
 
 [[item]]
 id = "x-account"
@@ -1098,7 +1098,7 @@ more accurate. No coding needed."""
 dev = """`wisp-launcher play --arg=--benchmark --arg=standard` writes a JSON report; `wisp-launcher data \
 benchmark <report>` shows what would be sent and uploads it (github.com/Lyvt-Dev/Wisp-Client/docs/performance). Results from three \
 installs with the same hardware appear on the Benchmarks page. Example: #1711."""
-links = ["https://github.com/Lyvt-Dev/Wisp-Client/docs/performance"]
+links = ["https://github.com/Lyvt-Dev/Wisp-Client/tree/main/docs"]
 
 [[item]]
 id = "end-city-banners"

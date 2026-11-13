@@ -69,7 +69,7 @@ or when the file breaks a rule; `python3 tools/roadmap.py check --offline` runs 
 
 ## The journal
 
-The hub's Journal tab and `https://github.com/Lyvt-Dev/Wisp-Client/data/journal.json` are built with each deploy of the website
+The hub's Journal tab and `https://github.com/Lyvt-Dev/Wisp-Client/blob/main/roadmap/roadmap.json` are built with each deploy of the website
 (`src/hub.js` in Lyvt-Dev/Wisp-Client). The tab shows every game and launcher release with its notes' changes, each placed under
 the roadmap item it moves (the pull request's `roadmap:<id>` label, else the item that links it), the merged pull
 requests no release has yet, and the weekly summaries above.
@@ -78,24 +78,24 @@ requests no release has yet, and the weekly summaries above.
 merged pull request, release, shipped item and weekly summary, newest first, the latest 300.
 
 ```json
-{ "format": "wisp-journal", "version": 2, "generated": "…", "url": "https://github.com/Lyvt-Dev/Wisp-Client/hub#journal",
+{ "format": "wisp-journal", "version": 2, "generated": "…", "url": "https://github.com/Lyvt-Dev/Wisp-Client/blob/main/ROADMAP.md",
   "entries": [
     { "id": "pr-1788", "kind": "merge", "date": "…", "title": "the pull request's title", "url": "…",
       "number": 1788, "item": "discord-presence", "item_title": "Discord Rich Presence" },
     { "id": "release-v0.2.57", "kind": "release", "date": "…", "title": "…", "plain": "one line", "url": "…",
       "tag": "v0.2.57" },
     { "id": "shipped-server-resource-packs", "kind": "shipped", "date": "the release's", "title": "…",
-      "plain": "…", "url": "https://github.com/Lyvt-Dev/Wisp-Client/hub#server-resource-packs", "item": "…", "item_title": "…",
+      "plain": "…", "url": "https://github.com/Lyvt-Dev/Wisp-Client/blob/main/ROADMAP.md", "item": "…", "item_title": "…",
       "shipped_in": "v0.2.48", "post": "at most 240 characters", "announce": false },
     { "id": "weekly-2026-43", "kind": "weekly", "date": "the week's last second", "title": "…", "plain": "…",
-      "dev": "…", "url": "https://github.com/Lyvt-Dev/Wisp-Client/hub#week-2026-43" } ] }
+      "dev": "…", "url": "https://github.com/Lyvt-Dev/Wisp-Client/blob/main/ROADMAP.md" } ] }
 ```
 
 - An `id` never changes: readers post each one once. `merge` entries are the pull requests players see (no
   `skip-release` label), plus any that moves a roadmap item; `item` is absent when none does.
 - `announce: true` (the item's `announce` key) asks Kira to post the shipped item on X too, with `post`.
-- `https://github.com/Lyvt-Dev/Wisp-Client/data/roadmap.json` is `roadmap.toml` as JSON (`areas`, `items` with every key above,
-  `overview`, the weekly summaries); an item's page is `https://github.com/Lyvt-Dev/Wisp-Client/hub#<id>`.
+- `https://github.com/Lyvt-Dev/Wisp-Client/blob/main/roadmap/roadmap.json` is `roadmap.toml` as JSON (`areas`, `items` with every key above,
+  `overview`, the weekly summaries); an item's page is `https://github.com/Lyvt-Dev/Wisp-Client/blob/main/ROADMAP.md<id>`.
 
 ## The intake: votes and bug reports
 

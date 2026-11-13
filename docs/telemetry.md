@@ -88,7 +88,7 @@ The server keeps sessions in memory only, never on disk, and never with the send
 { "playing": 1243, "lan": 87, "versions": { "v2026.10.22": 1102, "other": 141 }, "platforms": { "linux": 301, "macos": 238, "windows": 704 } }
 ```
 
-Once a minute the server writes down only those totals (playing, LAN, per platform; no session, version or address) for the history at [github.com/Lyvt-Dev/Wisp-Client/stats](https://github.com/Lyvt-Dev/Wisp-Client/stats): every minute for 7 days, then per hour (average and peak) for 90 days, then per day (average and peak) for good. `GET /v1/live/history?range=24h|7d|30d|all` serves it (`&series=official`: the official server's count instead, below):
+Once a minute the server writes down only those totals (playing, LAN, per platform; no session, version or address) for the history at [github.com/Lyvt-Dev/Wisp-Client/stats](https://github.com/Lyvt-Dev/Wisp-Client/blob/main/docs/telemetry.md): every minute for 7 days, then per hour (average and peak) for 90 days, then per day (average and peak) for good. `GET /v1/live/history?range=24h|7d|30d|all` serves it (`&series=official`: the official server's count instead, below):
 
 ```json
 { "source": "players", "range": "24h", "step": 300, "from": 1793404800, "to": 1793491260,

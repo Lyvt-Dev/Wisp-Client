@@ -463,7 +463,7 @@ keep its own server config in `serverconfig/` ([native-mods.md](native-mods.md))
 
 Wisp's registry lists mods, modpacks (`.hpack`) and resource packs made for Wisp. **A project is reviewed
 once, when it is listed; its later releases are checked by machine, not read by a person.** Players find them at
-[github.com/Lyvt-Dev/Wisp-Client/mods](https://github.com/Lyvt-Dev/Wisp-Client/mods) and in the launcher (Mods, then **Wisp** beside Modrinth),
+[github.com/Lyvt-Dev/Wisp-Client/mods](https://github.com/Lyvt-Dev/Wisp-Client/blob/main/docs/mods.md) and in the launcher (Mods, then **Wisp** beside Modrinth),
 which checks every file before it installs it.
 
 1. Run `cargo wisp-mod check` on the file (above): the registry runs the same checks.
@@ -471,7 +471,7 @@ which checks every file before it installs it.
    its source.
 3. Publish a **GitHub release** in it with the file as an asset (`.hmod`, `.hnmod`, `.hpack`, `.hshader`, or a resource
    pack's `.zip`), and its `.minisig` beside it if you sign. The release notes are the changelog.
-4. List the project once: open [github.com/Lyvt-Dev/Wisp-Client/mods/submit](https://github.com/Lyvt-Dev/Wisp-Client/mods/submit), sign in with GitHub
+4. List the project once: open [github.com/Lyvt-Dev/Wisp-Client/mods/submit](https://github.com/Lyvt-Dev/Wisp-Client/blob/main/docs/mods.md), sign in with GitHub
    and give the repository and the page (name, summary, licence, optionally a minisign public key). It opens a pull
    request in [Lyvt-Dev/Wisp-Client-mods](https://github.com/Lyvt-Dev/Wisp-Client-mods) adding `mods/<id>.toml`, with
    you as owner. A reviewer reads the repository and its source and merges it.

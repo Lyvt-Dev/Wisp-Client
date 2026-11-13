@@ -16,8 +16,6 @@ Tab, the arrows, Enter and Space work it from the keyboard (Left and Right step 
 
 Every setting applies at once, except worker threads, the graphics API and translucent batching, which apply at the next start. A preset sets the quality settings together; changing one of them turns it into Custom. Display preferences (FOV, framerate, VSync, GUI scale, fullscreen, present mode, pacing) leave the preset as it is.
 
-![Video Settings, with Wisp's buttons at the top](media/settings-simple.png)
-![The graphics settings screen](media/settings-graphics.png)
 
 | Page | Setting | Stored in |
 | --- | --- | --- |

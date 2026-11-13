@@ -2,7 +2,7 @@
 
 Who writes Wisp, how changes are checked, and why it is safe to run. You can check every claim on this page in the repository, and anything not done yet is marked as not done.
 
-This page is also on the website: [github.com/Lyvt-Dev/Wisp-Client/docs/how-wisp-is-built](https://github.com/Lyvt-Dev/Wisp-Client/docs/how-wisp-is-built). The longer version, with what is still missing, is [Security](security.md).
+This page is also on the website: [github.com/Lyvt-Dev/Wisp-Client/docs/how-wisp-is-built](https://github.com/Lyvt-Dev/Wisp-Client/blob/main/docs/how-wisp-is-built.md). The longer version, with what is still missing, is [Security](security.md).
 
 ## Who builds it
 
@@ -24,7 +24,7 @@ Not every line is read by a person. Instead, every change is checked against the
 - **Open source.** All of the code is public on [GitHub](https://github.com/Lyvt-Dev/Wisp-Client), under the MIT licence.
 - **Built from the public code.** Releases are built by GitHub Actions, the build service of GitHub, from the public source. Linux and Windows are built on GitHub's machines, and macOS on Ludovic's Mac mini, which runs GitHub Actions jobs. Every build log is [public](https://github.com/Lyvt-Dev/Wisp-Client/actions/workflows/release.yml).
 - **Signed checksums.** Every release has a `SHA256SUMS` file, a fingerprint of each download, and `SHA256SUMS.sig`, a signature of that list made with Wisp's release key, which only release builds from main can use. The launcher and `wisp-server update` check both before they install anything, and refuse a file that does not match. The very first server install with `install.sh` checks the fingerprint but not the signature.
-- **Not yet signed by Apple or Microsoft.** The macOS app is not notarized by Apple, because it is not signed with a paid Apple developer account, so macOS asks you to confirm the first time ([Install](https://github.com/Lyvt-Dev/Wisp-Client/docs/install#download-the-launcher) shows how). The Windows programs are not code-signed either, so Windows may warn you too.
+- **Not yet signed by Apple or Microsoft.** The macOS app is not notarized by Apple, because it is not signed with a paid Apple developer account, so macOS asks you to confirm the first time ([Install](https://github.com/Lyvt-Dev/Wisp-Client/blob/main/launcher/README.md#download-the-launcher) shows how). The Windows programs are not code-signed either, so Windows may warn you too.
 - **Mods are off by default, and reviewed.** A content mod is data and runs no code. A native mod is Rust code with your rights, not sandboxed: the launcher builds it only after a warning and your OK, in a game of its own, and the registry lists one only after a maintainer has read its source. See [Mods](mods.md) and [Native mods](native-mods.md).
 - **Nothing collected unless you say yes.** Data collection is off until you turn it on, with four separate switches. The one exception is an anonymous "I'm playing" ping for the launcher's player count, which holds nothing about you. See [Opt-in data collection](telemetry.md).
 

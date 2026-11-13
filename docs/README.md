@@ -1,6 +1,6 @@
 # Wisp documentation
 
-To play, use [the launcher](../launcher/README.md); the project site is [github.com/Lyvt-Dev/Wisp-Client](https://github.com/Lyvt-Dev/Wisp-Client). These pages are for developers. What is being done now and next, the work board and how to help: [the hub](https://github.com/Lyvt-Dev/Wisp-Client/hub) ([ROADMAP.md](../ROADMAP.md), [roadmap/README.md](../roadmap/README.md) for keeping it current).
+To play, use [the launcher](../launcher/README.md); the project site is [github.com/Lyvt-Dev/Wisp-Client](https://github.com/Lyvt-Dev/Wisp-Client). These pages are for developers. What is being done now and next, the work board and how to help: [the hub](https://github.com/Lyvt-Dev/Wisp-Client/blob/main/ROADMAP.md) ([ROADMAP.md](../ROADMAP.md), [roadmap/README.md](../roadmap/README.md) for keeping it current).
 
 ## Build and run
 

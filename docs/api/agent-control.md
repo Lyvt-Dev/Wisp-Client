@@ -2,7 +2,7 @@
 
 How a program drives a running game: an AI agent through MCP, a script through `wisp-ctl`, a test through the
 control socket. Design and inventory: [agent-control.md](../agent-control.md); for players:
-[github.com/Lyvt-Dev/Wisp-Client/docs/agents](https://github.com/Lyvt-Dev/Wisp-Client/docs/agents).
+[github.com/Lyvt-Dev/Wisp-Client/docs/agents](https://github.com/Lyvt-Dev/Wisp-Client/blob/main/docs/agent-control.md).
 
 ## Overview
 

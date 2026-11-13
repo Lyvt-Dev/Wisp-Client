@@ -1,14 +1,10 @@
-> **Wisp launcher fork, 0.7.0:** Windows installer with the native Rust engine,
-> Microsoft sign-in, owned-game installation, local instances and `.amod` client modules.
-> The first module is Zoom: install it from Mods, then hold Z and scroll.
-> See [launcher setup](launcher/README.md) and [client modules](docs/amod.md).
-> The original documentation below also describes upstream engine features.
->
-> **Wisp für Windows:** [Windows-Setup bauen](packaging/windows/README.md).
-> Der Launcher-Workflow stellt das Setup als Artefakt `Wisp-Client-Windows-Installer` bereit.
+> **Wisp Client 0.14.0:** the launcher and the Rust engine in one Windows installer, with
+> Microsoft sign-in, local instances, cosmetics, emotes and the Wisp Menu (Right Shift).
+> Get it from [the releases](https://github.com/Lyvt-Dev/Wisp-Client/releases); building it
+> yourself: [Windows setup](packaging/windows/README.md).
 
 <p align="center">
-  <img src="docs/media/banner.webp" alt="The Wisp website: the game you know, rebuilt in Rust" width="100%">
+  <img src="docs/media/banner.png" alt="Wisp Client: the game you know, rebuilt in Rust" width="100%">
 </p>
 
 <p align="center">
@@ -17,21 +13,20 @@
   <img src="https://img.shields.io/badge/Rust-stable-B7410E?logo=rust&logoColor=white" alt="Rust">
   <img src="https://img.shields.io/badge/vanilla%20parity-100%25-F0795A" alt="Vanilla parity 100%">
   <a href="#project-status"><img src="https://img.shields.io/badge/player--visible%20gaps-0%20open-F0795A" alt="Player-visible gaps open"></a>
-  <img src="https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-2A2470" alt="Linux, macOS and Windows">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-3B2F7E" alt="MIT license"></a>
+  <img src="https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-333333" alt="Linux, macOS and Windows">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-555555" alt="MIT license"></a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/Lyvt-Dev/Wisp-Client"><b>Website</b></a> ·
   <a href="#download"><b>Download</b></a> ·
-  <a href="https://github.com/Lyvt-Dev/Wisp-Client/docs/"><b>Documentation</b></a> ·
+  <a href="https://github.com/Lyvt-Dev/Wisp-Client/tree/main/docs"><b>Documentation</b></a> ·
   <a href="https://github.com/Lyvt-Dev/Wisp-Client/releases"><b>Release notes</b></a> ·
   <a href="ROADMAP.md"><b>Roadmap</b></a> ·
   <a href="#project-status"><b>Project status</b></a> ·
   <a href="#contributing"><b>Contributing</b></a>
 </p>
 
-# Wisp
+# Wisp Client
 
 Minecraft: Java Edition 26.3, rewritten in Rust. Same worlds, same rules, same terrain, checked against the Java game by more than 300 differential harnesses. Free, open source and unofficial.
 
@@ -41,22 +36,25 @@ Minecraft: Java Edition 26.3, rewritten in Rust. Same worlds, same rules, same t
 
 Get **the Wisp launcher** from [github.com/Lyvt-Dev/Wisp-Client](https://github.com/Lyvt-Dev/Wisp-Client) or [the launcher releases](https://github.com/Lyvt-Dev/Wisp-Client/releases?q=launcher-v&expanded=true) (Linux x86-64, macOS on Apple Silicon, macOS on Intel from the next Nightly, Windows x64). It installs and updates the game, prepares its files from your copy of Minecraft, and updates itself.
 
-**You need** a Microsoft account that owns Java Edition ([why](docs/microsoft-account.md)) and a GPU with Vulkan or OpenGL 3.3 (Linux), Vulkan or DirectX 12 (Windows), or a Mac (Apple Silicon, or Intel from the next Nightly). An existing Minecraft install (official launcher, Prism, MultiMC...) is reused; without one, Play downloads 26.3 from Mojang for your account. Step by step: [Install and first launch](https://github.com/Lyvt-Dev/Wisp-Client/docs/install).
+**You need** a Microsoft account that owns Java Edition ([why](docs/microsoft-account.md)) and a GPU with Vulkan or OpenGL 3.3 (Linux), Vulkan or DirectX 12 (Windows), or a Mac (Apple Silicon, or Intel from the next Nightly). An existing Minecraft install (official launcher, Prism, MultiMC...) is reused; without one, Play downloads 26.3 from Mojang for your account. Step by step: [Install and first launch](https://github.com/Lyvt-Dev/Wisp-Client/blob/main/launcher/README.md).
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/media/launcher-play.webp" alt="The launcher's Home page: the selected instance ready to play, the version picker, Join a friend and the instance's tabs"></td>
-    <td width="50%"><img src="docs/media/launcher-settings.webp" alt="The launcher's Settings page: Microsoft account, offline name, updates, appearance and accent colour"></td>
+    <td colspan="2"><img src="docs/media/launcher-home.png" alt="The launcher's Home page: Install and Play, the featured server, Jump back in, shortcuts and the news"></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/media/launcher-shop.png" alt="The launcher's Store: capes, wings, hats, badges, pets, trails, auras and emotes for Wisp Coins"></td>
+    <td width="50%"><img src="docs/media/launcher-settings.png" alt="The launcher's Settings page: what Wisp does when the game starts, the start page and the Wisp server"></td>
   </tr>
 </table>
 
 ## What works today
 
 - **The game:** vanilla world generation, mobs, villagers, raids, redstone, every command, the HUD and the recipe book, on vanilla saves. Worlds from 1.8 to 26.2 are upgraded. [Status](#project-status).
-- **Extras:** new menus, graphics presets, distant terrain up to 1024 chunks, controllers, zoom, minimap and more, off by default where they change the vanilla look. [Settings](https://github.com/Lyvt-Dev/Wisp-Client/docs/settings).
+- **Extras:** new menus, graphics presets, distant terrain up to 1024 chunks, controllers, zoom, minimap and more, off by default where they change the vanilla look. [Settings](https://github.com/Lyvt-Dev/Wisp-Client/blob/main/docs/extras.md).
 - **Packs:** resource packs, and data packs with functions, predicates, item modifiers and world generation.
-- **Multiplayer:** invite friends with a code, Open to LAN, join servers (online mode included). [Multiplayer](https://github.com/Lyvt-Dev/Wisp-Client/docs/multiplayer).
-- **Mods:** content mods (blocks, items, data) and native Rust mods, built by the launcher with nothing to install. Java mod jars do not run. [Mods](https://github.com/Lyvt-Dev/Wisp-Client/docs/mods).
+- **Multiplayer:** invite friends with a code, Open to LAN, join servers (online mode included). [Multiplayer](https://github.com/Lyvt-Dev/Wisp-Client/tree/main/docs).
+- **Mods:** content mods (blocks, items, data) and native Rust mods, built by the launcher with nothing to install. Java mod jars do not run. [Mods](https://github.com/Lyvt-Dev/Wisp-Client/blob/main/docs/mods.md).
 
 In the Rust client, with vanilla assets and no mods or shaders:
 
@@ -66,7 +64,7 @@ In the Rust client, with vanilla assets and no mods or shaders:
   </tr>
   <tr>
     <td width="50%"><img src="docs/media/survival.webp" alt="Survival at dusk: a zombie walks up, with the hotbar, health, hunger and experience"></td>
-    <td width="50%"><img src="docs/media/settings.webp" alt="Vanilla's Video Settings screen with Wisp's own buttons at the top: Wisp Graphics and Advanced Graphics"></td>
+    <td width="50%"><img src="docs/media/underwater.webp" alt="Under water"></td>
   </tr>
   <tr>
     <td width="50%"><img src="docs/media/village.webp" alt="A plains village among savanna hills, with farms, villagers and an iron golem"></td>
@@ -76,11 +74,11 @@ In the Rust client, with vanilla assets and no mods or shaders:
 
 ## Host a server
 
-The launcher's **Servers** page creates, starts, backs up and updates a server, and invites friends over Tailscale. On a VPS, `wisp-server` installs with one command and needs no Java. [Host a server](https://github.com/Lyvt-Dev/Wisp-Client/docs/hosting) ([reference](docs/hosting.md)).
+The launcher's **Servers** page creates, starts, backs up and updates a server, and invites friends over Tailscale. On a VPS, `wisp-server` installs with one command and needs no Java. [Host a server](https://github.com/Lyvt-Dev/Wisp-Client/blob/main/docs/hosting.md) ([reference](docs/hosting.md)).
 
 ## Modpacks
 
-The launcher imports Modrinth and CurseForge packs and plays the mods Wisp can carry over: today, content mods made of data and assets, not Java code. [Modpacks](https://github.com/Lyvt-Dev/Wisp-Client/docs/modpacks).
+The launcher imports Modrinth and CurseForge packs and plays the mods Wisp can carry over: today, content mods made of data and assets, not Java code. [Modpacks](https://github.com/Lyvt-Dev/Wisp-Client/blob/main/docs/modpacks.md).
 
 ## Agent control
 
@@ -116,7 +114,7 @@ Prepared files land in the gitignored `.local/`: never commit or share them. Opt
 
 ## Roadmap
 
-What is in progress, what comes next and where to help: [ROADMAP.md](ROADMAP.md), or [github.com/Lyvt-Dev/Wisp-Client/hub](https://github.com/Lyvt-Dev/Wisp-Client/hub) with the work board and what shipped.
+What is in progress, what comes next and where to help: [ROADMAP.md](ROADMAP.md), or [github.com/Lyvt-Dev/Wisp-Client/hub](https://github.com/Lyvt-Dev/Wisp-Client/blob/main/ROADMAP.md) with the work board and what shipped.
 
 ## Contributing
 

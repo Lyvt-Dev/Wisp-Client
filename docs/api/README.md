@@ -53,6 +53,6 @@ Every page has the same parts: **Overview** (what you can build), **Guide** (whe
 **Examples**, **Stability** (the level of each part, per [stability.md](stability.md)), **Changelog** and
 **Not there yet** (what is planned, so nobody builds on a guess).
 
-The website shows these pages at [github.com/Lyvt-Dev/Wisp-Client/docs/api](https://github.com/Lyvt-Dev/Wisp-Client/docs/api), built from this
-folder, and a summary for players and authors at [github.com/Lyvt-Dev/Wisp-Client/docs/apis](https://github.com/Lyvt-Dev/Wisp-Client/docs/apis)
+The website shows these pages at [github.com/Lyvt-Dev/Wisp-Client/docs/api](https://github.com/Lyvt-Dev/Wisp-Client/tree/main/docs/api), built from this
+folder, and a summary for players and authors at [github.com/Lyvt-Dev/Wisp-Client/docs/apis](https://github.com/Lyvt-Dev/Wisp-Client/tree/main/docs/api)
 (in the website's repository, Lyvt-Dev/Wisp-Client).

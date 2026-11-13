@@ -35,7 +35,7 @@ SITE_DATA = ROOT / "roadmap" / "roadmap.json"
 JOURNAL = ROOT / "roadmap" / "journal"
 WEEK = re.compile(r"(\d{4})-(\d{2})\.md$")
 REPO = "Lyvt-Dev/Wisp-Client"
-SITE = "https://github.com/Lyvt-Dev/Wisp-Client/hub"
+SITE = "https://github.com/Lyvt-Dev/Wisp-Client/blob/main/ROADMAP.md"
 
 STATUSES = {
     "now": "Now",
