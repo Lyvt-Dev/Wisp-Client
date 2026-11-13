@@ -208,6 +208,8 @@ enum Event {
     FriendHead(String, Option<Vec<[u8; 4]>>),
     /// A newer launcher's installer, downloaded and checked, and its version.
     UpdateReady(PathBuf, String),
+    /// A running game's session renewed (`session_renewal`), or why not.
+    SessionRenewed(Result<auth::SignedIn, String>),
     /// An update downloading: its version and the share done (`None` while the size is unknown).
     UpdateProgress(String, Option<f32>),
     /// An update that couldn't be downloaded: its version and why.
@@ -273,6 +275,9 @@ struct Launcher {
     setup_busy: bool,
     /// A downloaded update, installed once nothing runs.
     update: Option<(PathBuf, String)>,
+    /// A running game's session is being renewed; and ticks until the next look for its request.
+    renewing: bool,
+    renew_ticks: u8,
     /// The update window, once an update was found (`update_view`).
     update_window: Option<gpui::Entity<update_view::UpdateWindow>>,
     /// Ticks (200 ms) until the launcher quits for the installer.
@@ -415,6 +420,22 @@ impl Launcher {
                     }
                     changed = true;
                 }
+                this.renew_ticks = (this.renew_ticks + 1) % 10;
+                if this.renew_ticks == 0 && this.child.is_some() && !this.renewing {
+                    let dir = wisp_launcher::session_renewal::dir(&this.home);
+                    if wisp_launcher::session_renewal::requested(&dir) {
+                        this.renewing = true;
+                        let (home, cached, events) =
+                            (this.home.clone(), this.account.clone(), this.sender.clone());
+                        std::thread::spawn(move || {
+                            let renewed = auth::for_game(&home, cached, &|_| {}).and_then(|account| {
+                                wisp_launcher::session_renewal::answer(&dir, &account.credentials())
+                                    .map(|()| account)
+                            });
+                            let _ = events.send(Event::SessionRenewed(renewed));
+                        });
+                    }
+                }
                 if let Some(ticks) = this.quit_in.as_mut() {
                     if *ticks == 0 {
                         cx.quit();
@@ -511,6 +532,8 @@ impl Launcher {
             launching: false,
             setup_busy: false,
             update: None,
+            renewing: false,
+            renew_ticks: 0,
             update_window: None,
             quit_in: None,
             install_after_sign_in: false,
@@ -591,6 +614,24 @@ impl Launcher {
                 self.status = tr("Finish sign-in at microsoft.com/link.");
             }
             Event::Status(status) => self.status = status,
+            Event::SessionRenewed(result) => {
+                self.renewing = false;
+                match result {
+                    Ok(account) => {
+                        self.account = Some(account);
+                        self.status = tr("Minecraft session renewed. Keep playing.");
+                    }
+                    Err(error) => {
+                        // Take the request away: the game asks again, not every two seconds.
+                        let dir = wisp_launcher::session_renewal::dir(&self.home);
+                        let _ = std::fs::remove_file(dir.join("request"));
+                        self.status = trf(
+                            "The Minecraft session couldn't be renewed: {error}",
+                            &[("error", &error)],
+                        );
+                    }
+                }
+            }
             Event::UpdateProgress(version, share) => {
                 self.show_update(&version, update_view::Phase::Downloading(share), cx);
             }

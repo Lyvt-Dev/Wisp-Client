@@ -5,7 +5,7 @@
 //! process's memory: it is never logged, printed or written anywhere.
 use std::{
     path::Path,
-    sync::{Arc, Mutex, OnceLock},
+    sync::{Arc, Mutex},
     time::{Duration, SystemTime},
 };
 
@@ -105,6 +105,11 @@ impl AuthSession {
     /// service would refuse it. A token that doesn't read as a JWT counts as good: the server
     /// says.
     pub fn expired(&self) -> bool {
+        self.expires_within(60)
+    }
+    /// The access token's expiry (its JWT `exp`) is at most `seconds` away. False for a token
+    /// that doesn't read as a JWT.
+    pub fn expires_within(&self, seconds: u64) -> bool {
         let exp = self
             .access_token
             .split('.')
@@ -115,18 +120,105 @@ impl AuthSession {
         let now = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .map_or(0, |d| d.as_secs());
-        exp.is_some_and(|exp| exp <= now + 60)
+        exp.is_some_and(|exp| exp <= now + seconds)
     }
 }
 
-static CURRENT: OnceLock<Arc<AuthSession>> = OnceLock::new();
+static CURRENT: Mutex<Option<Arc<AuthSession>>> = Mutex::new(None);
 
-/// The account this game was started with (set once at start).
+/// The account this game was started with. The launcher renews its session while the game runs
+/// ([`renewal`]), so a long session needs no restart.
 pub fn set_current(session: AuthSession) {
-    let _ = CURRENT.set(Arc::new(session));
+    let first = CURRENT.lock().unwrap().replace(Arc::new(session)).is_none();
+    if first {
+        renewal::start();
+    }
 }
 pub fn current() -> Option<Arc<AuthSession>> {
-    CURRENT.get().cloned()
+    CURRENT.lock().unwrap().clone()
+}
+
+/// Session renewal without a restart. The Minecraft session lasts a day; the launcher holds the
+/// sign-in that renews it. In the folder the launcher names (`WISP_SESSION_RENEW`) the game leaves
+/// a `request` file when its session has under half an hour left, or a server refused it; the
+/// launcher answers with a fresh `session.json` (read once and deleted, like the session file at
+/// start), which replaces the session in memory.
+pub mod renewal {
+    use super::{AuthSession, CURRENT};
+    use std::path::{Path, PathBuf};
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    /// The request the game leaves and the session the launcher answers with.
+    pub const REQUEST: &str = "request";
+    pub const SESSION: &str = "session.json";
+    /// Ask this long before the session ends.
+    const AHEAD: u64 = 30 * 60;
+
+    /// Ask again this long after a request that brought no session.
+    const AGAIN: std::time::Duration = std::time::Duration::from_secs(120);
+
+    static FORCED: AtomicBool = AtomicBool::new(false);
+    static ASKED: std::sync::Mutex<Option<std::time::Instant>> = std::sync::Mutex::new(None);
+
+    /// Asks for a fresh session now: a server refused this one.
+    pub fn request() {
+        FORCED.store(true, Ordering::Relaxed);
+    }
+
+    /// Watches for the session's end and the launcher's answers, for the rest of the run.
+    pub(super) fn start() {
+        let Some(dir) = wisp_compat::var_os("WISP_SESSION_RENEW")
+            .filter(|p| !p.is_empty())
+            .map(PathBuf::from)
+        else {
+            return;
+        };
+        let _ = std::thread::Builder::new()
+            .name("session-renewal".into())
+            .spawn(move || {
+                loop {
+                    std::thread::sleep(std::time::Duration::from_secs(3));
+                    step(&dir);
+                }
+            });
+    }
+
+    /// One look: takes a waiting answer, else asks when it is time.
+    pub fn step(dir: &Path) {
+        let answer = dir.join(SESSION);
+        if answer.exists() {
+            match AuthSession::load(&answer) {
+                Ok(fresh) => {
+                    let mut current = CURRENT.lock().unwrap();
+                    // Only the same account: the game's worlds and servers know this player.
+                    if current.as_ref().is_none_or(|c| c.uuid == fresh.uuid) {
+                        *current = Some(Arc::new(fresh));
+                        FORCED.store(false, Ordering::Relaxed);
+                        *ASKED.lock().unwrap() = None;
+                        log::info!("Wisp: the Minecraft session was renewed");
+                    } else {
+                        log::warn!("Wisp: a renewed session for another account was ignored");
+                    }
+                }
+                Err(error) => log::warn!("Wisp: the renewed session: {error}"),
+            }
+            return;
+        }
+        let due = FORCED.load(Ordering::Relaxed)
+            || CURRENT
+                .lock()
+                .unwrap()
+                .as_ref()
+                .is_some_and(|c| c.expires_within(AHEAD));
+        let request = dir.join(REQUEST);
+        let mut asked = ASKED.lock().unwrap();
+        if due && !request.exists() && asked.is_none_or(|at| at.elapsed() >= AGAIN) {
+            let _ = std::fs::create_dir_all(dir);
+            let _ = std::fs::write(&request, b"");
+            *asked = Some(std::time::Instant::now());
+        }
+    }
 }
 
 /// Why joining a server through the session service failed, like the
@@ -309,10 +401,13 @@ fn join_server_once(session: &AuthSession, server_hash: &str) -> Result<(), Join
             if status >= 500 {
                 log::warn!("The session service's join answered {status}");
             }
-            Err(JoinError::from_response(
-                status,
-                &response.into_string().unwrap_or_default(),
-            ))
+            let error =
+                JoinError::from_response(status, &response.into_string().unwrap_or_default());
+            if error == JoinError::InvalidSession {
+                // The launcher renews the session: joining again in a moment works.
+                renewal::request();
+            }
+            Err(error)
         }
         Err(ureq::Error::Transport(e)) => {
             log::warn!("The session service's join: {e}");
@@ -938,5 +1033,87 @@ mod tests {
             Some("https://s/join")
         );
         assert_eq!(endpoint(&doc, "session", "verify"), None);
+    }
+}
+
+#[cfg(test)]
+mod renewal_tests {
+    use super::*;
+
+    /// A token whose JWT payload says it ends at `exp`.
+    fn token(exp: u64) -> String {
+        const T: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+        let payload = format!("{{\"exp\":{exp}}}");
+        let mut out = String::new();
+        for c in payload.as_bytes().chunks(3) {
+            let n = (u32::from(c[0]) << 16)
+                | (u32::from(*c.get(1).unwrap_or(&0)) << 8)
+                | u32::from(*c.get(2).unwrap_or(&0));
+            for i in 0..=c.len() {
+                out.push(T[(n >> (18 - 6 * i) & 63) as usize] as char);
+            }
+        }
+        format!("h.{out}.s")
+    }
+
+    /// The game asks before its session ends and takes the launcher's answer, once, and only
+    /// for the same account.
+    #[test]
+    fn a_session_near_its_end_is_asked_for_and_replaced() {
+        let dir = std::env::temp_dir().join(format!("wisp-renew-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let now = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let uuid = 0x069a79f444e94726a5befca90e38aaf5;
+        let set = |exp| {
+            *CURRENT.lock().unwrap() = Some(Arc::new(AuthSession::new("Notch", uuid, &token(exp))));
+        };
+        let answer = |json: String| {
+            let path = dir.join(renewal::SESSION);
+            std::fs::write(&path, json).unwrap();
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+            }
+        };
+        set(now + 86_000);
+        assert!(!current().unwrap().expires_within(3600));
+        renewal::step(&dir);
+        assert!(
+            !dir.join(renewal::REQUEST).exists(),
+            "a day left: nothing to ask"
+        );
+        set(now + 600);
+        renewal::step(&dir);
+        assert!(
+            dir.join(renewal::REQUEST).exists(),
+            "ten minutes left: asked"
+        );
+        answer(format!(
+            r#"{{"name":"Notch","uuid":"069a79f444e94726a5befca90e38aaf5","access_token":"{}","user_type":"msa"}}"#,
+            token(now + 86_400)
+        ));
+        renewal::step(&dir);
+        assert!(
+            !dir.join(renewal::SESSION).exists(),
+            "read once, then deleted"
+        );
+        assert!(
+            !current().unwrap().expires_within(3600),
+            "the fresh session plays"
+        );
+        // Another account's session is not taken.
+        answer(
+            r#"{"name":"Other","uuid":"00000000000000000000000000000001","access_token":"x","user_type":"msa"}"#
+                .to_owned(),
+        );
+        renewal::step(&dir);
+        assert_eq!(current().unwrap().name, "Notch");
+        *CURRENT.lock().unwrap() = None;
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

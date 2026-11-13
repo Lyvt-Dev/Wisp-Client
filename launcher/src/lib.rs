@@ -16,6 +16,33 @@ pub mod shop;
 mod sources;
 pub mod updater;
 
+/// Renewing a running game's Minecraft session, so a long session needs no restart. The game
+/// leaves a `request` file in this folder when its session is about to end (or a server refused
+/// it); the launcher renews the sign-in and answers with `session.json`, which the game reads
+/// once and deletes (`wisp_client::auth::renewal`).
+pub mod session_renewal {
+    use std::path::{Path, PathBuf};
+
+    pub fn dir(home: &Path) -> PathBuf {
+        home.join("session-renewal")
+    }
+    /// Empties the folder for a new game: no old request, no old answer.
+    pub fn clear(dir: &Path) {
+        let _ = std::fs::remove_dir_all(dir);
+        let _ = std::fs::create_dir_all(dir);
+    }
+    /// Whether the game asks for a session and has no answer waiting.
+    pub fn requested(dir: &Path) -> bool {
+        dir.join("request").exists() && !dir.join("session.json").exists()
+    }
+    /// Hands `credentials` to the game and takes the request away.
+    pub fn answer(dir: &Path, credentials: &crate::auth::GameCredentials) -> Result<(), String> {
+        credentials.write_session_file(&dir.join("session.json"))?;
+        let _ = std::fs::remove_file(dir.join("request"));
+        Ok(())
+    }
+}
+
 use serde::{Deserialize, Serialize};
 use std::fs::{self, File};
 use std::io::Write;
@@ -241,6 +268,12 @@ impl Profile {
         let log = File::create(logs.join("local-launcher.log"))?;
         command.stdout(log.try_clone()?).stderr(log);
         if credentials.is_some() {
+            // Where the game asks for a fresh session while it runs (`session_renewal`).
+            if let Ok(home) = launcher_home() {
+                let dir = session_renewal::dir(&home);
+                session_renewal::clear(&dir);
+                command.env("WISP_SESSION_RENEW", &dir);
+            }
             command.arg("--session-stdin").stdin(Stdio::piped());
         } else {
             command.stdin(Stdio::null());

@@ -685,6 +685,22 @@ impl GameCredentials {
         }
     }
 
+    /// Answers a running game's request for a fresh session (`session_renewal`): the session as
+    /// a file only this user can read, which the game reads once and deletes.
+    pub fn write_session_file(&self, path: &std::path::Path) -> Result<(), String> {
+        let part = path.with_extension("part");
+        let mut options = std::fs::OpenOptions::new();
+        options.write(true).create(true).truncate(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(0o600);
+        }
+        let file = options.open(&part).map_err(|e| e.to_string())?;
+        self.write_to(file)?;
+        std::fs::rename(&part, path).map_err(|e| e.to_string())
+    }
+
     pub(crate) fn write_to(&self, output: impl std::io::Write) -> Result<(), String> {
         serde_json::to_writer(
             output,
