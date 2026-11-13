@@ -86,11 +86,16 @@ impl Game<'_> {
         let m = self.player_model.as_ref()?;
         Some((m, self.own_profile_name()))
     }
-    /// The local player's name as the server's player list shows it (`PlayerInfo.tabListDisplayName`:
-    /// rank and all), when the server set one.
-    fn own_list_name(&self) -> Option<Text> {
+    /// A player's name as the server's player list shows it (`PlayerInfo.tabListDisplayName`:
+    /// rank and all), when the server set one: the local player's (`own`) or entity `id`'s.
+    fn list_name(&self, id: u32, own: bool) -> Option<Text> {
         let r = self.remote.as_ref()?;
-        let listed = r.tab_players.get(&r.profile)?.display_name.as_ref()?;
+        let uuid = if own {
+            r.profile
+        } else {
+            *r.level_players.get(&(id as i32))?
+        };
+        let listed = r.tab_players.get(&uuid)?.display_name.as_ref()?;
         let text = sb::comp_text(listed).resolve_legacy();
         (!text.plain().trim().is_empty()).then_some(text)
     }
@@ -245,11 +250,15 @@ impl Game<'_> {
                 None => member,
             }
             .resolve_legacy();
-            // Wisp's own name tag: a server that keeps ranks out of the teams (they carry
-            // only the sorting) shows them in the player list, so the own tag takes that name.
-            let shown = match self.own_list_name() {
-                Some(listed) if Some(m.id) == own && shown.plain() == name => listed,
-                _ => shown,
+            // A server that keeps ranks out of the teams (they carry only the sorting) shows
+            // them in the player list: a player's tag the team adds nothing to takes that name,
+            // when it still names the player.
+            let shown = if player && shown.plain() == name {
+                self.list_name(m.id, Some(m.id) == own)
+                    .filter(|listed| listed.plain().contains(&name))
+                    .unwrap_or(shown)
+            } else {
+                shown
             };
             let shown = text
                 .map(|text| Text::literal(text).resolve_legacy())
