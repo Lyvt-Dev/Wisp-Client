@@ -1005,7 +1005,12 @@ pub fn tag_json(tag: &Tag) -> Value {
         }
         Tag::ByteArray(a) => Value::Array(a.iter().map(|b| Value::from(*b as i8)).collect()),
         Tag::String(s) => Value::String(s.to_string_lossy()),
-        Tag::List(l) => Value::Array(l.iter().map(tag_json).collect()),
+        // A mixed list's `{"": element}` wrappers (`NbtOps`), as a name's or lore's `extra` has them.
+        Tag::List(l) => Value::Array(
+            l.iter()
+                .map(|e| tag_json(crate::scoreboard::unwrap_list_element(e)))
+                .collect(),
+        ),
         Tag::Compound(c) => Value::Object(
             c.iter()
                 .map(|(k, v)| (k.to_string_lossy(), tag_json(v)))

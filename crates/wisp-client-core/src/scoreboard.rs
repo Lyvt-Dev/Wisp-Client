@@ -60,7 +60,11 @@ pub fn tag_to_json(t: &Tag) -> Value {
         Tag::Float(v) => Value::from(f64::from(f32::from_bits(*v))),
         Tag::Double(v) => Value::from(f64::from_bits(*v)),
         Tag::String(s) => Value::String(s.to_string_lossy()),
-        Tag::List(l) => Value::Array(l.iter().map(tag_to_json).collect()),
+        Tag::List(l) => Value::Array(
+            l.iter()
+                .map(|e| tag_to_json(unwrap_list_element(e)))
+                .collect(),
+        ),
         Tag::Compound(c) => Value::Object(
             c.iter()
                 .map(|(k, v)| (k.to_string_lossy(), tag_to_json(v)))
@@ -70,6 +74,21 @@ pub fn tag_to_json(t: &Tag) -> Value {
         Tag::IntArray(b) => Value::Array(b.iter().map(|v| Value::from(*v)).collect()),
         Tag::LongArray(b) => Value::Array(b.iter().map(|v| Value::from(*v)).collect()),
     }
+}
+/// `NbtOps`' reading of a list element: a list mixing kinds (a component's `extra` with plain
+/// strings beside styled parts, as servers send rank prefixes) wraps each element that isn't a
+/// compound, and each compound, as `{"": element}`. Without unwrapping, those parts decode as empty
+/// text and a team prefix like `[Owner] ` loses its plain pieces or vanishes.
+pub fn unwrap_list_element(t: &Tag) -> &Tag {
+    if let Tag::Compound(c) = t {
+        let mut entries = c.iter();
+        if let (Some((key, value)), None) = (entries.next(), entries.next())
+            && key.to_string_lossy().is_empty()
+        {
+            return value;
+        }
+    }
+    t
 }
 fn string_of(t: Option<&Tag>) -> Option<String> {
     match t {
@@ -1407,6 +1426,38 @@ fn finish(node: &mut serde_json::Map<String, Value>, extra: Vec<Comp>) -> Comp {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A rank prefix as a server sends it over the network: `extra` mixes a plain string with
+    /// styled parts, so every element is wrapped as `{"": element}`. The name tag must show the
+    /// whole rank (zedix.de's TAB ranks showed nothing).
+    #[test]
+    fn a_team_prefix_with_a_mixed_extra_list_keeps_every_part() {
+        let s = |v: &str| Tag::String(v.into());
+        let prefix = Tag::compound([
+            ("text", s("")),
+            (
+                "extra",
+                Tag::List(vec![
+                    Tag::compound([("", s("["))]),
+                    Tag::compound([(
+                        "",
+                        Tag::compound([("text", s("Owner")), ("color", s("red"))]),
+                    )]),
+                    Tag::compound([("", s("] "))]),
+                ]),
+            ),
+        ]);
+        let mut board = Scoreboard::default();
+        board.add_team("rank_1");
+        board.team_mut("rank_1").unwrap().prefix = tag_to_json(&prefix);
+        board.add_to_team("Lyvt", "rank_1");
+        let team = board.players_team("Lyvt").unwrap();
+        let shown = team.formatted_name(Text::literal("Lyvt"));
+        assert_eq!(shown.plain(), "[Owner] Lyvt");
+        // A compound with other keys besides "" is left alone.
+        let kept = Tag::compound([("", s("a")), ("text", s("b"))]);
+        assert_eq!(unwrap_list_element(&kept), &kept);
+    }
 
     fn board() -> Scoreboard {
         let mut sb = Scoreboard::default();

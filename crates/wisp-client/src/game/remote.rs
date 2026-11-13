@@ -5019,9 +5019,16 @@ impl Game<'_> {
         use wisp_client::scoreboard::{CollisionRule, Visibility, tag_to_json};
         // The team packets of a join, for the nametag and tab list investigation (capped).
         static LOGGED: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
-        if LOGGED.fetch_add(1, std::sync::atomic::Ordering::Relaxed) < 300 {
+        if LOGGED.fetch_add(1, std::sync::atomic::Ordering::Relaxed) < 1000 {
+            let affix = p.parameters.as_ref().map_or_else(String::new, |t| {
+                format!(
+                    " prefix {} suffix {}",
+                    tag_to_json(&t.prefix),
+                    tag_to_json(&t.suffix)
+                )
+            });
             log::info!(
-                "Wisp: team {} method {}: {}",
+                "Wisp: team {} method {}:{affix} {}",
                 p.name,
                 p.method,
                 p.players.join(", ")

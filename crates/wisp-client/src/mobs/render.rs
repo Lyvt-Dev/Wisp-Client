@@ -1663,7 +1663,7 @@ pub fn cape_bend(u: f32, flap: f32, lean: f32, phase: f32) -> f32 {
 /// from the shoulders, so the cape bends instead of turning as one board. A constant `bend` is
 /// the board turned that much further.
 pub fn wavy_cape(model: &Part, bend: impl Fn(f32) -> f32) -> Part {
-    fn find<'a>(part: &'a mut Part) -> Option<&'a mut Part> {
+    fn find(part: &mut Part) -> Option<&mut Part> {
         if part.name == "cape" {
             return Some(part);
         }
