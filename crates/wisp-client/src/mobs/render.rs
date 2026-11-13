@@ -1607,17 +1607,7 @@ pub fn cape(
     let s = anim::state(m, alpha);
     let mut poses = Poses::new(model);
     anim::setup(m, &s, &mut poses, &data.animations);
-    let a = f64::from(alpha);
-    let at = [
-        m.previous.x + (m.position.x - m.previous.x) * a,
-        m.previous.y + (m.position.y - m.previous.y) * a,
-        m.previous.z + (m.position.z - m.previous.z) * a,
-    ];
-    let body = m.previous_body_yaw + wrap(m.body_yaw - m.previous_body_yaw) * alpha;
-    // LivingEntityRenderState.fallFlyingScale.
-    let ticks = m.extra.fall_fly_ticks as f32 + alpha;
-    let gliding = (ticks * ticks / 100.0).clamp(0.0, 1.0);
-    let [flap, lean, lean2] = m.extra.avatar.cape(alpha, at, body, gliding);
+    let [flap, lean, lean2] = cape_motion(m, alpha);
     let pose = poses.get("cape");
     let by = glam::Quat::from_rotation_y(-PI)
         * glam::Quat::from_rotation_x((6.0 + lean / 2.0 + flap).to_radians())
@@ -1634,6 +1624,39 @@ pub fn cape(
     }
     // RenderTypes.entitySolid with OverlayTexture.NO_OVERLAY.
     draw(model, base, &poses, uv, 0xFFFF_FFFF, light, 0, out);
+}
+
+/// `AvatarRenderer.extractCapeState` for `m`: the cape's flap, lean and sideways lean (degrees).
+pub fn cape_motion(m: &Mob, alpha: f32) -> [f32; 3] {
+    let a = f64::from(alpha);
+    let at = [
+        m.previous.x + (m.position.x - m.previous.x) * a,
+        m.previous.y + (m.position.y - m.previous.y) * a,
+        m.previous.z + (m.position.z - m.previous.z) * a,
+    ];
+    let body = m.previous_body_yaw + wrap(m.body_yaw - m.previous_body_yaw) * alpha;
+    // LivingEntityRenderState.fallFlyingScale.
+    let ticks = m.extra.fall_fly_ticks as f32 + alpha;
+    let gliding = (ticks * ticks / 100.0).clamp(0.0, 1.0);
+    m.extra.avatar.cape(alpha, at, body, gliding)
+}
+
+/// Wavy Capes on a cape nothing else moves (a Shop cape hangs at its own rest angle): `model`
+/// bent by [`cape_bend`] plus the lift vanilla would give the whole board, so it flies out
+/// behind a running player and waves like the Mojang cape. `None` for a model without a `cape`
+/// part (wings).
+pub fn wavy_worn_cape(model: &Part, m: &Mob, alpha: f32) -> Option<Part> {
+    fn has_cape(part: &Part) -> bool {
+        part.name == "cape" || part.children.iter().any(has_cape)
+    }
+    if !has_cape(model) {
+        return None;
+    }
+    let [flap, lean, _] = cape_motion(m, alpha);
+    let phase = m.extra.avatar.cape_phase(alpha);
+    Some(wavy_cape(model, |u| {
+        cape_bend(u, flap, lean, phase) + lean / 2.0 + flap
+    }))
 }
 
 /// Wavy Capes: the strips the cape is cut into along its height.

@@ -876,6 +876,23 @@ impl Game<'_> {
                 };
                 poses.reset(model);
                 item.animate(ticks, |name, pose| *poses.get(name) = pose);
+                // Wavy Capes: a cape on the back is bent anew each frame, so it is drawn here
+                // and not through the GPU path's cached model.
+                let wavy = (item.slot == Slot::Back && self.settings.extras.module("wavy_capes"))
+                    .then(|| render::wavy_worn_cape(model, m, alpha))
+                    .flatten();
+                if let Some(bent) = &wavy {
+                    wisp_client::mobs::render_model(
+                        bent,
+                        bone,
+                        &|p: &Part| poses.pose(p),
+                        uv,
+                        light,
+                        0,
+                        out,
+                    );
+                    continue;
+                }
                 if gpu {
                     let mut models = self.skin_models.borrow_mut();
                     let mut frame = self.skin_frame.borrow_mut();

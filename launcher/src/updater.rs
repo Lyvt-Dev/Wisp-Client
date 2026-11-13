@@ -1,6 +1,6 @@
 //! Automatic updates: the launcher looks for a newer `launcher-v<version>` release of Wisp Client
 //! on GitHub, downloads its Windows installer beside the launcher's data, checks it against the
-//! release's `.sha256`, and runs it silently once no game is running. The installer closes the
+//! release's `.sha256`, and runs it (only its progress window shows) once no game is running. The installer closes the
 //! launcher, installs over it and starts the new one.
 //!
 //! Off with Settings' "Update automatically" (`Prefs::auto_update`) or `WISP_LAUNCHER_NO_SELF_UPDATE`
@@ -100,8 +100,13 @@ pub fn expected_digest(sidecar: &str, name: &str) -> Option<String> {
 }
 
 /// Downloads `update`'s installer into `dir` (kept there once checked) and returns its path; one
-/// already downloaded and checked is reused.
-pub fn download(update: &Update, dir: &Path) -> Result<PathBuf, String> {
+/// already downloaded and checked is reused. `progress` hears the bytes received so far and the
+/// installer's size when the server tells it.
+pub fn download(
+    update: &Update,
+    dir: &Path,
+    progress: &mut dyn FnMut(u64, Option<u64>),
+) -> Result<PathBuf, String> {
     std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
     let sidecar = agent()
         .get(&update.checksum_url)
@@ -117,15 +122,19 @@ pub fn download(update: &Update, dir: &Path) -> Result<PathBuf, String> {
             return Ok(path);
         }
     }
-    let mut body = Vec::new();
-    agent()
+    let response = agent()
         .get(&update.installer_url)
         .call()
-        .map_err(|e| e.to_string())?
-        .into_reader()
-        .take(MAX_INSTALLER + 1)
-        .read_to_end(&mut body)
         .map_err(|e| e.to_string())?;
+    let total = response
+        .header("Content-Length")
+        .and_then(|v| v.trim().parse::<u64>().ok());
+    let body = read_counting(
+        response.into_reader().take(MAX_INSTALLER + 1),
+        total,
+        progress,
+    )
+    .map_err(|e| e.to_string())?;
     if body.len() as u64 > MAX_INSTALLER {
         return Err("The update is larger than expected.".into());
     }
@@ -144,6 +153,33 @@ pub fn download(update: &Update, dir: &Path) -> Result<PathBuf, String> {
         }
     }
     Ok(path)
+}
+
+/// Reads `reader` to its end, telling `progress` the bytes read so far after each chunk.
+fn read_counting(
+    mut reader: impl Read,
+    total: Option<u64>,
+    progress: &mut dyn FnMut(u64, Option<u64>),
+) -> std::io::Result<Vec<u8>> {
+    let mut body = Vec::with_capacity(total.unwrap_or(0).min(MAX_INSTALLER) as usize);
+    let mut chunk = vec![0; 64 << 10];
+    progress(0, total);
+    loop {
+        let n = reader.read(&mut chunk)?;
+        if n == 0 {
+            return Ok(body);
+        }
+        body.extend_from_slice(&chunk[..n]);
+        progress(body.len() as u64, total);
+    }
+}
+
+/// The share of the download done, 0 to 1 (0 while the size is unknown).
+pub fn fraction(done: u64, total: Option<u64>) -> f32 {
+    match total {
+        Some(total) if total > 0 => (done as f64 / total as f64).clamp(0.0, 1.0) as f32,
+        _ => 0.0,
+    }
 }
 
 fn hex(bytes: &[u8]) -> String {
@@ -171,8 +207,10 @@ pub fn install(path: &Path) -> Result<(), String> {
         return Err("Automatic updates install on Windows only.".into());
     }
     std::process::Command::new(path)
+        // `/SILENT` skips the wizard's pages but shows its progress window, so the player sees
+        // the update install.
         .args([
-            "/VERYSILENT",
+            "/SILENT",
             "/SUPPRESSMSGBOXES",
             "/NORESTART",
             "/CLOSEAPPLICATIONS",
@@ -186,6 +224,21 @@ pub fn install(path: &Path) -> Result<(), String> {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn a_download_reports_its_progress_up_to_the_whole_size() {
+        let data = vec![7u8; 200_000];
+        let mut heard = Vec::new();
+        let body = read_counting(&data[..], Some(200_000), &mut |done, total| {
+            heard.push(fraction(done, total))
+        })
+        .unwrap();
+        assert_eq!(body, data);
+        assert_eq!(heard.first(), Some(&0.0));
+        assert_eq!(heard.last(), Some(&1.0));
+        assert!(heard.windows(2).all(|w| w[0] <= w[1]));
+        assert_eq!(fraction(5, None), 0.0);
+    }
 
     fn release(tag: &str, draft: bool, prerelease: bool, with_files: bool) -> Value {
         let version = tag.trim_start_matches("launcher-v");

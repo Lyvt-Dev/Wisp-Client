@@ -33,6 +33,7 @@ mod settings_view;
 mod shaders_view;
 mod shop_view;
 mod theme;
+mod update_view;
 mod versions_view;
 mod views;
 use catalog_views::CatalogUi;
@@ -207,6 +208,10 @@ enum Event {
     FriendHead(String, Option<Vec<[u8; 4]>>),
     /// A newer launcher's installer, downloaded and checked, and its version.
     UpdateReady(PathBuf, String),
+    /// An update downloading: its version and the share done (`None` while the size is unknown).
+    UpdateProgress(String, Option<f32>),
+    /// An update that couldn't be downloaded: its version and why.
+    UpdateFailed(String, String),
 }
 
 struct Launcher {
@@ -268,6 +273,10 @@ struct Launcher {
     setup_busy: bool,
     /// A downloaded update, installed once nothing runs.
     update: Option<(PathBuf, String)>,
+    /// The update window, once an update was found (`update_view`).
+    update_window: Option<gpui::Entity<update_view::UpdateWindow>>,
+    /// Ticks (200 ms) until the launcher quits for the installer.
+    quit_in: Option<u8>,
     install_after_sign_in: bool,
     account: Option<auth::SignedIn>,
     /// Every account kept, to switch between (the one that plays among them).
@@ -343,16 +352,26 @@ impl Launcher {
             let (events, dir) = (sender.clone(), wisp_launcher::updater::updates_dir(&home));
             std::thread::spawn(move || {
                 use wisp_launcher::updater;
-                match updater::check().and_then(|u| {
-                    u.map(|u| updater::download(&u, &dir).map(|p| (p, u.version)))
-                        .transpose()
-                }) {
-                    Ok(Some((path, version))) => {
-                        let _ = events.send(Event::UpdateReady(path, version.to_string()));
+                let update = match updater::check() {
+                    Ok(Some(update)) => update,
+                    Ok(None) => return,
+                    Err(error) => return eprintln!("update check failed: {error}"),
+                };
+                let version = update.version.to_string();
+                // The update window hears every whole percent (`update_view`).
+                let mut shown = None;
+                let mut progress = |done: u64, total: Option<u64>| {
+                    let share = total.map(|_| updater::fraction(done, total));
+                    let percent = share.map(|f| (f * 100.0) as u32);
+                    if shown != Some(percent) {
+                        shown = Some(percent);
+                        let _ = events.send(Event::UpdateProgress(version.clone(), share));
                     }
-                    Ok(None) => {}
-                    Err(error) => eprintln!("update check failed: {error}"),
-                }
+                };
+                let _ = match updater::download(&update, &dir, &mut progress) {
+                    Ok(path) => events.send(Event::UpdateReady(path, version)),
+                    Err(error) => events.send(Event::UpdateFailed(version, error)),
+                };
             });
         }
         cx.spawn(async move |this, cx| loop {
@@ -382,11 +401,25 @@ impl Launcher {
                     match wisp_launcher::updater::install(&path) {
                         Ok(()) => {
                             this.status = trf("Updating to Wisp Client {version}…", &[("version", &version)]);
-                            cx.quit();
+                            this.show_update(&version, update_view::Phase::Installing, cx);
+                            // A moment for the update window to say so, as the installer's own
+                            // progress window opens.
+                            this.quit_in = Some(8);
                         }
-                        Err(error) => this.status = trf("The update couldn't start: {error}", &[("error", &error)]),
+                        Err(error) => {
+                            this.status = trf("The update couldn't start: {error}", &[("error", &error)]);
+                            if let Some(w) = &this.update_window {
+                                w.update(cx, |w, cx| w.fail(error, cx));
+                            }
+                        }
                     }
                     changed = true;
+                }
+                if let Some(ticks) = this.quit_in.as_mut() {
+                    if *ticks == 0 {
+                        cx.quit();
+                    }
+                    *ticks = ticks.saturating_sub(1);
                 }
                 if this.page == Page::Shop {
                     this.shop.slide_ticks += 1;
@@ -478,6 +511,8 @@ impl Launcher {
             launching: false,
             setup_busy: false,
             update: None,
+            update_window: None,
+            quit_in: None,
             install_after_sign_in: false,
             account: None,
             accounts,
@@ -491,6 +526,37 @@ impl Launcher {
         };
         launcher.write_cosmetic_prefs();
         launcher
+    }
+
+    /// Opens the update window (once) and shows `phase` in it, so the player sees the update.
+    fn show_update(&mut self, version: &str, phase: update_view::Phase, cx: &mut Context<Self>) {
+        if self.update_window.is_none() {
+            let mut made = None;
+            let bounds = Bounds::centered(None, size(px(480.), px(170.)), cx);
+            let opened = cx.open_window(
+                WindowOptions {
+                    window_bounds: Some(WindowBounds::Windowed(bounds)),
+                    app_id: Some("wisp-launcher".into()),
+                    titlebar: Some(TitlebarOptions {
+                        title: Some(tr("Wisp Client update").into()),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                },
+                |_, cx| {
+                    let view = cx.new(|_| update_view::UpdateWindow::new(version));
+                    made = Some(view.clone());
+                    view
+                },
+            );
+            if let Err(error) = opened {
+                eprintln!("the update window didn't open: {error}");
+            }
+            self.update_window = made;
+        }
+        if let Some(w) = &self.update_window {
+            w.update(cx, |w, cx| w.set(phase, cx));
+        }
     }
 
     /// Whether the bundled game or preparer runs, perhaps started by an earlier launcher.
@@ -525,7 +591,20 @@ impl Launcher {
                 self.status = tr("Finish sign-in at microsoft.com/link.");
             }
             Event::Status(status) => self.status = status,
-            Event::UpdateReady(path, version) => self.update = Some((path, version)),
+            Event::UpdateProgress(version, share) => {
+                self.show_update(&version, update_view::Phase::Downloading(share), cx);
+            }
+            Event::UpdateReady(path, version) => {
+                self.show_update(&version, update_view::Phase::Waiting, cx);
+                self.update = Some((path, version));
+            }
+            Event::UpdateFailed(version, error) => {
+                eprintln!("update download failed: {error}");
+                self.show_update(&version, update_view::Phase::Downloading(None), cx);
+                if let Some(w) = &self.update_window {
+                    w.update(cx, |w, cx| w.fail(error, cx));
+                }
+            }
             Event::SignedIn(result) => {
                 self.auth_busy = false;
                 self.browser_waiting = false;

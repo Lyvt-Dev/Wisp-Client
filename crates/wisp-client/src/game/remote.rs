@@ -607,7 +607,7 @@ pub(super) struct Remote {
     pub(super) players: HashMap<u128, String>,
     /// `ClientPacketListener.playerInfoMap` as player-list entries, and
     /// which of them are listed.
-    tab_players: HashMap<u128, wisp_client::tab_list::TabPlayer>,
+    pub(super) tab_players: HashMap<u128, wisp_client::tab_list::TabPlayer>,
     /// Each listed profile's unpacked `textures` property.
     skin_textures: HashMap<u128, wisp_client::skins::Textures>,
     /// Active skin and cape from the services profile when the server sent none.
@@ -643,7 +643,7 @@ pub(super) struct Remote {
     /// `Player.DATA_SHOULDER_PARROT_LEFT` and `_RIGHT` of the own player.
     pub(super) own_shoulders: [Option<i32>; 2],
     /// The local player's profile UUID (always in the level).
-    profile: u128,
+    pub(super) profile: u128,
     /// The local player's profile name: its score holder and team member.
     pub(super) profile_name: String,
     /// `MultiPlayerGameMode.destroyBlockPos`, `.destroyProgress` and the face last sent: the block
@@ -5019,12 +5019,18 @@ impl Game<'_> {
         use wisp_client::scoreboard::{CollisionRule, Visibility, tag_to_json};
         // The team packets of a join, for the nametag and tab list investigation (capped).
         static LOGGED: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
-        if LOGGED.fetch_add(1, std::sync::atomic::Ordering::Relaxed) < 1000 {
+        let mine = self
+            .remote
+            .as_ref()
+            .is_some_and(|r| p.players.contains(&r.profile_name));
+        if mine || LOGGED.fetch_add(1, std::sync::atomic::Ordering::Relaxed) < 200 {
             let affix = p.parameters.as_ref().map_or_else(String::new, |t| {
                 format!(
-                    " prefix {} suffix {}",
+                    " prefix {} suffix {} color {:?} visibility {}",
                     tag_to_json(&t.prefix),
-                    tag_to_json(&t.suffix)
+                    tag_to_json(&t.suffix),
+                    t.color,
+                    t.name_tag_visibility
                 )
             });
             log::info!(
@@ -5079,6 +5085,20 @@ impl Game<'_> {
                 }
             }
             _ => {}
+        }
+        if mine && let Some(t) = self.score.board.team(&p.name) {
+            log::info!(
+                "Wisp: your team {}: prefix {} suffix {} visibility {:?}; list name {:?}",
+                t.name,
+                t.prefix,
+                t.suffix,
+                t.nametag_visibility,
+                self.remote
+                    .as_ref()
+                    .and_then(|r| r.tab_players.get(&r.profile))
+                    .and_then(|t| t.display_name.as_ref())
+                    .map(ToString::to_string)
+            );
         }
     }
     /// The player list's view of the connection: the listed players (with

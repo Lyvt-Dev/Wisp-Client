@@ -145,6 +145,39 @@ impl Game<'_> {
         })
     }
 
+    /// What rides a player, for the name tag investigation (servers that hang a rank over a head
+    /// with a display or an armor stand): the first 200 such packets.
+    fn log_player_passengers(&self, vehicle: i32, passengers: &[i32], me: i32) {
+        static LOGGED: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+        let player = vehicle == me
+            || self
+                .remote
+                .as_ref()
+                .is_some_and(|r| r.level_players.contains_key(&vehicle));
+        if !player || LOGGED.fetch_add(1, std::sync::atomic::Ordering::Relaxed) >= 200 {
+            return;
+        }
+        let kinds: Vec<String> = passengers
+            .iter()
+            .map(|&id| {
+                if self.text_displays.contains_key(&id) {
+                    format!("{id} display")
+                } else if self.armor_stands.iter().any(|a| a.id as i32 == id) {
+                    format!("{id} armor_stand")
+                } else if let Some(m) = self.mobs.iter().find(|m| m.id as i32 == id) {
+                    format!("{id} {}", m.kind.id)
+                } else {
+                    format!("{id} unknown")
+                }
+            })
+            .collect();
+        log::info!(
+            "Wisp: passengers of player {vehicle}{}: [{}]",
+            if vehicle == me { " (you)" } else { "" },
+            kinds.join(", ")
+        );
+    }
+
     /// `ClientPacketListener.handleSetEntityPassengersPacket`: who rides
     /// `vehicle` now. The local player gets in or out; mobs and other
     /// players sit where the server keeps them.
@@ -153,6 +186,7 @@ impl Game<'_> {
             return;
         };
         let vehicle_id = vehicle as u32;
+        self.log_player_passengers(vehicle, passengers, me);
         for m in &mut self.mobs {
             // `Entity.isVehicle` (the saddle reins of a ridden horse): the
             // server sends no rider on the mob itself, only this list.

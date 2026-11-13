@@ -86,6 +86,14 @@ impl Game<'_> {
         let m = self.player_model.as_ref()?;
         Some((m, self.own_profile_name()))
     }
+    /// The local player's name as the server's player list shows it (`PlayerInfo.tabListDisplayName`:
+    /// rank and all), when the server set one.
+    fn own_list_name(&self) -> Option<Text> {
+        let r = self.remote.as_ref()?;
+        let listed = r.tab_players.get(&r.profile)?.display_name.as_ref()?;
+        let text = sb::comp_text(listed).resolve_legacy();
+        (!text.plain().trim().is_empty()).then_some(text)
+    }
     /// The local player's profile name as others see it: the session's on a
     /// server (single player's server thread included), else the local player's.
     pub(super) fn own_profile_name(&self) -> String {
@@ -237,6 +245,12 @@ impl Game<'_> {
                 None => member,
             }
             .resolve_legacy();
+            // Wisp's own name tag: a server that keeps ranks out of the teams (they carry
+            // only the sorting) shows them in the player list, so the own tag takes that name.
+            let shown = match self.own_list_name() {
+                Some(listed) if Some(m.id) == own && shown.plain() == name => listed,
+                _ => shown,
+            };
             let shown = text
                 .map(|text| Text::literal(text).resolve_legacy())
                 .unwrap_or(shown);
