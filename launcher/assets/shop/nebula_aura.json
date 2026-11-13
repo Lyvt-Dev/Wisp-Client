@@ -1,0 +1,13 @@
+{
+  "aura": {
+    "colours": [
+      "#ff9bf0",
+      "#c26bff",
+      "#6b4dff"
+    ],
+    "style": "nebula"
+  },
+  "format": 1,
+  "id": "nebula_aura",
+  "slot": "aura"
+}

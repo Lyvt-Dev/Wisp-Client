@@ -1,0 +1,8 @@
+format = "wisp-client-mod"
+api = 1
+id = "voicechat"
+name = "Simple Voice Chat"
+version = "1.0.0"
+description = "Proximity voice chat. Talk with players near you on servers that run the Simple Voice Chat mod or plugin. Press V in game for the voice chat menu."
+module = "voicechat"
+capabilities = ["voice-chat"]

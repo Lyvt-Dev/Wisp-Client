@@ -1,0 +1,13 @@
+{
+  "format": 1,
+  "id": "stardust_trail",
+  "slot": "trail",
+  "trail": {
+    "colours": [
+      "#f6eeff",
+      "#c7a3ff",
+      "#8a4dff"
+    ],
+    "style": "stardust"
+  }
+}

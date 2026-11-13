@@ -1,0 +1,29 @@
+# The Wisp server on any Linux machine with Docker, with HTTPS set up automatically:
+#
+#   DOMAIN=wisp.example.com docker compose -f crates/wisp-cosmetics-server/docker-compose.yml up -d
+#
+# Point the domain's DNS (an A record) at the machine first; Caddy gets the certificate itself.
+services:
+  wisp:
+    build:
+      context: ../..
+      dockerfile: crates/wisp-cosmetics-server/Dockerfile
+    restart: unless-stopped
+    volumes:
+      - wisp-data:/data
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN to your domain, e.g. DOMAIN=wisp.example.com}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    depends_on:
+      - wisp
+volumes:
+  wisp-data:
+  caddy-data:

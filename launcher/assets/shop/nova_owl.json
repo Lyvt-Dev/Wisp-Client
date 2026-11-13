@@ -1,0 +1,318 @@
+{
+  "animations": [
+    {
+      "amplitude": 0.35,
+      "axis": "y",
+      "motion": "bob",
+      "part": "owl",
+      "period": 60,
+      "phase": 0
+    },
+    {
+      "amplitude": 25,
+      "axis": "y",
+      "motion": "swing",
+      "part": "owl_head",
+      "period": 180,
+      "phase": 0.2
+    },
+    {
+      "amplitude": 6,
+      "axis": "z",
+      "motion": "swing",
+      "part": "owl_wing_left",
+      "period": 40,
+      "phase": 0
+    },
+    {
+      "amplitude": 6,
+      "axis": "z",
+      "motion": "swing",
+      "part": "owl_wing_right",
+      "period": 40,
+      "phase": 0.5
+    },
+    {
+      "amplitude": 8,
+      "axis": "x",
+      "motion": "swing",
+      "part": "owl_tail",
+      "period": 60,
+      "phase": 0.3
+    }
+  ],
+  "attach": {
+    "offset": [
+      7,
+      0.5,
+      0
+    ],
+    "scale": 0.9
+  },
+  "bone": "body",
+  "format": 1,
+  "glow": true,
+  "id": "nova_owl",
+  "parts": [
+    {
+      "children": [
+        {
+          "children": [
+            {
+              "cubes": [
+                {
+                  "origin": [
+                    -0.5,
+                    -2,
+                    -0.5
+                  ],
+                  "size": [
+                    1,
+                    2,
+                    1
+                  ],
+                  "uv": [
+                    24,
+                    0
+                  ]
+                }
+              ],
+              "name": "owl_tuft_left",
+              "pivot": [
+                2.5,
+                -5,
+                0
+              ],
+              "rotation": [
+                0,
+                0,
+                20
+              ]
+            },
+            {
+              "cubes": [
+                {
+                  "origin": [
+                    -0.5,
+                    -2,
+                    -0.5
+                  ],
+                  "size": [
+                    1,
+                    2,
+                    1
+                  ],
+                  "uv": [
+                    28,
+                    0
+                  ]
+                }
+              ],
+              "name": "owl_tuft_right",
+              "pivot": [
+                -2.5,
+                -5,
+                0
+              ],
+              "rotation": [
+                0,
+                0,
+                -20
+              ]
+            }
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -3,
+                -5,
+                -2.5
+              ],
+              "size": [
+                6,
+                5,
+                5
+              ],
+              "uv": [
+                0,
+                10
+              ]
+            },
+            {
+              "origin": [
+                -1,
+                -2,
+                -3.5
+              ],
+              "size": [
+                2,
+                1,
+                1
+              ],
+              "uv": [
+                32,
+                0
+              ]
+            }
+          ],
+          "name": "owl_head",
+          "pivot": [
+            0,
+            -5,
+            0
+          ]
+        },
+        {
+          "cubes": [
+            {
+              "inflate": 0.1,
+              "origin": [
+                0,
+                0,
+                -2
+              ],
+              "size": [
+                1,
+                4,
+                4
+              ],
+              "uv": [
+                0,
+                20
+              ]
+            }
+          ],
+          "name": "owl_wing_left",
+          "pivot": [
+            2.5,
+            -4.5,
+            0
+          ]
+        },
+        {
+          "cubes": [
+            {
+              "inflate": 0.1,
+              "origin": [
+                -1,
+                0,
+                -2
+              ],
+              "size": [
+                1,
+                4,
+                4
+              ],
+              "uv": [
+                10,
+                20
+              ]
+            }
+          ],
+          "name": "owl_wing_right",
+          "pivot": [
+            -2.5,
+            -4.5,
+            0
+          ]
+        },
+        {
+          "cubes": [
+            {
+              "origin": [
+                -1.5,
+                0,
+                0
+              ],
+              "size": [
+                3,
+                1,
+                2
+              ],
+              "uv": [
+                20,
+                20
+              ]
+            }
+          ],
+          "name": "owl_tail",
+          "pivot": [
+            0,
+            -1,
+            2
+          ],
+          "rotation": [
+            -25,
+            0,
+            0
+          ]
+        }
+      ],
+      "cubes": [
+        {
+          "origin": [
+            -2.5,
+            -5,
+            -2
+          ],
+          "size": [
+            5,
+            5,
+            4
+          ],
+          "uv": [
+            0,
+            0
+          ]
+        },
+        {
+          "origin": [
+            -2,
+            -1,
+            -2.6
+          ],
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "uv": [
+            36,
+            0
+          ]
+        },
+        {
+          "origin": [
+            1,
+            -1,
+            -2.6
+          ],
+          "size": [
+            1,
+            1,
+            1
+          ],
+          "uv": [
+            40,
+            0
+          ]
+        }
+      ],
+      "name": "owl",
+      "pivot": [
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "slot": "shoulder",
+  "sparkles": [
+    "#ffffff",
+    "#ffd36b",
+    "#c7a3ff"
+  ],
+  "texture": {
+    "png": "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAADpUlEQVR4nO2YW0hUQRjHv3P2uLuutUUXtaIroUFKSC/1YJFZJEZFPRTUQ0QQCGlWqN2kBzPLMLKH6sUeAokgoUSwEBGE6qXoooamS2p5zcuuu7q6u23nfNvOuhcviyvtNPOTb/8z3wyL8985M3NGAh+S1uU43eXfTgdqTKQOtWfMAi9r8+BAShF8bi8RYJb0tjrxO2M2CkKguqkqFev17wzYP3nbBlR9eo1Xu7seSvy+MJABgqBCHbebSL+vPx7O6p9xD3YqIpv3QDCE2gTJNxGrW0LKXZZ+mCu7d2VN297QGfpfNRj8DLDajZ6yzVVeu8g1JTtHTBAsDZ2l/3SAMyEkrslyrohaThKlT674dTp65AJq3KIY1KahDtBGLCbtTvnvg6EwrAc6FaJvYsRkw4jf6ilbbSYMTcRCDF826GOBViRJpYWe0QGSMBtt8KtvVFYd6rJoHWlrHGxHFWTfJuxmkh+3RQKt+K0BI6YJ0GglL52Jb8MdQCv+BsgzwGKegKgFaqI6jWtnWBOlR20zjsL/ApULVyiRAiXjVp4ihxeNpCd590FogTYWKmqy4XDqXTBbe6Clq4xaI8XpGqvrb3jV1Sodhk60w4m9xaiRk7ZDGglogHvg+5K9zwSVdde86uWvLwLtBJy6Ses97wMWq+c4rJaiUCvrrkL6zutYjpBnxKcgXozCDSmYzqIYgXow5RZIKtfeb3OMAc0IhxKLnAZTL0lIIJ/8HMNYLrn9CPV8zhnULdHbUZsGDKS/KEqwfqHnKN3Q34ja0v2YilkRcA1obLkMjc88L0VKWckpz4USKpWGhEKr8ScJ2hDbjN3ysdYCL2pzUTct3QzwMRdWpbWTTliWc81DnRiTsVj7cB1wh3J34L4/oAEyA9J25KPeqTgGr74/hbIHb0knpazkpuN5zTmgEb9HYH9KMayL0wUMQb7BUsLusJLwpbq+AGjCb6FKWJ2JW+BMFxkz9YtfeZpspVq167AkiVp4bygIq8VRhHlGmRFjE4MYZms3hBtBnQNmQ8Lqs06bYxTy8wqx/qZK/vh7L5p/qUj+vImV45nRYTET5u0RoAXBPZBQQZsholatByW+dNxDVZhLjjbE7KxM+aJTD+X3+1EV5pKjDdwFMjJOwmSda44mmL8Sm/dzQLjDDQDG4QYA43ADgHG4AcA43ABgHG4AMA43ABiHGwCMww0AxuEGAONwA4BxuAHAONwAYBxuADAONwAYhxsAjMMNAMb5A1j1YUtEP8U/AAAAAElFTkSuQmCC"
+  }
+}

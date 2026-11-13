@@ -1,0 +1,60 @@
+[package]
+name = "wisp-launcher"
+version = "0.14.0"
+edition = "2021"
+license = "MIT"
+description = "Wisp launcher for the Rust Minecraft engine"
+
+[workspace]
+
+[features]
+default = ["gui"]
+gui = ["dep:gpui", "dep:gpui_platform", "dep:wisp-theme", "dep:image", "dep:objc2-app-kit", "dep:wry", "dep:tao"]
+
+[dependencies]
+wisp-compat = { path = "../crates/wisp-compat" }
+wisp-cosmetics = { path = "../crates/wisp-cosmetics" }
+glam = "0.30"
+wisp-mods = { path = "../crates/wisp-mods" }
+wisp-shader-api = { path = "../crates/wisp-shader-api" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+semver = "1"
+dirs = "5"
+clap = { version = "4", features = ["derive"] }
+ureq = { version = "2", default-features = false, features = ["json", "tls"] }
+getrandom = "0.3"
+sha1 = "0.10"
+sha2 = "0.10"
+base64 = "0.22"
+zip = { version = "9.1.3", default-features = false, features = ["deflate"] }
+gpui = { package = "gpui-fast", version = "0.1.13", optional = true }
+gpui_platform = { package = "gpui-fast-platform", version = "0.1.13", features = ["wayland", "x11", "font-kit"], optional = true }
+wisp-theme = { path = "../crates/wisp-theme", optional = true }
+
+[dependencies.image]
+version = "0.25"
+default-features = false
+optional = true
+features = ["png"]
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2-app-kit = { version = "0.3", default-features = false, features = ["NSAccessibility", "NSWorkspace"], optional = true }
+
+[target.'cfg(windows)'.build-dependencies]
+winresource = "0.1"
+
+[target.'cfg(windows)'.dependencies]
+# The Microsoft sign-in window (WebView2), as other launchers sign in.
+wry = { version = "0.53", optional = true }
+tao = { version = "0.34", optional = true }
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security_Cryptography", "Win32_System_Memory", "Win32_System_JobObjects", "Win32_System_Threading"] }
+
+[profile.release]
+strip = true
+
+[build-dependencies]
+wisp-compat = { path = "../crates/wisp-compat" }
+
+[patch.crates-io]
+naga = { path = "../third_party/naga" }

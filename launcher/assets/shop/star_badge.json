@@ -1,0 +1,12 @@
+{
+  "format": 1,
+  "id": "star_badge",
+  "parts": [],
+  "slot": "name_tag",
+  "tag": {
+    "line": "#a98fff"
+  },
+  "texture": {
+    "png": "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAeElEQVR4nLWSzQ2AIAyFecQZXMCtvDqBRyfw6ARe3coFXAJjSBNC2qoU3qUh9H39Sb0zyjujOu1zm0J44rwDUg7ezCQJYh4BWvVxie9jlbsAZ0zNJILkIGjmfojxOmVI3R2YRuBAv5fIQbiqqdrcQd5F0Sl/lXmEGzh2MBrz9VGzAAAAAElFTkSuQmCC"
+  }
+}

@@ -1,0 +1,8 @@
+[package]
+name = "wisp-compat"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Non-destructive compatibility for Wisp's pre-rebrand data"
+
+[dependencies]

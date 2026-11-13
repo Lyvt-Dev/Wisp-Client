@@ -1,0 +1,92 @@
+name: local-launcher
+on:
+  push:
+    paths: ['launcher/**', 'crates/**', 'third_party/**', 'mods/wisp/src/test/java/**', 'mods/wisp-mods/**', 'shaders/wisp/**', 'Cargo.toml', 'Cargo.lock', 'research-lock.json', 'packaging/windows/**', 'packaging/icons/**', 'LICENSE', 'THIRD_PARTY_NOTICES.md', '.github/workflows/launcher.yml']
+  pull_request:
+    paths: ['launcher/**', 'crates/**', 'third_party/**', 'mods/wisp/src/test/java/**', 'mods/wisp-mods/**', 'shaders/wisp/**', 'Cargo.toml', 'Cargo.lock', 'research-lock.json', 'packaging/windows/**', 'packaging/icons/**', 'LICENSE', 'THIRD_PARTY_NOTICES.md', '.github/workflows/launcher.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - run: sudo apt-get update && sudo apt-get install -y libxkbcommon-dev libxkbcommon-x11-dev libx11-xcb-dev libwayland-dev libfontconfig1-dev libx11-dev libxcb1-dev libxcursor-dev libxrandr-dev libxi-dev libvulkan-dev
+      - run: cargo fmt --manifest-path launcher/Cargo.toml --check
+      - run: cargo test --manifest-path launcher/Cargo.toml --locked --no-default-features
+      - run: cargo clippy --manifest-path launcher/Cargo.toml --locked --all-targets -- -D warnings
+  windows-installer:
+    runs-on: windows-latest
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/launcher/target/installer
+      RUSTFLAGS: '-C target-feature=+crt-static'
+      CARGO_BUILD_JOBS: '2'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target/installer-game
+            launcher -> target/installer
+          cache-on-failure: true
+      - run: cargo fmt --manifest-path launcher/Cargo.toml --check
+      - run: cargo test --manifest-path launcher/Cargo.toml --locked --release --target x86_64-pc-windows-msvc --all-targets
+      - run: cargo clippy --manifest-path launcher/Cargo.toml --locked --release --target x86_64-pc-windows-msvc --all-targets -- -D warnings
+      - name: Check resource-pack loading and custom skies
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/target/installer-game
+        run: |
+          $manifest = Get-Content launcher/Cargo.toml -Raw
+          $env:WISP_VERSION = [regex]::Match($manifest, '(?m)^version\s*=\s*"([^"]+)"').Groups[1].Value
+          cargo test --locked --profile fast --target x86_64-pc-windows-msvc -p wisp-core --lib prepared_files::tests
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # Keep test bodies unoptimized; the installer still builds the optimized engine.
+          cargo test --locked --profile fast --config 'profile.fast.package.wisp-client-render.opt-level=0' --target x86_64-pc-windows-msvc -p wisp-client-render --lib packs::
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo test --locked --profile fast --config 'profile.fast.package.wisp-client-render.opt-level=0' --target x86_64-pc-windows-msvc -p wisp-client-render --lib custom_sky::tests
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build Windows setup
+        shell: pwsh
+        env:
+          WISP_MSA_CLIENT_ID: ${{ vars.WISP_MSA_CLIENT_ID }}
+        run: ./packaging/windows/build-installer.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Wisp-Client-Windows-Installer
+          path: |
+            dist/Wisp-Client-*-Setup-x64.exe
+            dist/Wisp-Client-*-Setup-x64.exe.sha256
+            dist/Wisp-*.hshader
+            dist/Wisp-*.hshader.sha256
+          if-no-files-found: error
+  publish-release:
+    needs: [check, windows-installer]
+    if: github.event_name != 'pull_request' && github.repository == 'Lyvt-Dev/Wisp-Client' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    concurrency:
+      group: wisp-launcher-release
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: Wisp-Client-Windows-Installer
+          path: dist
+      - name: Publish versioned Windows installer
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $manifest = Get-Content launcher/Cargo.toml -Raw
+          $version = [regex]::Match($manifest, '(?m)^version\s*=\s*"([^"]+)"').Groups[1].Value
+          ./packaging/windows/publish-release.ps1 -Version $version -Commit $env:GITHUB_SHA -Repository $env:GITHUB_REPOSITORY

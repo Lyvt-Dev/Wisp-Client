@@ -1,0 +1,12 @@
+{
+  "format": 1,
+  "id": "crown_badge",
+  "parts": [],
+  "slot": "name_tag",
+  "tag": {
+    "line": "#f2c14e"
+  },
+  "texture": {
+    "png": "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAgElEQVR4nMWSMQqAMAxFE3HWI3gUVyfv40W8hFOdXMXJrR5FPUClhZYKjVUj+CC0NJ/PJ00CTBJgkl411ToofWJeIcQSWLHPLltTlPEpQUhI4WvZMwgabGOt7rxpMCagyMoeyQRP+N6gKYS7T50wFepZ2DNweyDnBd6AwOT/XzgAxussEFjim1UAAAAASUVORK5CYII="
+  }
+}
