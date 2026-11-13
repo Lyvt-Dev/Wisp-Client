@@ -14,6 +14,9 @@ use wisp_client::mobs::{Mob, Part, Polygon};
 use wisp_cosmetics::prefs::{self, Others};
 use wisp_cosmetics::{Item, Slot};
 
+/// Wisp's badge (the launcher writes it for every player): shown even with cosmetics hidden.
+const WISP_BADGE: &str = "wisp_badge";
+
 /// An item as the renderer takes it.
 struct Baked {
     item: Arc<Item>,
@@ -712,9 +715,13 @@ impl Game<'_> {
 
     /// The name tag style `m` wears, if cosmetics are shown for it (name tags only counts): its
     /// mark's place in the atlas and its line's colour. None until the mark is in the atlas.
+    /// Wisp's own badge shows whatever the cosmetics settings say: it marks a Wisp player.
     pub(super) fn cosmetics_tag(&self, m: &Mob, own: bool) -> Option<super::names::TagStyle> {
-        let worn = self.worn(m, own)?;
-        let item = worn.iter().find(|i| i.slot == Slot::NameTag)?;
+        let shown = self.cosmetics_shown(own);
+        let worn = self.worn_by(m, own)?;
+        let item = worn
+            .iter()
+            .find(|i| i.slot == Slot::NameTag && (shown || i.id == WISP_BADGE))?;
         let [r, g, b] = item.tag?.line;
         let frame = self.cosmetics.frame.get();
         let mut baked = self.cosmetics.baked.borrow_mut();
@@ -741,15 +748,24 @@ impl Game<'_> {
 
     /// What `m` wears, if cosmetics are shown for it: `own` for the player's own model.
     fn worn(&self, m: &Mob, own: bool) -> Option<wisp_cosmetics::Worn> {
-        let client = self.cosmetics.client.as_ref()?;
+        self.cosmetics_shown(own)
+            .then(|| self.worn_by(m, own))
+            .flatten()
+    }
+
+    /// Whether the settings show the player's own cosmetics (`own`) or others'.
+    fn cosmetics_shown(&self, own: bool) -> bool {
         let extras = &self.settings.extras;
-        if if own {
-            !extras.cosmetics_mine
+        if own {
+            extras.cosmetics_mine
         } else {
-            extras.cosmetics_others == Others::Hidden
-        } {
-            return None;
+            extras.cosmetics_others != Others::Hidden
         }
+    }
+
+    /// What `m` wears, whatever the settings show.
+    fn worn_by(&self, m: &Mob, own: bool) -> Option<wisp_cosmetics::Worn> {
+        let client = self.cosmetics.client.as_ref()?;
         let uuid = if own {
             // Cosmetics belong to the Minecraft account. In singleplayer the integrated server
             // names its own player by an offline UUID, so the signed-in account's comes first.

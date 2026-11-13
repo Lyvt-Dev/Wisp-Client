@@ -14,6 +14,7 @@ pub mod server_ping;
 pub mod shaders;
 pub mod shop;
 mod sources;
+pub mod updater;
 
 use serde::{Deserialize, Serialize};
 use std::fs::{self, File};

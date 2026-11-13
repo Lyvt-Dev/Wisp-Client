@@ -24,8 +24,10 @@ const SCRIM: u32 = 0x050507;
 const PANEL: u32 = hex(0x0F0F12, 244);
 const HEADER: u32 = hex(0x16161B, 255);
 const ACCENT: u32 = hex(wisp_theme::glass::ACCENT, 255);
-const ACCENT_HOVER: u32 = hex(0x7D61FF, 255);
-const ACCENT_SOFT: u32 = hex(0xA08CFF, 255);
+const ACCENT_HOVER: u32 = hex(0xFFFFFF, 255);
+const ACCENT_SOFT: u32 = hex(0xD4D4D8, 255);
+/// Text on the accent: it is near white, so the text is dark.
+const ON_ACCENT: u32 = hex(wisp_theme::glass::ON_LIGHT, 255);
 const ON: u32 = hex(0x22C55E, 235);
 const ON_HOVER: u32 = hex(0x2BD46A, 255);
 const INK: u32 = hex(0xFFFFFF, 255);
@@ -238,15 +240,12 @@ impl Menu {
         ui.rounded(px, py, pw, HEADER_H + TABS_H, RADIUS, HEADER);
         ui.rounded(px, py + HEADER_H + TABS_H - RADIUS, pw, RADIUS, 0.0, HEADER);
         ui.rounded(px, py + HEADER_H + TABS_H, pw, 1.0, 0.0, STROKE);
-        // The mark: Wisp's line (bars of 4, 8 and 10 over a 12-unit line) on an accent tile.
+        // The mark: Wisp's white feather on a black tile, as the app icon has it.
         let (bx, by, side) = (px + 20.0, py + 14.0, 32.0);
-        ui.rounded(bx, by, side, side, 9.0, ACCENT);
-        let unit = side / 16.0;
-        for (i, bar) in [4.0, 8.0, 10.0, 12.0].into_iter().enumerate() {
-            let bw = bar * unit;
-            let y = by + (3.5 + i as f32 * 2.5) * unit;
-            ui.rounded(bx + (side - bw) / 2.0, y, bw, unit * 1.2, unit * 0.6, INK);
-        }
+        let tile = hex(0x000000, 255);
+        ui.rounded(bx, by, side, side, 9.0, tile);
+        ui.border(bx, by, side, side, 9.0, STROKE);
+        ui.feather(bx + side / 2.0, by + side / 2.0, side, INK, tile);
         ui.text(Face::Heading, 18.0, bx + 42.0, by - 2.0, INK, "Wisp");
         let client = lang::get_or("wisp.menu.client", "Client");
         ui.text(Face::Regular, 11.0, bx + 42.0, by + 18.0, MUTED, &client);
@@ -260,7 +259,7 @@ impl Menu {
             ACCENT
         };
         ui.rounded(ex, ey, ew, eh, 10.0, fill);
-        ui.text_line(Face::Medium, 13.0, eh, ex + 15.0, ey, INK, &label);
+        ui.text_line(Face::Medium, 13.0, eh, ex + 15.0, ey, ON_ACCENT, &label);
         self.hit(ui, ex, ey, ew, eh, Action::EditHud);
         // The search, for the modules.
         if !self.friends_page {
@@ -700,12 +699,12 @@ impl Menu {
                 let bw = ui.measure(Face::Medium, 13.0, &button) + 28.0;
                 let (bx, by) = (x + w - bw, y + (ROW_H - 32.0) / 2.0);
                 let fill = if hover(ui, bx, by, bw, 32.0) {
-                    hex(0x7D61FF, 255)
+                    ACCENT_HOVER
                 } else {
                     ACCENT
                 };
                 ui.rounded(bx, by, bw, 32.0, 10.0, fill);
-                ui.text_line(Face::Medium, 13.0, 32.0, bx + 14.0, by, INK, &button);
+                ui.text_line(Face::Medium, 13.0, 32.0, bx + 14.0, by, ON_ACCENT, &button);
                 self.hit(ui, bx, by, bw, 32.0, Action::EditHud);
                 return;
             }
@@ -745,7 +744,7 @@ impl Menu {
                     } else if hover(ui, sx, cy - th / 2.0, *sw, th) {
                         ui.rounded(sx, cy - th / 2.0 + 2.0, *sw, th - 4.0, 8.0, CARD_HOVER);
                     }
-                    let colour = if i == current { INK } else { MUTED };
+                    let colour = if i == current { ON_ACCENT } else { MUTED };
                     ui.text_line(
                         Face::Medium,
                         12.0,

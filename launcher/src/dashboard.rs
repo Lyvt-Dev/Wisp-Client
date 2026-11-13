@@ -205,6 +205,8 @@ enum Event {
     Ping(String, Result<wisp_launcher::server_ping::Status, String>),
     Friends(friends_view::FriendsUpdate),
     FriendHead(String, Option<Vec<[u8; 4]>>),
+    /// A newer launcher's installer, downloaded and checked, and its version.
+    UpdateReady(PathBuf, String),
 }
 
 struct Launcher {
@@ -264,6 +266,8 @@ struct Launcher {
     auth_busy: bool,
     launching: bool,
     setup_busy: bool,
+    /// A downloaded update, installed once nothing runs.
+    update: Option<(PathBuf, String)>,
     install_after_sign_in: bool,
     account: Option<auth::SignedIn>,
     /// Every account kept, to switch between (the one that plays among them).
@@ -335,6 +339,22 @@ impl Launcher {
         std::thread::spawn(move || {
             let _ = startup.send(Event::Loaded(auth::saved(&store)));
         });
+        if wisp_launcher::updater::enabled(prefs.auto_update) {
+            let (events, dir) = (sender.clone(), wisp_launcher::updater::updates_dir(&home));
+            std::thread::spawn(move || {
+                use wisp_launcher::updater;
+                match updater::check().and_then(|u| {
+                    u.map(|u| updater::download(&u, &dir).map(|p| (p, u.version)))
+                        .transpose()
+                }) {
+                    Ok(Some((path, version))) => {
+                        let _ = events.send(Event::UpdateReady(path, version.to_string()));
+                    }
+                    Ok(None) => {}
+                    Err(error) => eprintln!("update check failed: {error}"),
+                }
+            });
+        }
         cx.spawn(async move |this, cx| loop {
             cx.background_executor().timer(Duration::from_millis(200)).await;
             if this.update(cx, |this, cx| {
@@ -354,6 +374,19 @@ impl Launcher {
                         Err(error) => { this.status = error.to_string(); this.failed = true; changed = true; }
                         Ok(None) => {}
                     }
+                }
+                if this.update.is_some() && this.prefs.auto_update && this.child.is_none()
+                    && !this.launching && !this.setup_busy && !this.engine_in_use()
+                {
+                    let (path, version) = this.update.take().expect("checked");
+                    match wisp_launcher::updater::install(&path) {
+                        Ok(()) => {
+                            this.status = trf("Updating to Wisp Client {version}…", &[("version", &version)]);
+                            cx.quit();
+                        }
+                        Err(error) => this.status = trf("The update couldn't start: {error}", &[("error", &error)]),
+                    }
+                    changed = true;
                 }
                 if this.page == Page::Shop {
                     this.shop.slide_ticks += 1;
@@ -444,6 +477,7 @@ impl Launcher {
             auth_busy: true,
             launching: false,
             setup_busy: false,
+            update: None,
             install_after_sign_in: false,
             account: None,
             accounts,
@@ -457,6 +491,12 @@ impl Launcher {
         };
         launcher.write_cosmetic_prefs();
         launcher
+    }
+
+    /// Whether the bundled game or preparer runs, perhaps started by an earlier launcher.
+    fn engine_in_use(&self) -> bool {
+        wisp_launcher::engine::bundled()
+            .is_some_and(|b| wisp_launcher::updater::in_use(&[&b.binary, &b.preparer]))
     }
 
     fn event(&mut self, event: Event, cx: &mut Context<Self>) {
@@ -485,6 +525,7 @@ impl Launcher {
                 self.status = tr("Finish sign-in at microsoft.com/link.");
             }
             Event::Status(status) => self.status = status,
+            Event::UpdateReady(path, version) => self.update = Some((path, version)),
             Event::SignedIn(result) => {
                 self.auth_busy = false;
                 self.browser_waiting = false;

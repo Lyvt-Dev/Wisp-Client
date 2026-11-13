@@ -110,17 +110,6 @@ fn fill_box(c: &mut Canvas, u: i32, v: i32, w: i32, h: i32, d: i32, colour: Rgba
     }
 }
 
-/// A four-pointed star: concave sides, `r` pixels to each point.
-fn star_shape(dx: f32, dy: f32, r: f32) -> bool {
-    star_oval(dx, dy, r, r)
-}
-
-/// The same star stretched to `rx` × `ry`.
-fn star_oval(dx: f32, dy: f32, rx: f32, ry: f32) -> bool {
-    let (x, y) = (dx.abs() / rx, dy.abs() / ry);
-    x.powf(0.72) + y.powf(0.72) <= 1.0
-}
-
 // ---------------------------------------------------------------- capes (HD, animated)
 
 /// HD capes are drawn at 4× Minecraft's cape: a 40×64×4 box at a quarter scale, so it has the
@@ -551,58 +540,37 @@ fn cape_item(id: &str, frames: &[Canvas]) -> Value {
 
 // ---------------------------------------------------------------- badges
 
-fn badge_texture(kind: &str) -> Canvas {
-    let mut c = Canvas::new(16, 16);
-    match kind {
-        "star" => {
-            for y in 0..16 {
-                for x in 0..16 {
-                    let (dx, dy) = (x as f32 - 7.5, y as f32 - 7.5);
-                    if star_shape(dx, dy, 7.6) {
-                        let core = star_shape(dx, dy, 4.6);
-                        c.set(x, y, if core { hex(0xe9dcff) } else { hex(0x8f63ff) });
+/// Wisp's badge: the app icon (a white feather on a black tile) shrunk to a name tag's mark,
+/// each pixel the average of the icon's pixels it covers (alpha-weighted).
+fn wisp_badge_texture() -> Canvas {
+    let src = png_canvas(WISP_MARK);
+    let side = wisp_cosmetics::MAX_MARK;
+    // The tile's rim is left out, so the feather fills more of the small mark.
+    let rim = src.w / 8;
+    let step = (src.w - 2 * rim) / side;
+    let mut c = Canvas::new(side, side);
+    for y in 0..side {
+        for x in 0..side {
+            let mut sum = [0u32; 4];
+            for sy in 0..step {
+                for sx in 0..step {
+                    let p = src.get((rim + x * step + sx) as i32, (rim + y * step + sy) as i32);
+                    let a = u32::from(p[3]);
+                    for i in 0..3 {
+                        sum[i] += u32::from(p[i]) * a;
                     }
+                    sum[3] += a;
                 }
             }
-            c.rect(7, 7, 2, 2, hex(0xffffff));
-        }
-        "crown" => {
-            let gold = hex(0xf2c14e);
-            let shade = hex(0xc28a1f);
-            c.rect(2, 9, 12, 4, gold);
-            c.rect(2, 12, 12, 1, shade);
-            for (x, top) in [(2, 4), (5, 6), (7, 3), (8, 3), (10, 6), (13, 4)] {
-                c.rect(x, top, 1, 9 - top, gold);
+            if sum[3] > 0 {
+                let n = step * step;
+                let rgb = |i: usize| (sum[i] / sum[3]) as u8;
+                c.set(
+                    x as i32,
+                    y as i32,
+                    [rgb(0), rgb(1), rgb(2), (sum[3] / n) as u8],
+                );
             }
-            c.rect(3, 7, 10, 2, gold);
-            for (x, y, col) in [
-                (7, 10, 0xb56cff),
-                (8, 10, 0xb56cff),
-                (4, 10, 0x6be0ff),
-                (11, 10, 0x6be0ff),
-            ] {
-                c.set(x, y, hex(col));
-            }
-            for (x, y) in [(2, 3), (7, 2), (8, 2), (13, 3)] {
-                c.set(x, y, hex(0xfff1b8));
-            }
-        }
-        _ => {
-            // A crescent moon with a small star.
-            for y in 0..16 {
-                for x in 0..16 {
-                    let (dx, dy) = (x as f32 - 7.0, y as f32 - 8.0);
-                    let (ex, ey) = (x as f32 - 10.0, y as f32 - 6.0);
-                    if dx * dx + dy * dy <= 42.0 && ex * ex + ey * ey > 30.0 {
-                        let edge = dx * dx + dy * dy > 30.0;
-                        c.set(x, y, if edge { hex(0x9b7bff) } else { hex(0xd9ccff) });
-                    }
-                }
-            }
-            for (x, y) in [(12, 9), (12, 11), (11, 10), (13, 10)] {
-                c.set(x, y, hex(0xbfa8ff));
-            }
-            c.set(12, 10, hex(0xffffff));
         }
     }
     c
@@ -1212,27 +1180,6 @@ fn flat_cape(card: &mut Canvas, texture: &Canvas, ox: i32, oy: i32, height: i32)
             card.set(ox + x, oy + y, p);
         }
     }
-}
-
-/// A big pixel mark (a badge) centred on its card.
-fn mark_card(mark: &Canvas, w: u32, h: u32, glow: [f32; 3], seed: u32) -> Canvas {
-    let mut card = backdrop(w, h, glow, seed);
-    let scale = (h as i32 * 8 / 10) / mark.h as i32;
-    let ox = (w as i32 - mark.w as i32 * scale) / 2;
-    let oy = (h as i32 - mark.h as i32 * scale) / 2 - h as i32 / 20;
-    for y in 0..mark.h as i32 {
-        for x in 0..mark.w as i32 {
-            let p = mark.get(x, y);
-            if p[3] > 0 {
-                for yy in 0..scale {
-                    for xx in 0..scale {
-                        card.set(ox + x * scale + xx, oy + y * scale + yy, p);
-                    }
-                }
-            }
-        }
-    }
-    card
 }
 
 /// A particle trail sweeping across the card: `colours` from head to tail.
@@ -2446,21 +2393,12 @@ fn main() {
         }
     }
 
-    for (id, kind, line, glow) in [
-        ("star_badge", "star", "#a98fff", violet),
-        ("crown_badge", "crown", "#f2c14e", [240.0, 190.0, 80.0]),
-        ("moon_badge", "moon", "#bfa8ff", [130.0, 120.0, 255.0]),
-    ] {
-        let mark = badge_texture(kind);
-        let file = serde_json::to_vec_pretty(&badge_item(id, &mark, line)).unwrap();
-        Item::parse(&file).unwrap_or_else(|e| panic!("{id}: {e}"));
-        write(dir, &format!("{id}.json"), &file);
-        write(
-            dir,
-            &format!("{id}.png"),
-            &mark_card(&mark, cw, ch, glow, id.len() as u32).png(),
-        );
-    }
+    // Wisp's badge: every player wears it (the launcher always writes it), so it has no card.
+    let file =
+        serde_json::to_vec_pretty(&badge_item("wisp_badge", &wisp_badge_texture(), "#ffffff"))
+            .unwrap();
+    Item::parse(&file).unwrap_or_else(|e| panic!("wisp_badge: {e}"));
+    write(dir, "wisp_badge.json", &file);
 
     let cosmic = [90.0, 140.0, 255.0];
     for (id, texture, value, glow) in [

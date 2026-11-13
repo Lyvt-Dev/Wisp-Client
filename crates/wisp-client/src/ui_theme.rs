@@ -373,6 +373,98 @@ impl<'a> Ui<'a> {
     pub fn circle(&mut self, cx: f32, cy: f32, r: f32, color: u32) {
         self.rounded(cx - r, cy - r, 2.0 * r, 2.0 * r, r, color);
     }
+    /// A filled quad, its corners in dp in order round it (a triangle repeats one).
+    pub fn quad(&mut self, corners: [[f32; 2]; 4], color: u32) {
+        if color >> 24 == 0 {
+            return;
+        }
+        let k = self.density / self.scale;
+        self.batch
+            .fill_quad(self.atlas, corners.map(|[x, y]| [x * k, y * k]), color);
+    }
+    /// A line through `points` (dp), `width` dp across.
+    pub fn polyline(&mut self, points: &[[f32; 2]], width: f32, color: u32) {
+        for pair in points.windows(2) {
+            let ([x0, y0], [x1, y1]) = (pair[0], pair[1]);
+            let len = (x1 - x0).hypot(y1 - y0).max(1e-4);
+            let (nx, ny) = (-(y1 - y0) / len * width / 2.0, (x1 - x0) / len * width / 2.0);
+            self.quad(
+                [
+                    [x0 + nx, y0 + ny],
+                    [x1 + nx, y1 + ny],
+                    [x1 - nx, y1 - ny],
+                    [x0 - nx, y0 - ny],
+                ],
+                color,
+            );
+        }
+    }
+    /// Wisp's feather (`packaging/windows/draw-feather.ps1`'s shapes) centred on `(cx, cy)`,
+    /// fitting a square `size` dp across: drawn in `ink`, its splits and shaft in `ground` (the
+    /// colour behind it).
+    pub fn feather(&mut self, cx: f32, cy: f32, size: f32, ink: u32, ground: u32) {
+        let k = size / 990.0 * 1.02;
+        let (s, c) = 40f32.to_radians().sin_cos();
+        let at = |[x, y]: [f32; 2]| [cx + (x * c - y * s) * k, cy + (x * s + y * c) * k];
+        // Cubic Béziers given as a start, then three points a curve, sampled `steps` times
+        // each, and placed.
+        let curve = |pts: &[[f32; 2]], steps: usize| -> Vec<[f32; 2]> {
+            let mut out = vec![at(pts[0])];
+            let mut p0 = pts[0];
+            for &[p1, p2, p3] in pts[1..].as_chunks::<3>().0 {
+                for i in 1..=steps {
+                    let t = i as f32 / steps as f32;
+                    let u = 1.0 - t;
+                    let b = |a: f32, b: f32, cc: f32, d: f32| {
+                        u * u * u * a + 3.0 * u * u * t * b + 3.0 * u * t * t * cc + t * t * t * d
+                    };
+                    out.push(at([
+                        b(p0[0], p1[0], p2[0], p3[0]),
+                        b(p0[1], p1[1], p2[1], p3[1]),
+                    ]));
+                }
+                p0 = p3;
+            }
+            out
+        };
+        const VANE: [[f32; 2]; 16] = [
+            [0.0, -430.0], [58.0, -380.0], [96.0, -250.0], [98.0, -90.0],
+            [100.0, 40.0], [72.0, 170.0], [18.0, 232.0],
+            [4.0, 236.0], [-6.0, 236.0], [-12.0, 232.0],
+            [-82.0, 200.0], [-128.0, 80.0], [-125.0, -60.0],
+            [-121.0, -230.0], [-62.0, -372.0], [0.0, -430.0],
+        ];
+        let vane = curve(&VANE, 10);
+        let n = vane.len() as f32;
+        let centre = vane
+            .iter()
+            .fold([0.0, 0.0], |a, p| [a[0] + p[0] / n, a[1] + p[1] / n]);
+        for pair in vane.windows(2) {
+            self.quad([centre, pair[0], pair[1], pair[1]], ink);
+        }
+        // The splits: beyond the vane they fall on the ground and don't show.
+        for [a, b, d] in [
+            [[140.0, -215.0], [12.0, -128.0], [140.0, -178.0]],
+            [[140.0, 0.0], [9.0, 82.0], [140.0, 30.0]],
+            [[-150.0, -150.0], [-10.0, -52.0], [-150.0, -112.0]],
+            [[-150.0, 70.0], [-8.0, 160.0], [-150.0, 102.0]],
+        ] {
+            self.quad([at(a), at(b), at(d), at(d)], ground);
+        }
+        let shaft = curve(&[[0.0, -410.0], [10.0, -150.0], [5.0, 120.0], [1.0, 234.0]], 12);
+        self.polyline(&shaft, (11.0 * k).max(0.6), ground);
+        let quill = curve(&[[1.0, 234.0], [0.0, 300.0], [-6.0, 360.0], [-14.0, 415.0]], 8);
+        self.polyline(&quill, (16.0 * k).max(0.8), ink);
+        for wisp in [
+            [[0.0, 222.0], [-40.0, 216.0], [-72.0, 236.0], [-88.0, 268.0]],
+            [[0.0, 246.0], [-30.0, 246.0], [-52.0, 266.0], [-60.0, 294.0]],
+            [[2.0, 228.0], [36.0, 228.0], [58.0, 248.0], [68.0, 274.0]],
+            [[1.0, 252.0], [26.0, 254.0], [40.0, 272.0], [46.0, 294.0]],
+        ] {
+            let line = curve(&wisp, 6);
+            self.polyline(&line, (7.0 * k).max(0.5), ink);
+        }
+    }
     /// Move rasterized glyphs into the batch's atlas uploads (real frames only).
     pub fn finish(self) {
         let pending = with_cache(self.atlas, |c| std::mem::take(&mut c.pending));

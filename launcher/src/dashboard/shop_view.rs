@@ -1,4 +1,4 @@
-//! The Shop: Wisp Coins, capes, wings, weapons, badges, pets, trails, auras and emotes
+//! The Shop: Wisp Coins, capes, wings, weapons, hats, pets, trails, auras and emotes
 //! (`wisp_launcher::shop`).
 //!
 //! A store page: a compact header with the balance, a featured carousel with a thumbnail picker
@@ -73,7 +73,6 @@ fn kind_label(kind: Kind) -> &'static str {
         Kind::Wings => "Wings",
         Kind::Weapon => "Weapons",
         Kind::Head => "Hats",
-        Kind::Badge => "Badges",
         Kind::Pet => "Pets",
         Kind::Trail => "Trails",
         Kind::Aura => "Auras",
@@ -87,7 +86,6 @@ fn kind_icon(kind: Kind) -> &'static str {
         Kind::Wings => "wings",
         Kind::Weapon => "sword",
         Kind::Head => "hat",
-        Kind::Badge => "badge",
         Kind::Pet => "pet",
         Kind::Trail => "trail",
         Kind::Aura => "aura",

@@ -452,6 +452,15 @@ impl Launcher {
                 start,
                 s,
             ))
+            .child(heading("Updates", s))
+            .child(row(
+                "Update automatically",
+                "Download new Wisp Client versions in the background and install them once no game is running.",
+                switch("auto-update", p.auto_update, s).on_click(cx.listener(|this, _, _, cx| {
+                    this.set_prefs(|p| p.auto_update = !p.auto_update, cx)
+                })),
+                s,
+            ))
             .child(heading("Wisp server", s))
             .child(row(
                 "Server address",

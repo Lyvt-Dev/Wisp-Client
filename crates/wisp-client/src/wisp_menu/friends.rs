@@ -291,12 +291,12 @@ impl Menu {
         self.hit(ui, fx, fy, fw, h, Action::FriendField);
         let ready = !empty && !busy;
         let fill = match (ready, hover(ui, bx, fy, bw, h)) {
-            (true, true) => hex(0x7D61FF, 255),
+            (true, true) => ACCENT_HOVER,
             (true, false) => ACCENT,
             (false, _) => CARD_HOVER,
         };
         ui.rounded(bx, fy, bw, h, 12.0, fill);
-        let colour = if ready { INK } else { MUTED };
+        let colour = if ready { ON_ACCENT } else { MUTED };
         ui.text_line(Face::Medium, 13.0, h, bx + 14.0, fy, colour, &label);
         self.hit(ui, bx, fy, bw, h, Action::FriendAdd);
     }
@@ -348,14 +348,18 @@ impl Menu {
         let over = hover(ui, bx, by, bw, bh);
         let fill = match (style, over) {
             (1, false) => ACCENT,
-            (1, true) => hex(0x7D61FF, 255),
+            (1, true) => ACCENT_HOVER,
             (2, false) => hex(0xFF6B6B, 200),
             (2, true) => hex(0xFF6B6B, 255),
             (_, false) => FIELD,
             (_, true) => CARD_HOVER,
         };
         ui.rounded(bx, by, bw, bh, 9.0, fill);
-        let colour = if style == 0 { INK_SOFT } else { INK };
+        let colour = match style {
+            0 => INK_SOFT,
+            1 => ON_ACCENT,
+            _ => INK,
+        };
         ui.text_line(Face::Medium, 12.0, bh, bx + 11.0, by, colour, label);
         self.hit(ui, bx, by, bw, bh, action);
         bx

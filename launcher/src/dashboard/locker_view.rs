@@ -40,7 +40,6 @@ fn kind_label(kind: Kind) -> &'static str {
         Kind::Wings => "Wings",
         Kind::Weapon => "Weapons",
         Kind::Head => "Hats",
-        Kind::Badge => "Badges",
         Kind::Pet => "Pets",
         Kind::Trail => "Trails",
         Kind::Aura => "Auras",

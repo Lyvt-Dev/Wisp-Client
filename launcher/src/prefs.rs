@@ -218,6 +218,8 @@ pub struct Prefs {
     // General
     pub after_launch: AfterLaunch,
     pub start_page: StartPage,
+    /// Download and install new launcher releases by itself (`updater`).
+    pub auto_update: bool,
     // Game
     pub window: (u32, u32),
     pub fullscreen: bool,
@@ -247,6 +249,7 @@ impl Default for Prefs {
         Self {
             after_launch: AfterLaunch::KeepOpen,
             start_page: StartPage::Home,
+            auto_update: true,
             window: (0, 0),
             fullscreen: false,
             render_distance: 0,

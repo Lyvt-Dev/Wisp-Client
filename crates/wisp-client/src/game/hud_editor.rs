@@ -70,11 +70,11 @@ impl Game<'_> {
                         rw + 6.0,
                         rh + 6.0,
                         10.0,
-                        hex(0x8B6BFF, 40),
+                        hex(0xFFFFFF, 28),
                     );
                 }
                 let ring = if hot {
-                    hex(0xA08CFF, 255)
+                    hex(0xFFFFFF, 255)
                 } else {
                     hex(0xFFFFFF, 90)
                 };
@@ -86,7 +86,7 @@ impl Game<'_> {
                     let tw = ui.measure(Face::Medium, 12.0, &tag) + 16.0;
                     let ty = if y > 30.0 { y - 28.0 } else { y + rh + 8.0 };
                     let tx = x.min(w - tw - 4.0).max(4.0);
-                    ui.rounded(tx, ty, tw, 22.0, 8.0, hex(0x6B4BFF, 245));
+                    ui.rounded(tx, ty, tw, 22.0, 8.0, hex(0x2A2A30, 245));
                     ui.text_line(
                         Face::Medium,
                         12.0,
@@ -147,8 +147,8 @@ impl Game<'_> {
                 let (yy, hh) = (by + 12.0, 32.0);
                 let over = cursor_in(&ui, x, yy, *bw, hh);
                 let fill = match (button, over) {
-                    (Button::Done, false) => hex(0x6B4BFF, 255),
-                    (Button::Done, true) => hex(0x7D61FF, 255),
+                    (Button::Done, false) => hex(0xF2F2F2, 255),
+                    (Button::Done, true) => hex(0xFFFFFF, 255),
                     (_, false) => hex(0xFFFFFF, 20),
                     (_, true) => hex(0xFFFFFF, 36),
                 };
@@ -159,7 +159,11 @@ impl Game<'_> {
                     hh,
                     x + 14.0,
                     yy,
-                    hex(0xFFFFFF, 255),
+                    if *button == Button::Done {
+                        hex(0x141414, 255)
+                    } else {
+                        hex(0xFFFFFF, 255)
+                    },
                     label,
                 );
                 hits.push((ui.gui_rect(x, yy, *bw, hh), *button));

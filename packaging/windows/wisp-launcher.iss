@@ -63,3 +63,5 @@ Name: "{autodesktop}\Wisp Client"; Filename: "{app}\Wisp Client.exe"; WorkingDir
 
 [Run]
 Filename: "{app}\Wisp Client.exe"; Description: "{cm:LaunchProgram,Wisp Client}"; Flags: nowait postinstall skipifsilent
+; A silent install is an automatic update: start the new launcher again.
+Filename: "{app}\Wisp Client.exe"; Flags: nowait skipifnotsilent

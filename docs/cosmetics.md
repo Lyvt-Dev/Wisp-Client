@@ -180,6 +180,10 @@ does the asking.
 - **Name tag styles** (`game/names.rs`): the mark, 8 text pixels square, before the name and a
   one-pixel line in the style's colour under the name's background, in the name tag's own pass
   (the mark is in the atlas like the other items' textures).
+- **Wisp's badge** (`wisp_badge`, the app icon's feather as a 16×16 mark): the launcher writes it
+  into every player's worn folder (`shop::WISP_BADGE`); it isn't sold and can't be taken off. The
+  game shows it even when the player hid their own or others' cosmetics (others' only while the
+  game still asks about them, so not with *Hidden*). It replaced the Star, Crown and Moon badges.
 - **Drawing** (`game/cosmetics.rs`): an item's texture takes one of the skin atlas's 64×64 slots
   and its boxes are posed on the wearer's bone each frame, through the same GPU skin path as the
   player model (the CPU path where that is off), lit and culled with the player. A helmet hides a

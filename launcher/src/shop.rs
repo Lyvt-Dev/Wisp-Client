@@ -1,7 +1,7 @@
 //! The Shop: Wisp Coins, the items they buy, and what the player wears in the game.
 //!
 //! Everything is local to this launcher (`shop.json` in its data folder). Coins are earned, never
-//! bought: a welcome gift and a daily bonus. Equipped capes, weapons, hats, badges, pets and trails are written
+//! bought: a welcome gift and a daily bonus. Equipped capes, weapons, hats, pets and trails are written
 //! as cosmetic item files (`docs/cosmetics.md`) into `shop/worn`, which the game reads through
 //! `WISP_COSMETICS_LOCAL`, limited to the signed-in player.
 use serde::{Deserialize, Serialize};
@@ -24,7 +24,6 @@ pub enum Kind {
     Weapon,
     /// Worn on the head (a hat); a helmet hides it.
     Head,
-    Badge,
     Pet,
     Trail,
     Aura,
@@ -39,18 +38,20 @@ impl Kind {
         self == other || (back(self) && back(other))
     }
 
-    pub const ALL: [Kind; 9] = [
+    pub const ALL: [Kind; 8] = [
         Kind::Cape,
         Kind::Wings,
         Kind::Weapon,
         Kind::Head,
-        Kind::Badge,
         Kind::Pet,
         Kind::Trail,
         Kind::Aura,
         Kind::Emote,
     ];
 }
+
+/// Wisp's badge before the name: every player wears it, so it isn't sold and can't be taken off.
+pub const WISP_BADGE: &[u8] = include_bytes!("../assets/shop/wisp_badge.json");
 
 /// The file in the worn folder that lists the emotes in the wheel, one id a line.
 pub const EMOTES_FILE: &str = "emotes.txt";
@@ -160,30 +161,6 @@ pub const OFFERS: &[Offer] = &[
         "A wide conical straw hat, woven strip by strip and bound with a copper rim.",
         Head,
         600,
-        item
-    ),
-    offer!(
-        "star_badge",
-        "Star Badge",
-        "A violet star before your name.",
-        Badge,
-        300,
-        item
-    ),
-    offer!(
-        "crown_badge",
-        "Crown Badge",
-        "A golden crown before your name.",
-        Badge,
-        500,
-        item
-    ),
-    offer!(
-        "moon_badge",
-        "Moon Badge",
-        "A pale crescent moon before your name.",
-        Badge,
-        400,
         item
     ),
     offer!(
@@ -522,7 +499,8 @@ impl Wallet {
                 fs::remove_file(path)?;
             }
         }
-        let mut written = 0;
+        fs::write(dir.join("wisp_badge.json"), WISP_BADGE)?;
+        let mut written = 1;
         let mut emotes = String::new();
         for id in &self.equipped {
             match offer(id) {
@@ -612,7 +590,6 @@ mod tests {
                 Kind::Cape | Kind::Wings => "back",
                 Kind::Weapon => "weapon",
                 Kind::Head => "head",
-                Kind::Badge => "name_tag",
                 Kind::Pet => "shoulder",
                 Kind::Trail => "trail",
                 Kind::Aura => "aura",
@@ -676,7 +653,7 @@ mod tests {
         assert_eq!(w.buy("founders_cape"), Ok(()));
         assert_eq!(w.coins, 0);
         assert_eq!(w.claim("founders_cape"), Err(Refused::Owned));
-        assert_eq!(w.claim("star_badge"), Err(Refused::NotClaimable));
+        assert_eq!(w.claim("stray_head"), Err(Refused::NotClaimable));
         assert_eq!(w.buy("nothing"), Err(Refused::Unknown));
     }
 
@@ -689,24 +666,25 @@ mod tests {
         for id in [
             "founders_cape",
             "aurora_cape",
-            "star_badge",
+            "stray_head",
             "stardust_trail",
         ] {
             w.buy(id).unwrap();
         }
-        assert_eq!(w.equip("moon_badge"), Err(Refused::NotOwned));
+        assert_eq!(w.equip("nova_owl"), Err(Refused::NotOwned));
         w.equip("founders_cape").unwrap();
         w.equip("aurora_cape").unwrap();
-        w.equip("star_badge").unwrap();
+        w.equip("stray_head").unwrap();
         w.equip("stardust_trail").unwrap();
         assert!(!w.wears("founders_cape"));
-        assert_eq!(w.equipped, ["aurora_cape", "star_badge", "stardust_trail"]);
+        assert_eq!(w.equipped, ["aurora_cape", "stray_head", "stardust_trail"]);
 
         let dir = std::env::temp_dir().join(format!("wisp-shop-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         fs::write(dir.join("old_item.json"), b"{}").unwrap();
-        assert_eq!(w.dress(&dir).unwrap(), 3);
+        // Wisp's badge is always worn.
+        assert_eq!(w.dress(&dir).unwrap(), 4);
         let mut names: Vec<_> = fs::read_dir(&dir)
             .unwrap()
             .map(|e| e.unwrap().file_name().into_string().unwrap())
@@ -714,7 +692,12 @@ mod tests {
         names.sort();
         assert_eq!(
             names,
-            ["aurora_cape.json", "star_badge.json", "stardust_trail.json"]
+            [
+                "aurora_cape.json",
+                "stardust_trail.json",
+                "stray_head.json",
+                "wisp_badge.json"
+            ]
         );
         w.unequip("aurora_cape");
         w.save(&dir).unwrap();
@@ -725,18 +708,18 @@ mod tests {
     #[test]
     fn a_bought_emote_goes_in_the_wheel_beside_worn_items() {
         let mut w = Wallet {
-            coins: 1_000,
+            coins: 1_200,
             ..Wallet::default()
         };
         w.buy("black_hole").unwrap();
-        assert_eq!(w.coins, 400);
+        assert_eq!(w.coins, 600);
         w.equip("black_hole").unwrap();
-        w.buy("star_badge").unwrap();
-        w.equip("star_badge").unwrap();
-        assert!(w.wears("black_hole") && w.wears("star_badge"));
+        w.buy("stray_head").unwrap();
+        w.equip("stray_head").unwrap();
+        assert!(w.wears("black_hole") && w.wears("stray_head"));
         let dir = std::env::temp_dir().join(format!("wisp-emotes-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
-        assert_eq!(w.dress(&dir).unwrap(), 2);
+        assert_eq!(w.dress(&dir).unwrap(), 3);
         assert_eq!(
             fs::read_to_string(dir.join(EMOTES_FILE)).unwrap(),
             "black_hole\n"
