@@ -1587,6 +1587,9 @@ pub fn render_skinned(
 /// as the player's, its cape turned by `ModelPart.rotateBy` with the cape's
 /// flap and leans. `base` is the player's root transform (moved out over a
 /// chestplate); `uv` the cape texture.
+///
+/// `wavy` (Wisp's Wavy Capes module) bends the cape along its height instead of turning it as one
+/// board ([`wavy_cape`]).
 #[allow(clippy::too_many_arguments)]
 pub fn cape(
     m: &Mob,
@@ -1595,6 +1598,7 @@ pub fn cape(
     uv: [f32; 4],
     light: u32,
     data: &MobData,
+    wavy: bool,
     out: &mut Vec<Vertex>,
 ) {
     let Some(model) = m.kind.layer("player#cape") else {
@@ -1622,8 +1626,128 @@ pub fn cape(
     let now = glam::Quat::from_euler(glam::EulerRot::ZYX, pose[5], pose[4], pose[3]);
     let (z, y, x) = (now * by).to_euler(glam::EulerRot::ZYX);
     (pose[3], pose[4], pose[5]) = (x, y, z);
+    if wavy {
+        let phase = m.extra.avatar.cape_phase(alpha);
+        let bent = wavy_cape(model, |u| cape_bend(u, flap, lean, phase));
+        draw(&bent, base, &poses, uv, 0xFFFF_FFFF, light, 0, out);
+        return;
+    }
     // RenderTypes.entitySolid with OverlayTexture.NO_OVERLAY.
     draw(model, base, &poses, uv, 0xFFFF_FFFF, light, 0, out);
+}
+
+/// Wavy Capes: the strips the cape is cut into along its height.
+const CAPE_STRIPS: usize = 16;
+
+/// Wavy Capes: how far the cape at height `u` (0 at the shoulders, 1 at the hem) turns past
+/// vanilla's rigid turn, in degrees; positive lifts it away from the back like vanilla's flap.
+/// `flap` and `lean` are vanilla's (`ClientAvatarState::cape`), `phase` the player's wave
+/// (`AvatarBob::cape_phase`).
+///
+/// The lift vanilla gives the whole board is shared out unevenly: the top hangs closer to the back
+/// and the hem trails further, so a running cape curves instead of standing out flat. On top runs
+/// a wave from the shoulders down, stronger towards the hem and with speed; standing, a slow sway.
+/// The result never turns a strip into the back (below 0 degrees from hanging straight down).
+pub fn cape_bend(u: f32, flap: f32, lean: f32, phase: f32) -> f32 {
+    let rigid = 6.0 + lean / 2.0 + flap;
+    let lift = (lean / 2.0 + flap).max(0.0);
+    let speed = (lean / 60.0).clamp(0.0, 1.0);
+    let drag = lift * (0.7 * u - 0.35);
+    let amplitude = (2.5 + 10.0 * speed) * u.powf(1.4);
+    let wave = amplitude * (phase - u * 5.0).sin();
+    (rigid + drag + wave).clamp(0.0, 120.0) - rigid
+}
+
+/// Wavy Capes: `model` with its `cape` part cut into [`CAPE_STRIPS`] strips along the height, each
+/// turned about the part's X axis by `bend(u)` degrees (as [`cape_bend`]) and laid end to end
+/// from the shoulders, so the cape bends instead of turning as one board. A constant `bend` is
+/// the board turned that much further.
+pub fn wavy_cape(model: &Part, bend: impl Fn(f32) -> f32) -> Part {
+    fn find<'a>(part: &'a mut Part) -> Option<&'a mut Part> {
+        if part.name == "cape" {
+            return Some(part);
+        }
+        part.children.iter_mut().find_map(find)
+    }
+    let mut model = model.clone();
+    let Some(cape) = find(&mut model) else {
+        return model;
+    };
+    let (top, bottom) = cape
+        .polygons
+        .iter()
+        .flat_map(|p| p.vertices)
+        .fold((f32::MAX, f32::MIN), |(lo, hi), v| {
+            (lo.min(v[1]), hi.max(v[1]))
+        });
+    let height = bottom - top;
+    if height <= 0.0 {
+        return model;
+    }
+    // The part turns `-angle` about X to lift its hem away from the back: the cape's own yRot of
+    // a half turn flips the X axis vanilla's flap turns about.
+    let turn = |degrees: f32| glam::Quat::from_rotation_x(-degrees.to_radians());
+    let step = height / CAPE_STRIPS as f32;
+    // The spine (z = 0, the side against the back) at each strip's edge, and each edge's turn.
+    let mut edge = vec![turn(bend(0.0))];
+    let mut spine = vec![edge[0] * glam::Vec3::new(0.0, top, 0.0)];
+    for k in 0..CAPE_STRIPS {
+        let middle = turn(bend((k as f32 + 0.5) / CAPE_STRIPS as f32));
+        spine.push(spine[k] + middle * glam::Vec3::new(0.0, step, 0.0));
+        edge.push(turn(bend((k + 1) as f32 / CAPE_STRIPS as f32)));
+    }
+    // A point of the flat cape at height `y` and depth `z`, bent.
+    let place = |v: [f32; 5]| -> [f32; 5] {
+        let k = (((v[1] - top) / step).round() as usize).min(CAPE_STRIPS);
+        let p = spine[k] + edge[k] * glam::Vec3::new(0.0, 0.0, v[2]);
+        [v[0], p.y, p.z, v[3], v[4]]
+    };
+    let lerp = |a: [f32; 5], b: [f32; 5], y: f32| -> [f32; 5] {
+        let t = if b[1] == a[1] {
+            0.0
+        } else {
+            (y - a[1]) / (b[1] - a[1])
+        };
+        std::array::from_fn(|i| a[i] + (b[i] - a[i]) * t)
+    };
+    let mut polygons = Vec::with_capacity(cape.polygons.len() * CAPE_STRIPS);
+    for poly in &cape.polygons {
+        let v = poly.vertices;
+        let normal = glam::Vec3::from_array(poly.normal);
+        // Faces across the height (the top and the hem) only move.
+        let Some(r) = (0..2).find(|&r| (v[r][1] - v[r + 1][1]).abs() > 1e-4) else {
+            let k = (((v[0][1] - top) / step).round() as usize).min(CAPE_STRIPS);
+            polygons.push(super::Polygon {
+                normal: (edge[k] * normal).to_array(),
+                vertices: v.map(place),
+                ..poly.clone()
+            });
+            continue;
+        };
+        // The quad in order a, b, c, d with a→b (and d→c) along the height.
+        let [a, b, c, d] = [v[r], v[r + 1], v[(r + 2) % 4], v[(r + 3) % 4]];
+        let (from, to) = (a[1].min(b[1]), a[1].max(b[1]));
+        let first = ((from - top) / step).round() as usize;
+        let last = (((to - top) / step).round() as usize).min(CAPE_STRIPS);
+        for k in first..last {
+            let (y0, y1) = (top + k as f32 * step, top + (k + 1) as f32 * step);
+            let (ys, ye) = if a[1] < b[1] { (y0, y1) } else { (y1, y0) };
+            let quad = [
+                lerp(a, b, ys),
+                lerp(a, b, ye),
+                lerp(d, c, ye),
+                lerp(d, c, ys),
+            ];
+            let middle = turn(bend((k as f32 + 0.5) / CAPE_STRIPS as f32));
+            polygons.push(super::Polygon {
+                normal: (middle * normal).to_array(),
+                vertices: quad.map(place),
+                ..poly.clone()
+            });
+        }
+    }
+    cape.polygons = polygons;
+    model
 }
 /// `Deadmau5EarsLayer.submit` with `PlayerEarsModel`: the player model's
 /// head carrying two 6x6x1 ears (the model's other cubes are cleared),
@@ -4146,5 +4270,172 @@ mod random_texture_tests {
                 "{axis:?} scales by {length}, not 2 * 0.9375"
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod wavy_cape_tests {
+    use super::*;
+    use glam::{Mat4, Quat, Vec3};
+
+    /// `PlayerCapeModel`'s cape: `addBox(-5, 0, -1, 10, 16, 1)` on the body, turned a half turn.
+    fn cape_model() -> Part {
+        let (lo, hi) = (Vec3::new(-5.0, 0.0, -1.0), Vec3::new(5.0, 16.0, 0.0));
+        let c = |x: bool, y: bool, z: bool| {
+            [
+                if x { hi.x } else { lo.x },
+                if y { hi.y } else { lo.y },
+                if z { hi.z } else { lo.z },
+            ]
+        };
+        let face = |normal: [f32; 3], corners: [[f32; 3]; 4]| super::super::Polygon {
+            normal,
+            vertices: corners.map(|p| [p[0], p[1], p[2], 0.0, 0.0]),
+            cull_back: false,
+        };
+        let (f, t) = (false, true);
+        let polygons = vec![
+            face(
+                [0.0, -1.0, 0.0],
+                [c(f, f, f), c(t, f, f), c(t, f, t), c(f, f, t)],
+            ),
+            face(
+                [0.0, 1.0, 0.0],
+                [c(f, t, t), c(t, t, t), c(t, t, f), c(f, t, f)],
+            ),
+            face(
+                [-1.0, 0.0, 0.0],
+                [c(f, f, t), c(f, t, t), c(f, t, f), c(f, f, f)],
+            ),
+            face(
+                [0.0, 0.0, -1.0],
+                [c(f, f, f), c(f, t, f), c(t, t, f), c(t, f, f)],
+            ),
+            face(
+                [1.0, 0.0, 0.0],
+                [c(t, f, f), c(t, t, f), c(t, t, t), c(t, f, t)],
+            ),
+            face(
+                [0.0, 0.0, 1.0],
+                [c(t, f, t), c(t, t, t), c(f, t, t), c(f, f, t)],
+            ),
+        ];
+        let part = |name: &str, pose, polygons, children| Part {
+            name: name.into(),
+            pose,
+            polygons,
+            children,
+        };
+        let cape = part(
+            "cape",
+            [0.0, 0.0, 2.0, 0.0, PI, 0.0, 1.0, 1.0, 1.0],
+            polygons,
+            vec![],
+        );
+        let body = part(
+            "body",
+            [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0],
+            vec![],
+            vec![cape],
+        );
+        part(
+            "root",
+            [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0],
+            vec![],
+            vec![body],
+        )
+    }
+
+    fn cape_of(model: &Part) -> &Part {
+        &model.children[0].children[0]
+    }
+
+    /// The cape's matrix as `cape` turns it for a flap (no lean).
+    fn vanilla(flap: f32) -> Mat4 {
+        let now = Quat::from_rotation_y(PI);
+        let by = Quat::from_rotation_y(-PI)
+            * Quat::from_rotation_x((6.0 + flap).to_radians())
+            * Quat::from_rotation_y(PI);
+        Mat4::from_translation(Vec3::new(0.0, 0.0, 2.0)) * Mat4::from_quat(now * by)
+    }
+
+    #[test]
+    fn a_constant_bend_is_the_board_turned_further_back() {
+        let bent = wavy_cape(&cape_model(), |_| 10.0);
+        let cape = cape_of(&bent);
+        assert_eq!(cape.polygons.len(), 2 + 4 * CAPE_STRIPS);
+        let turn = Quat::from_rotation_x(-10f32.to_radians());
+        // Every bent point is a point of the flat box turned by the bend.
+        for v in cape.polygons.iter().flat_map(|p| p.vertices) {
+            let flat = turn.inverse() * Vec3::new(v[0], v[1], v[2]);
+            assert!(
+                flat.x.abs() <= 5.001 && (-0.001..=16.001).contains(&flat.y),
+                "{flat}"
+            );
+            assert!((-1.001..=0.001).contains(&flat.z), "{flat}");
+        }
+        // And turning it in the part's frame is vanilla's flap made 10 degrees larger.
+        let hem = Vec3::new(5.0, 16.0, -1.0);
+        let wavy = vanilla(4.0).transform_point3(turn * hem);
+        let further = vanilla(14.0).transform_point3(hem);
+        assert!(wavy.distance(further) < 1e-4, "{wavy} vs {further}");
+        // Further back is away from the body (+z, the back) and up.
+        let rest = vanilla(4.0).transform_point3(hem);
+        assert!(further.z > rest.z && further.y < rest.y);
+    }
+
+    #[test]
+    fn no_bend_keeps_the_board_and_its_strips_join() {
+        let bent = wavy_cape(&cape_model(), |u| (u * 9.0).sin() * 20.0 * u);
+        let cape = cape_of(&bent);
+        // Strips meet: every point of a long face but the hem is shared with the strip below.
+        let long: Vec<_> = cape
+            .polygons
+            .iter()
+            .filter(|p| p.normal[0].abs() < 0.5)
+            .collect();
+        let key = |v: [f32; 5]| [v[0], v[1], v[2]].map(|x| (x * 1000.0).round() as i32);
+        let mut seen = std::collections::HashMap::new();
+        for v in long.iter().flat_map(|p| p.vertices) {
+            *seen.entry(key(v)).or_insert(0) += 1;
+        }
+        // (The top and the hem share theirs with the first and last strips.)
+        assert!(seen.values().all(|&n| n >= 2), "{seen:?}");
+        let flat = wavy_cape(&cape_model(), |_| 0.0);
+        for v in cape_of(&flat).polygons.iter().flat_map(|p| p.vertices) {
+            assert!(
+                v[0].abs() <= 5.0 && (0.0..=16.0).contains(&v[1]) && (-1.0..=0.0).contains(&v[2])
+            );
+        }
+    }
+
+    #[test]
+    fn the_cape_never_bends_into_the_back_and_sways_gently_at_rest() {
+        for flap in [-6.0, 0.0, 12.0, 32.0] {
+            for lean in [0.0, 20.0, 60.0, 150.0] {
+                for k in 0..=20 {
+                    let u = k as f32 / 20.0;
+                    for phase in [0.0, 1.0, 2.5, 4.0, 5.5] {
+                        let total = 6.0 + lean / 2.0 + flap + cape_bend(u, flap, lean, phase);
+                        assert!(
+                            (-1e-4..=120.0001).contains(&total),
+                            "{u} {flap} {lean} {phase}"
+                        );
+                    }
+                }
+            }
+        }
+        for phase in [0.0, 1.0, 2.0, 3.0] {
+            assert!(cape_bend(1.0, 0.0, 0.0, phase).abs() <= 2.5 + 1e-4);
+            assert_eq!(cape_bend(0.0, 0.0, 0.0, phase), 0.0);
+        }
+        // Running, the hem trails further back than the shoulders.
+        let avg = |u: f32| {
+            (0..8)
+                .map(|i| cape_bend(u, 0.0, 80.0, i as f32 * 0.785))
+                .sum::<f32>()
+                / 8.0
+        };
+        assert!(avg(1.0) > avg(0.0) + 20.0);
     }
 }

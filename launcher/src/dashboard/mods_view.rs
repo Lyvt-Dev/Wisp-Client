@@ -75,6 +75,7 @@ fn about(key: &str) -> (Category, &'static str) {
             "Your sky stays at noon; the world's time is untouched.",
         ),
         "item_physics" => (Visual, "Dropped items lie flat on the ground."),
+        "wavy_capes" => (Visual, "Capes bend and wave as you move."),
         "arrow_trails" => (Visual, "Flying arrows leave a trail of sparks."),
         "target_crosshair" => (Combat, "The crosshair turns red over a mob or player."),
         "freelook" => (Utility, "Hold Left Alt to look around without turning."),

@@ -602,6 +602,8 @@
   "wisp.module.always_day.tooltip": "Draws the sky and light at noon whatever the time. Only you see it: the world's time, mobs and the server are unchanged.",
   "wisp.module.item_physics": "Item Physics",
   "wisp.module.item_physics.tooltip": "Dropped items lie flat on the ground instead of floating and spinning; blocks stand still. Only you see it.",
+  "wisp.module.wavy_capes": "Wavy Capes",
+  "wisp.module.wavy_capes.tooltip": "Capes bend and wave in the wind as you move, instead of swinging as one stiff board. Only you see it.",
   "wisp.module.arrow_trails": "Arrow Trails",
   "wisp.module.arrow_trails.tooltip": "Flying arrows leave a trail of glowing sparks. Only you see it.",
   "wisp.module.target_crosshair": "Target Crosshair",

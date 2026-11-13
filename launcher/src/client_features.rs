@@ -29,6 +29,7 @@ pub const FEATURES: &[(&str, &str)] = &[
     ("hud_arrows", "Arrow Count"),
     ("always_day", "Always Day"),
     ("item_physics", "Item Physics"),
+    ("wavy_capes", "Wavy Capes"),
     ("arrow_trails", "Arrow Trails"),
     ("target_crosshair", "Target Crosshair"),
     ("freelook", "Freelook"),

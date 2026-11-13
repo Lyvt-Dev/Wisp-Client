@@ -161,6 +161,12 @@ pub const MODULES: &[Module] = &[
         "The crosshair turns red while it is on a mob or player you can hit."
     ),
     module!(
+        "wavy_capes",
+        "visual",
+        "Wavy Capes",
+        "Capes bend and wave in the wind as you move, instead of swinging as one stiff board. Only you see it."
+    ),
+    module!(
         "freelook",
         "visual",
         "Freelook",

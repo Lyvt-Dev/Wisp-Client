@@ -754,6 +754,10 @@ pub struct AvatarBob {
     /// `xCloak`, `yCloak`, `zCloak`: a point trailing the player, which the cape leans from.
     pub cloak: [f64; 3],
     pub cloak_o: [f64; 3],
+    /// Wisp's Wavy Capes: the phase (radians) of the wave running down the cape, faster the
+    /// faster the player moves. Not vanilla's: nothing vanilla reads it.
+    pub cape_phase: f32,
+    pub cape_phase_o: f32,
 }
 impl AvatarBob {
     /// `ClientAvatarState.tick` (at the start of `AbstractClientPlayer.tick`)
@@ -762,6 +766,7 @@ impl AvatarBob {
     pub fn tick(&mut self, position: [f64; 3]) {
         self.walk_dist_o = self.walk_dist;
         self.cloak_o = self.cloak;
+        self.advance_cape_wave(position);
         for i in 0..3 {
             let d = position[i] - self.cloak[i];
             if d > 10.0 || d < -10.0 {
@@ -771,6 +776,23 @@ impl AvatarBob {
                 self.cloak[i] += d * 0.25;
             }
         }
+    }
+    /// Wavy Capes: moves the cape's wave on by a tick. The cloak trails the player by about four
+    /// ticks of movement, so the horizontal gap is the speed: the wave runs at ~0.4 Hz standing
+    /// and ~2 Hz sprinting.
+    fn advance_cape_wave(&mut self, position: [f64; 3]) {
+        let (dx, dz) = (position[0] - self.cloak[0], position[2] - self.cloak[2]);
+        let speed = ((dx * dx + dz * dz).sqrt() / 4.0).min(1.0) as f32;
+        self.cape_phase_o = self.cape_phase;
+        self.cape_phase += 0.12 + 1.8 * speed;
+        if self.cape_phase > std::f32::consts::TAU {
+            self.cape_phase -= std::f32::consts::TAU;
+            self.cape_phase_o -= std::f32::consts::TAU;
+        }
+    }
+    /// Wavy Capes: the wave's phase between the last tick and this one.
+    pub fn cape_phase(&self, partial: f32) -> f32 {
+        lerp(partial, self.cape_phase_o, self.cape_phase)
     }
     /// `AvatarRenderer.extractCapeState`: the cape's `capeFlap`, `capeLean`
     /// and `capeLean2` (degrees) for the player at `position` (interpolated)
@@ -1133,5 +1155,28 @@ mod tests {
         p.using = Some((UseItem::Spyglass, 3));
         assert_eq!(field_of_view_modifier(&p, true, 1.0), 0.1);
         assert_ne!(field_of_view_modifier(&p, false, 1.0), 0.1);
+    }
+}
+
+#[cfg(test)]
+mod cape_wave_tests {
+    use super::AvatarBob;
+
+    #[test]
+    fn the_cape_wave_runs_faster_while_moving_and_stays_continuous() {
+        let mut standing = AvatarBob::default();
+        let mut running = AvatarBob::default();
+        let (mut still, mut moved) = (0.0, 0.0);
+        for t in 0..40 {
+            standing.tick([0.0, 64.0, 0.0]);
+            running.tick([f64::from(t) * 0.28, 64.0, 0.0]);
+            let step =
+                |a: &AvatarBob| (a.cape_phase - a.cape_phase_o).rem_euclid(std::f32::consts::TAU);
+            still += step(&standing);
+            moved += step(&running);
+            assert!(running.cape_phase(0.5) >= running.cape_phase_o);
+            assert!(running.cape_phase <= std::f32::consts::TAU);
+        }
+        assert!(moved > still * 3.0, "{moved} vs {still}");
     }
 }

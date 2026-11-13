@@ -357,6 +357,7 @@ pub const FEATURES: &[Feature] = &[
         ),]
     ),
     feature!("item_physics", Visual, "minecraft:diamond", []),
+    feature!("wavy_capes", Visual, "minecraft:white_banner", []),
     feature!(
         "arrow_trails",
         Visual,

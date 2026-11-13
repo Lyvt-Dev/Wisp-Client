@@ -278,6 +278,11 @@ Client-only; off, nothing is computed.
 - Item Physics (`item_physics`, `item_draw.rs`): a dropped item at rest lies still, turned by its
   bob offset; a flat item (thinner than 0.1 along z in its ground transform) lies on its face, a
   block model stands on the ground. Items in the air spin and bob as vanilla's.
+- Wavy Capes (`wavy_capes`, `mobs/render.rs` `wavy_cape`, `cape_bend`): every player's Mojang cape
+  is cut into 16 strips along its height and bent instead of turned as one board: vanilla's lift
+  is shared so the hem trails further than the shoulders, and a wave runs down it, stronger at the
+  hem and with speed (its phase is `AvatarBob::cape_phase`, faster the faster the player moves).
+  No strip turns into the back. Shop capes (cosmetic `back` items) are not bent yet.
 - Arrow Trails (`arrow_trails`, `render_tick.rs`): every tick a flying arrow (not stuck) leaves six
   end rod sparks along the path it flew.
 - Target Crosshair (`target_crosshair`, `hud_layout::tint_crosshair`): over a living mob or player

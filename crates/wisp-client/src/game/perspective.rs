@@ -1035,6 +1035,7 @@ impl Game<'_> {
             [rect.u0, rect.v0, rect.u1, rect.v1],
             light,
             self.res.mob_data(),
+            self.settings.extras.module("wavy_capes"),
             out,
         );
     }
