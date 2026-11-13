@@ -16,8 +16,7 @@ the open work. The product is **Wisp Client** (it was Astrum, before that Horizo
   `codex/wisp-rebrand`, `codex/astrum-rebrand`) is left as it was. Its Actions failed on billing,
   so no release came from it after `launcher-v0.11.4`. Don't push there.
 - Untracked and not for the repository: `capeideas/`, `cosmeticideas/`, `modelsforshop/`,
-  `referenzen/` (the owner's references), `crates/astrum-cosmetics-server/target` (an old build
-  folder, safe to delete).
+  `referenzen/` (the owner's references).
 
 ## Tools on this machine
 
@@ -58,22 +57,38 @@ the open work. The product is **Wisp Client** (it was Astrum, before that Horizo
   Settings › General › Updates, the check/download thread in `dashboard.rs` (`Event::UpdateReady`)
   and the install in the 200 ms loop once no game, launch, setup or bundled engine runs. The
   installer's `[Run]` starts the new launcher after a silent install.
-- Launcher 0.14.1 (`packaging/windows/releases/0.14.1.md`) is published as `launcher-v0.14.1`.
+- Launcher 0.14.1 is published as `launcher-v0.14.1`; 0.14.2 (wavy capes, rank prefixes) was pushed
+  on 2026-11-13 and builds itself; 0.14.1 launchers should update to it automatically (first real
+  test of the updater).
 - Players on 0.14.0 install 0.14.1 by hand once. The first real test of the updater is the next
   release (0.14.2): a 0.14.1 launcher should update itself.
 
-### 3. Wavy capes: the Mojang cape done (committed locally, not pushed), Shop capes open
+### 3. Wavy capes: the Mojang cape done and released in 0.14.2; Shop capes open
 
 - Module `wavy_capes` (Visual, off by default; Extras row, Wisp Menu tile, `en_us.json`, launcher
   lists). `mobs/render.rs` `wavy_cape` cuts the `cape` part into 16 strips and bends them by
   `cape_bend(u, flap, lean, phase)`; the phase is `AvatarBob::cape_phase` (`camera.rs`, advanced in
   `tick` faster with speed), so remote players' capes wave too. Tests: `wavy_cape_tests`,
-  `cape_wave_tests`. Release 0.14.1 is published (`launcher-v0.14.1`).
-- Before pushing: `cargo clippy -p wisp-client -p wisp-client-lib -p wisp-client-render --lib
-  --tests -- -D warnings` (it failed on a full disk, not on the code), then look at it in the
-  game (third person, walk/sprint/stand) and tune the numbers in `cape_bend` if needed.
+  `cape_wave_tests`. Not yet looked at in the game: tune the numbers in `cape_bend` if needed.
 - Next: Shop capes (cosmetic `back` items, `game/cosmetics.rs` `cosmetics_geometry`, GPU skin
   path): bend their vertices with the same `cape_bend` on the CPU path when the module is on.
+
+### 4. Rank prefixes (TAB plugin, zedix.de): fixed in 0.14.2, confirm on the server
+
+- Cause found: mixed component lists arrive as NBT with `{"": element}` wrappers; both converters
+  (`scoreboard::tag_to_json`, `item_render::tag_json`) kept them, so plain parts of a team prefix
+  decoded as empty. Now unwrapped (`scoreboard::unwrap_list_element`, test
+  `a_team_prefix_with_a_mixed_extra_list_keeps_every_part`).
+- Not verified on the server. The team log (`remote_team`, first 1000 packets) now records each
+  prefix and suffix: if the owner's rank still doesn't show, find the `Wisp: team` line that adds
+  `Lyvt` in the instance's `logs/latest.log` and look at its prefix. Their own tag shows only with
+  the `ownNameTag` extra, in third person (vanilla never shows it).
+
+### Disk
+
+- 2026-11-13: old build caches deleted (~109 GB): `launcher/target`, every `target/*` but
+  `target/debug` (its `incremental` too) and `crates/astrum-cosmetics-server`. The next launcher
+  or installer build compiles from scratch.
 
 ### Smaller open points
 
