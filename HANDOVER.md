@@ -58,31 +58,22 @@ the open work. The product is **Wisp Client** (it was Astrum, before that Horizo
   Settings › General › Updates, the check/download thread in `dashboard.rs` (`Event::UpdateReady`)
   and the install in the 200 ms loop once no game, launch, setup or bundled engine runs. The
   installer's `[Run]` starts the new launcher after a silent install.
-- Launcher 0.14.1 (`packaging/windows/releases/0.14.1.md`); tests, fmt and clippy pass. Pushed to
-  `wisp main`, so `local-launcher` builds and publishes `launcher-v0.14.1`. Check with
-  `gh run list --repo Lyvt-Dev/Wisp-Client --workflow launcher.yml`.
+- Launcher 0.14.1 (`packaging/windows/releases/0.14.1.md`) is published as `launcher-v0.14.1`.
 - Players on 0.14.0 install 0.14.1 by hand once. The first real test of the updater is the next
   release (0.14.2): a 0.14.1 launcher should update itself.
 
-### 3. Wavy capes: designed, not started
+### 3. Wavy capes: the Mojang cape done (committed locally, not pushed), Shop capes open
 
-The owner wants capes that wave realistically (like the "Wavey Capes" mod), for the Mojang cape
-and ideally the Shop capes, as a Wisp Menu module that can be switched off.
-- The Mojang cape: `crates/wisp-client/src/mobs/render.rs` `pub fn cape` draws the
-  `player#cape` model as one box turned by vanilla's flap/lean
-  (`camera.rs` `ClientAvatarState::cape`). Plan: find the `cape` part's matrix the way
-  `draw_normals` walks the tree, slice its six faces into ~16 strips along the cape's height and
-  bend them along a curve: angle(u) = amplitude(u) * sin(phase - u*2.6π) + curl(u), with
-  u = height 0..1, amplitude growing to the bottom and with speed (vanilla `lean`), phase from
-  `m.age + alpha`; a gentle sway when standing. Stateless, so other players get it too.
-- The Shop capes are cosmetic `back` items (`crates/wisp-client/src/game/cosmetics.rs`
-  `cosmetics_geometry`, GPU skin path), animated only by the item's `animations`. Either split the
-  cape into chained child parts with phased `swing` animations in
-  `crates/wisp-cosmetics/examples/shop_items.rs` `cape_item` (data only, but not driven by
-  movement), or bend their vertices like the Mojang cape on the CPU path.
-- The module: add a `module!` row to `crates/wisp-client-render/src/extras.rs` `MODULES` and a tile
-  in `extras/features.rs` `FEATURES` (category Visual), with an English text in
-  `assets/wisp/lang/en_us.json` (the language test checks every key).
+- Module `wavy_capes` (Visual, off by default; Extras row, Wisp Menu tile, `en_us.json`, launcher
+  lists). `mobs/render.rs` `wavy_cape` cuts the `cape` part into 16 strips and bends them by
+  `cape_bend(u, flap, lean, phase)`; the phase is `AvatarBob::cape_phase` (`camera.rs`, advanced in
+  `tick` faster with speed), so remote players' capes wave too. Tests: `wavy_cape_tests`,
+  `cape_wave_tests`. Release 0.14.1 is published (`launcher-v0.14.1`).
+- Before pushing: `cargo clippy -p wisp-client -p wisp-client-lib -p wisp-client-render --lib
+  --tests -- -D warnings` (it failed on a full disk, not on the code), then look at it in the
+  game (third person, walk/sprint/stand) and tune the numbers in `cape_bend` if needed.
+- Next: Shop capes (cosmetic `back` items, `game/cosmetics.rs` `cosmetics_geometry`, GPU skin
+  path): bend their vertices with the same `cape_bend` on the CPU path when the module is on.
 
 ### Smaller open points
 
