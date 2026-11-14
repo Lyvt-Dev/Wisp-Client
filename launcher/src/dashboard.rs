@@ -605,6 +605,13 @@ impl Launcher {
                         } else {
                             "Ready to play."
                         });
+                        // First start: no instance yet, so the game download begins at once (after
+                        // sign-in when no account is saved: `install` asks for it and goes on).
+                        if self.settings.profiles.is_empty()
+                            && wisp_launcher::engine::bundled().is_some()
+                        {
+                            self.install(cx);
+                        }
                     }
                     Err(error) => self.error(error),
                 }

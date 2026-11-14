@@ -32,9 +32,11 @@ pub fn current() -> Version {
     Version::parse(env!("CARGO_PKG_VERSION")).expect("the package version is semver")
 }
 
-/// Whether updates may run: not turned off, and a release build.
+/// Whether updates may run: not turned off, a release build, and on Windows (the only platform
+/// with an installer it can run; the Linux AppImage is downloaded again by hand).
 pub fn enabled(auto_update: bool) -> bool {
     auto_update
+        && cfg!(windows)
         && !cfg!(debug_assertions)
         && wisp_compat::var_os("WISP_LAUNCHER_NO_SELF_UPDATE").is_none()
 }

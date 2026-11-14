@@ -29,6 +29,21 @@ foreach ($shader in @(Get-ChildItem -LiteralPath $InstallerDirectory -Filter 'Wi
     if (-not (Test-Path -LiteralPath $sidecar -PathType Leaf) -or (Get-Content -LiteralPath $sidecar -Raw).Trim() -ne "$hash  $($shader.Name)") { throw 'Shader checksum does not match its sidecar.' }
     $assets += @($shader.FullName, $sidecar)
 }
+# The Linux AppImage, when the workflow built one, goes up beside the Windows setup.
+$appImage = Join-Path $InstallerDirectory "Wisp-Client-$Version-x86_64.AppImage"
+if (Test-Path -LiteralPath $appImage -PathType Leaf) {
+    $sidecar = "$appImage.sha256"
+    $hash = (Get-FileHash -LiteralPath $appImage -Algorithm SHA256).Hash.ToLowerInvariant()
+    if (-not (Test-Path -LiteralPath $sidecar -PathType Leaf) -or (Get-Content -LiteralPath $sidecar -Raw).Trim() -ne "$hash  $([IO.Path]::GetFileName($appImage))") { throw 'AppImage checksum does not match its sidecar.' }
+    $assets += @($appImage, $sidecar)
+}
+# Client modules built for this release (max_render.amod), each with its checksum.
+foreach ($module in @(Get-ChildItem -LiteralPath $InstallerDirectory -Filter '*.amod' -File)) {
+    $sidecar = "$($module.FullName).sha256"
+    $hash = (Get-FileHash -LiteralPath $module.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+    if (-not (Test-Path -LiteralPath $sidecar -PathType Leaf) -or (Get-Content -LiteralPath $sidecar -Raw).Trim() -ne "$hash  $($module.Name)") { throw 'Client module checksum does not match its sidecar.' }
+    $assets += @($module.FullName, $sidecar)
+}
 $tag = "launcher-v$Version"
 $repoArgs = @('--repo', $Repository)
 $existing = & gh release view $tag @repoArgs --json isDraft,assets 2>$null

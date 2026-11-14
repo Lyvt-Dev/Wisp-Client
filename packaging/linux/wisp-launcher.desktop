@@ -1,8 +1,8 @@
 [Desktop Entry]
 Type=Application
-Name=Wisp
+Name=Wisp Client
 GenericName=Game launcher
-Comment=Install, prepare and play Wisp, Minecraft: Java Edition 26.3 rewritten in Rust
+Comment=Install, prepare and play Wisp Client, Minecraft: Java Edition 26.3 rewritten in Rust
 Exec=wisp-launcher
 Icon=wisp
 Terminal=false
