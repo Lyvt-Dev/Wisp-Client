@@ -245,7 +245,7 @@ fn rotated_refresh_survives_service_failure_and_rejected_refresh_requires_signin
         .is_err());
     worker.join().unwrap();
     assert_eq!(session.secrets.refresh_token, "fixture-rotated-refresh");
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "linux"))]
     assert_eq!(
         saved(&scratch.0).unwrap().unwrap().secrets.refresh_token,
         "fixture-rotated-refresh"
@@ -264,7 +264,7 @@ fn rotated_refresh_survives_service_failure_and_rejected_refresh_requires_signin
     let bodies = worker.join().unwrap();
     assert!(bodies[0].contains("fixture-rotated-refresh"));
     assert!(session.secrets.sign_in_required);
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "linux"))]
     assert!(saved(&scratch.0).unwrap().unwrap().secrets.sign_in_required);
 }
 
@@ -300,7 +300,7 @@ fn account_storage_never_falls_back_to_plaintext_and_signout_preserves_profiles(
     let scratch = Scratch::new();
     std::fs::write(scratch.0.join("local-profiles.json"), "keep").unwrap();
     save(&scratch.0, &fixture()).unwrap();
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "linux"))]
     {
         let bytes = std::fs::read(scratch.0.join("wisp-accounts.dat")).unwrap();
         assert!(!String::from_utf8_lossy(&bytes).contains("fixture-refresh"));
@@ -316,7 +316,7 @@ fn account_storage_never_falls_back_to_plaintext_and_signout_preserves_profiles(
         );
         std::fs::remove_file(scratch.0.join("wisp-accounts.dat")).unwrap();
     }
-    #[cfg(not(windows))]
+    #[cfg(not(any(windows, target_os = "linux")))]
     assert!(!scratch.0.join("wisp-accounts.dat").exists());
     sign_out(&scratch.0).unwrap();
     assert_eq!(
@@ -325,7 +325,7 @@ fn account_storage_never_falls_back_to_plaintext_and_signout_preserves_profiles(
     );
 }
 
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "linux"))]
 #[test]
 fn several_accounts_are_kept_and_one_plays() {
     let scratch = Scratch::new();

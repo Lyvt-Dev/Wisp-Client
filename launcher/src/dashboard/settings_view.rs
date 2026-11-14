@@ -533,6 +533,17 @@ impl Launcher {
                 })),
                 s,
             ))
+            // Linux only: Wayland can hold a window's frames to the display's refresh.
+            .when(cfg!(target_os = "linux"), |d| {
+                d.child(row(
+                    "Run through X11 (XWayland)",
+                    "On a Wayland desktop the game can be held to your screen's refresh rate even with VSync off. This opens it through XWayland instead, with no such cap.",
+                    switch("x11", p.x11, s).on_click(cx.listener(|this, _, _, cx| {
+                        this.set_prefs(|p| p.x11 = !p.x11, cx)
+                    })),
+                    s,
+                ))
+            })
             .child(heading("World", s))
             .child(row(
                 "Render distance",

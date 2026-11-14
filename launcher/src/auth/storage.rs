@@ -2,7 +2,8 @@ use super::*;
 
 /// The account before there could be several: one, encrypted. Read once and moved over.
 const SAVED_ACCOUNT: &str = "wisp-account.dat";
-/// Every account signed in, and which one plays, encrypted for the Windows user.
+/// Every account signed in, and which one plays, encrypted for this user (Windows: DPAPI;
+/// Linux: a key in the keyring, `linux`).
 const SAVED_ACCOUNTS: &str = "wisp-accounts.dat";
 
 /// The accounts kept: which one plays (`active`), and the others to switch to.
@@ -172,15 +173,150 @@ fn write_store(home: &Path, store: &Store) -> Result<(), String> {
     write_encrypted(home, SAVED_ACCOUNTS, &plain)
 }
 
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_os = "linux")))]
 fn read_encrypted(_: &Path, _: &str) -> Result<Option<Vec<u8>>, String> {
     Ok(None)
 }
 
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_os = "linux")))]
 fn write_encrypted(_: &Path, _: &str, _: &[u8]) -> Result<(), String> {
     // Other platforms keep credentials in memory; never create a plaintext token file.
     Ok(())
+}
+
+/// Linux: the sign-ins are kept encrypted (ChaCha20-Poly1305) in the launcher's folder, readable
+/// by this user only. The key is a random one kept in the desktop's keyring (the Secret Service:
+/// GNOME Keyring, KWallet), or, where there is none, in a file of its own beside it, readable by
+/// this user only, as other Linux launchers keep their sign-ins.
+#[cfg(target_os = "linux")]
+mod linux {
+    use std::io::Write;
+    use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+    use std::path::Path;
+
+    const KEYRING_SERVICE: &str = "Wisp Client";
+    const KEY_FILE: &str = "wisp-account.key";
+    const MAGIC: &[u8; 4] = b"WSP1";
+
+    fn unreadable() -> String {
+        crate::i18n::tr("The saved sign-ins could not be read. Sign out and sign in again.")
+    }
+
+    fn not_saved() -> String {
+        crate::i18n::tr("Could not save the sign-in.")
+    }
+
+    /// This launcher folder's entry in the keyring (a folder of its own for tests and agents).
+    fn keyring_entry(home: &Path) -> Option<keyring::Entry> {
+        // Tests never touch the player's keyring.
+        if cfg!(test) || wisp_compat::var_os("WISP_ACCOUNT_KEYRING").is_some_and(|v| v == "off") {
+            return None;
+        }
+        keyring::Entry::new(KEYRING_SERVICE, &format!("accounts key {}", home.display())).ok()
+    }
+
+    /// The key, made when `create` and there is none yet. The key file, once there, is the key:
+    /// a keyring that is locked or gone at one start must not orphan what an earlier one saved.
+    fn key(home: &Path, create: bool) -> Result<Option<[u8; 32]>, String> {
+        let file = home.join(KEY_FILE);
+        match std::fs::read(&file) {
+            Ok(bytes) => return bytes.try_into().map(Some).map_err(|_| unreadable()),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(_) => return Err(unreadable()),
+        }
+        let entry = keyring_entry(home);
+        if let Some(entry) = &entry {
+            match entry.get_secret() {
+                Ok(bytes) => return bytes.try_into().map(Some).map_err(|_| unreadable()),
+                Err(keyring::Error::NoEntry) => {}
+                // No keyring here: the key file it is.
+                Err(_) => {}
+            }
+        }
+        if !create {
+            return Ok(None);
+        }
+        let mut key = [0u8; 32];
+        getrandom::fill(&mut key).map_err(|_| not_saved())?;
+        let kept = entry.is_some_and(|entry| {
+            entry.set_secret(&key).is_ok() && entry.get_secret().is_ok_and(|b| b == key)
+        });
+        if kept {
+            return Ok(Some(key));
+        }
+        let mut out = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .open(&file)
+            .map_err(|_| not_saved())?;
+        out.write_all(&key).map_err(|_| not_saved())?;
+        out.sync_all().map_err(|_| not_saved())?;
+        Ok(Some(key))
+    }
+
+    pub(super) fn read(home: &Path, name: &str) -> Result<Option<Vec<u8>>, String> {
+        use chacha20poly1305::aead::{Aead, KeyInit};
+        let sealed = match std::fs::read(home.join(name)) {
+            Ok(bytes) if bytes.len() <= 1024 * 1024 => bytes,
+            Ok(_) => return Err(unreadable()),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(_) => return Err(unreadable()),
+        };
+        if sealed.len() < MAGIC.len() + 12 || &sealed[..4] != MAGIC {
+            return Err(unreadable());
+        }
+        let key = key(home, false)?.ok_or_else(unreadable)?;
+        let cipher = chacha20poly1305::ChaCha20Poly1305::new(&key.into());
+        let (nonce, body) = sealed[4..].split_at(12);
+        cipher
+            .decrypt(nonce.into(), body)
+            .map(Some)
+            .map_err(|_| unreadable())
+    }
+
+    pub(super) fn write(home: &Path, name: &str, plain: &[u8]) -> Result<(), String> {
+        use chacha20poly1305::aead::{Aead, KeyInit};
+        let key = key(home, true)?.ok_or_else(not_saved)?;
+        let cipher = chacha20poly1305::ChaCha20Poly1305::new(&key.into());
+        let mut nonce = [0u8; 12];
+        getrandom::fill(&mut nonce).map_err(|_| not_saved())?;
+        let body = cipher
+            .encrypt((&nonce).into(), plain)
+            .map_err(|_| not_saved())?;
+        let mut sealed = MAGIC.to_vec();
+        sealed.extend_from_slice(&nonce);
+        sealed.extend_from_slice(&body);
+        let suffix: String = nonce.iter().map(|b| format!("{b:02x}")).collect();
+        let temporary = home.join(format!(".wisp-account-{suffix}.tmp"));
+        let result = (|| -> std::io::Result<()> {
+            let mut file = std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .mode(0o600)
+                .open(&temporary)?;
+            file.write_all(&sealed)?;
+            file.sync_all()?;
+            drop(file);
+            std::fs::rename(&temporary, home.join(name))?;
+            // An older file may have had wider permissions.
+            std::fs::set_permissions(home.join(name), std::fs::Permissions::from_mode(0o600))
+        })();
+        if result.is_err() {
+            let _ = std::fs::remove_file(&temporary);
+        }
+        result.map_err(|_| not_saved())
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn read_encrypted(home: &Path, file: &str) -> Result<Option<Vec<u8>>, String> {
+    linux::read(home, file)
+}
+
+#[cfg(target_os = "linux")]
+fn write_encrypted(home: &Path, name: &str, plain: &[u8]) -> Result<(), String> {
+    linux::write(home, name, plain)
 }
 
 #[cfg(windows)]

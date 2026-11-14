@@ -1,6 +1,6 @@
 [package]
 name = "wisp-launcher"
-version = "0.14.5"
+version = "0.14.6"
 edition = "2021"
 license = "MIT"
 description = "Wisp launcher for the Rust Minecraft engine"
@@ -40,6 +40,12 @@ features = ["png"]
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2-app-kit = { version = "0.3", default-features = false, features = ["NSAccessibility", "NSWorkspace"], optional = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# Keeping the sign-in on Linux: its key in the desktop's keyring (Secret Service, pure Rust over
+# D-Bus), the sign-ins sealed with it.
+keyring = { version = "3.6", default-features = false, features = ["async-secret-service", "async-io", "crypto-rust"] }
+chacha20poly1305 = "0.10"
 
 [target.'cfg(windows)'.build-dependencies]
 winresource = "0.1"

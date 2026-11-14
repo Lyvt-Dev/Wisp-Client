@@ -223,6 +223,8 @@ pub struct Prefs {
     // Game
     pub window: (u32, u32),
     pub fullscreen: bool,
+    /// Linux: the game window through X11 (XWayland), `--x11`.
+    pub x11: bool,
     pub render_distance: u32,
     /// Keep the previous game log beside the new one (`local-launcher.prev.log`).
     pub keep_logs: bool,
@@ -252,6 +254,7 @@ impl Default for Prefs {
             auto_update: true,
             window: (0, 0),
             fullscreen: false,
+            x11: false,
             render_distance: 0,
             keep_logs: true,
             ui_size: 1.0,
@@ -298,6 +301,9 @@ impl Prefs {
         }
         if self.fullscreen {
             args.push("--fullscreen".into());
+        }
+        if self.x11 && cfg!(target_os = "linux") {
+            args.push("--x11".into());
         }
         if self.render_distance > 0 {
             args.extend(["--render-distance".into(), self.render_distance.to_string()]);
