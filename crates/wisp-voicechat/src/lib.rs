@@ -199,6 +199,11 @@ impl VoiceChat {
                     self.states = all.into_iter().map(|s| (s.player, s)).collect();
                 }
             }
+            protocol::REMOVE_STATE => {
+                if let Ok(player) = protocol::read_removed_state(data) {
+                    self.states.remove(&player);
+                }
+            }
             protocol::JOINED_GROUP => {}
             _ => return false,
         }
@@ -366,5 +371,18 @@ mod tests {
         v.available = true;
         v.apply(Settings::default());
         assert_eq!(v.take_outgoing(), [(protocol::CLIENT_STATE, vec![0, 0])]);
+    }
+
+    #[test]
+    fn a_removed_state_forgets_the_player() {
+        let mut v = VoiceChat::new(Settings::default());
+        let mut w = protocol::Writer::default();
+        w.u8(0).uuid(42).utf("Alex");
+        assert!(v.payload(protocol::STATE, &w.data));
+        assert!(v.player(42).is_some());
+        assert!(v.payload(protocol::REMOVE_STATE, &42u128.to_be_bytes()));
+        assert!(v.player(42).is_none());
+        // A short payload is ignored, not a crash.
+        assert!(v.payload(protocol::REMOVE_STATE, &[1, 2]));
     }
 }

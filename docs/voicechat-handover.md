@@ -95,11 +95,15 @@ generally allowed but a legal grey area; the owner was told and chose to go ahea
    - check in the log that `connected` appears;
    - ideally talk to a real Java client with the mod.
 
-   Not yet verified:
-   - when exactly the original client sends `request_secret`. We send it after the Login packet,
-     plus `minecraft:register` (needed on Paper/Bukkit);
-   - whether a Fabric server needs the channels announced during the configuration phase;
-   - Opus details of the original (channels/bitrate; we use mono, VOIP, default bitrate).
+   Answered from the official sources on 2026-11-14 (see `docs/voicechat-protocol.md`):
+   - the original sends `request_secret` as soon as play starts, like we do after Login;
+   - Opus: mono, 48 kHz, 20 ms, the codec byte's application, payload capped at the MTU: same
+     as ours apart from the cap;
+   - Fabric's server sends with `ServerPlayNetworking.send`, which doesn't check the client's
+     registered channels, so the configuration phase shouldn't matter. Still to be proven live.
+
+   Fixed on 2026-11-14: muted now blocks push-to-talk and whispering too (it only blocked voice
+   activation), and `voicechat:remove_state` is registered and handled.
 4. Note in `Agent.md` (owner decisions) and `THIRD_PARTY_NOTICES.md`:
    - the clean-room port;
    - libopus (BSD), aes-gcm and cpal;

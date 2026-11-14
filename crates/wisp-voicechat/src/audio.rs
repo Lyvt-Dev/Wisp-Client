@@ -497,15 +497,15 @@ pub struct Gate {
 
 impl Gate {
     pub fn open(&mut self, controls: &Controls, level_db: f32) -> bool {
-        if controls.disabled.load(Ordering::Relaxed) {
+        // Muted or off sends nothing, in either mode and while whispering, as the original does.
+        if controls.disabled.load(Ordering::Relaxed) || controls.muted.load(Ordering::Relaxed) {
             self.hold = 0;
             return false;
         }
         let voice = controls.voice_activation.load(Ordering::Relaxed);
         let whisper = controls.whisper.load(Ordering::Relaxed);
         let (on, hold) = if voice {
-            let muted = controls.muted.load(Ordering::Relaxed);
-            (!muted && level_db > controls.threshold_db.get(), VOICE_HOLD)
+            (level_db > controls.threshold_db.get(), VOICE_HOLD)
         } else {
             (controls.push_to_talk.load(Ordering::Relaxed), PTT_HOLD)
         };
@@ -645,6 +645,22 @@ mod tests {
         c.disabled.store(true, Ordering::Relaxed);
         c.whisper.store(true, Ordering::Relaxed);
         assert!(!g.open(&c, -20.0));
+    }
+
+    #[test]
+    fn muted_sends_nothing_by_push_to_talk_or_whisper() {
+        let c = Controls::default();
+        c.muted.store(true, Ordering::Relaxed);
+        c.push_to_talk.store(true, Ordering::Relaxed);
+        let mut g = Gate::default();
+        assert!(!g.open(&c, 0.0));
+        c.whisper.store(true, Ordering::Relaxed);
+        assert!(!g.open(&c, 0.0));
+        // Muting while talking cuts off at once, without the hold.
+        c.muted.store(false, Ordering::Relaxed);
+        assert!(g.open(&c, 0.0));
+        c.muted.store(true, Ordering::Relaxed);
+        assert!(!g.open(&c, 0.0));
     }
 
     #[test]

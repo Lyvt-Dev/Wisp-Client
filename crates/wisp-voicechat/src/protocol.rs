@@ -12,15 +12,23 @@ pub const CLIENT_STATE: &str = "voicechat:client_state";
 pub const STATE: &str = "voicechat:state";
 pub const STATES: &str = "voicechat:states";
 pub const JOINED_GROUP: &str = "voicechat:joined_group";
+/// A player left: their uuid.
+pub const REMOVE_STATE: &str = "voicechat:remove_state";
 /// Every channel, for `minecraft:register`.
-pub const CHANNELS: [&str; 6] = [
+pub const CHANNELS: [&str; 7] = [
     REQUEST_SECRET,
     SECRET,
     CLIENT_STATE,
     STATE,
     STATES,
+    REMOVE_STATE,
     JOINED_GROUP,
 ];
+
+/// `voicechat:remove_state`: the player whose state goes.
+pub fn read_removed_state(data: &[u8]) -> Result<u128, Error> {
+    Reader::new(data).uuid()
+}
 
 /// The largest Opus frame a packet carries.
 pub const MAX_OPUS: usize = 1275;
@@ -684,6 +692,50 @@ mod tests {
         }
         // Another key fails the tag.
         assert!(from_server(&[4; 16], &to_client(&key, &Packet::KeepAlive).unwrap()).is_err());
+    }
+
+    #[test]
+    fn malformed_input_is_an_error_not_a_panic() {
+        let key = [3u8; 16];
+        let good = Packet::Sound(Sound {
+            channel: 1,
+            sender: 2,
+            opus: vec![7; 60],
+            sequence: 3,
+            placement: Placement::Location {
+                at: [1.0, 2.0, 3.0],
+                distance: 8.0,
+            },
+            category: Some("x".into()),
+        })
+        .encode();
+        // Every truncation of a valid packet, and of the secret, fails cleanly.
+        for n in 0..good.len() {
+            assert!(Packet::decode(&good[..n]).is_err(), "{n}");
+        }
+        // Lengths past the limits, negative varints, unknown ids.
+        assert!(Packet::decode(&[1, 0xFF, 0xFF, 0xFF, 0xFF, 0x07]).is_err());
+        assert!(Packet::decode(&[1, 0xFF, 0xFF, 0xFF, 0xFF, 0x0F]).is_err());
+        assert!(Packet::decode(&[1, 0x80, 0x80, 0x80, 0x80, 0x80, 0x01]).is_err());
+        assert!(Packet::decode(&[0]).is_err() && Packet::decode(&[11]).is_err());
+        assert!(Secret::read(&[0; 20]).is_err());
+        assert!(PlayerState::read_all(&(-1i32).to_be_bytes()).is_err());
+        // Garbage datagrams: a pseudo-random sweep of lengths and bytes.
+        let mut x = 0x2545_F491_4F6C_DD1Du64;
+        for len in 0..300 {
+            let bytes: Vec<u8> = (0..len)
+                .map(|_| {
+                    x ^= x << 13;
+                    x ^= x >> 7;
+                    x ^= x << 17;
+                    x as u8
+                })
+                .collect();
+            let _ = Packet::decode(&bytes);
+            let _ = from_server(&key, &bytes);
+            let _ = Secret::read(&bytes);
+            let _ = PlayerState::read_all(&bytes);
+        }
     }
 
     #[test]

@@ -6,6 +6,11 @@ implementation for interoperability: it was written from this description of the
 and contains no code, assets or translations of the original mod (which is "All Rights
 Reserved"). Compatibility version: **21** (Simple Voice Chat 2.6.x / 2.7.x for Minecraft 26.3).
 
+Last checked on 2026-11-14 against the official 2.7.0-pre1+26.3 sources (branch `26.3`, commit
+`137d62f`, `voicechat_compatibility_version=21`, `mod_compatible_version=2.6.x`). Every layout
+below matched. The server only answers a `request_secret` whose version equals its own, so a
+different version is simply "no voice chat on this server", never a half-working connection.
+
 Integers are big-endian. `varint` is Minecraft's VarInt. `uuid` is two big-endian i64 (most
 significant first). `bytes` is a varint length then the bytes. `utf(n)` is a varint byte length
 then UTF-8, at most `n` characters. `bool` is one byte, 0 or 1.
@@ -23,13 +28,30 @@ request carried a compatible version.
 | `voicechat:client_state` | to server | bool muted, bool disabled |
 | `voicechat:state` | to client | one player state |
 | `voicechat:states` | to client | i32 count, then that many player states |
+| `voicechat:remove_state` | to client | uuid player (they left) |
 | `voicechat:joined_group` | to client | bool has group, [uuid group], bool wrong password |
+
+Not implemented yet (groups and volume categories), read from the same sources:
+
+| Channel | Direction | Body |
+| --- | --- | --- |
+| `voicechat:create_group` | to server | utf(24) name, bool has password, [utf(256) password], i16 type (0 normal, 1 open, 2 isolated) |
+| `voicechat:set_group` | to server | uuid group, bool has password, [utf(256) password] |
+| `voicechat:leave_group` | to server | empty |
+| `voicechat:add_group` | to client | uuid id, utf(24) name, bool has password, bool persistent, bool hidden, i16 type |
+| `voicechat:remove_group` | to client | uuid group |
+| `voicechat:add_category` | to client | utf(16) id, utf(16) name, opt utf(256) name key, opt utf(256) description, opt utf(256) description key, bool has icon, [16×16 i32 ARGB], opt utf(16) parent (`opt` = bool then the value) |
+| `voicechat:remove_category` | to client | utf(16) id |
 
 Player state: u8 flags (bit 0 muted, 1 force muted, 2 disabled, 3 force disabled, 4
 disconnected, 5 has group), uuid player, utf(256) name, [uuid group if bit 5].
 
-An empty voice host means "the Minecraft server's host". A host with a port (`host:port`) or a
-bare port overrides the UDP address.
+An empty voice host means "the Minecraft server's host" (the official client uses the IP the
+Minecraft connection resolved to). A host with a port (`host:port`) or a bare port overrides the
+UDP address.
+
+The official client sends `request_secret` as soon as the play state starts (Fabric's early
+`JOIN` event), and again after the integrated server's port changes.
 
 ## UDP
 
@@ -58,7 +80,11 @@ lost; request a new secret after 10 s.
 
 ## Audio
 
-Opus, 48 kHz mono, 20 ms frames (960 samples), the application from the codec byte. A frame with
+Muted sends nothing, in push-to-talk and voice activation alike, and whispering is off while
+muted (the original's `PTTMicrophoneProcessor`/`VoiceMicrophoneProcessor`).
+
+Opus, 48 kHz mono, 20 ms frames (960 samples), the application from the codec byte; the
+original caps an encoded frame at the secret's MTU. A frame with
 empty opus data ends a stretch of speech (decoder reset). Sequence numbers count up per sender
 from 0; gaps up to a few frames are concealed by the decoder. Received sound is keyed by the
 channel uuid. Player sound is placed at the sender's position, dropped past `distance + 1` and

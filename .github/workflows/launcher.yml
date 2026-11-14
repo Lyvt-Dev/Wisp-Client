@@ -102,12 +102,14 @@ jobs:
         run: |
           packaging/linux/appimage.sh launcher/target/appimage/release/wisp-launcher "$VERSION" dist target/appimage-engine
           cd dist && sha256sum "Wisp-Client-$VERSION-x86_64.AppImage" > "Wisp-Client-$VERSION-x86_64.AppImage.sha256"
-      - name: Package the Max Render client module
+      - name: Package the Max Render and voice chat client modules
         run: |
           CARGO_TARGET_DIR=target/appimage-game cargo build --locked -p cargo-wisp-mod
-          (cd mods/wisp-mods/max_render && ../../../target/appimage-game/debug/cargo-wisp-mod wisp-mod build)
-          cp mods/wisp-mods/max_render/target/wisp-mod/max_render.amod dist/
-          cd dist && sha256sum max_render.amod > max_render.amod.sha256
+          for m in max_render voicechat; do
+            (cd mods/wisp-mods/$m && ../../../target/appimage-game/debug/cargo-wisp-mod wisp-mod build)
+            cp mods/wisp-mods/$m/target/wisp-mod/$m.amod dist/
+            (cd dist && sha256sum $m.amod > $m.amod.sha256)
+          done
       - uses: actions/upload-artifact@v4
         with:
           name: Wisp-Client-Linux-AppImage
@@ -116,6 +118,8 @@ jobs:
             dist/Wisp-Client-*-x86_64.AppImage.sha256
             dist/max_render.amod
             dist/max_render.amod.sha256
+            dist/voicechat.amod
+            dist/voicechat.amod.sha256
           if-no-files-found: error
   publish-release:
     needs: [check, windows-installer, linux-appimage]
