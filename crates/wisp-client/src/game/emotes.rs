@@ -15,8 +15,9 @@
 //! The fifth is The Rook: the player points at the sky, a giant ivory chess rook falls and
 //! slams down in front of them, a Brilliant "!!" badge pops up over it, and the rook explodes
 //! forward in fire and smoke, then crumbles away into teal sparks.
-//! Dark Ascension, Bruh, the L Dance and Celestial Wings have no lens: they are a pose, particles
-//! and sounds (`moves.rs`).
+//! Dark Ascension, Bruh, the L Dance, Celestial Wings, Sit and the ragebait emotes (Crouch Spam,
+//! Skill Issue, Too Easy, Point and Laugh, Cry About It) have no lens: they are a pose, particles
+//! and sounds (`moves.rs`). The wheel has pages of ten: scrolling, or Q and E, turns them.
 //! With the cosmetics service, other Wisp players see it too: the game tells the service
 //! which emote started (`wisp_cosmetics::share`), and plays the emotes of the players in view
 //! on them (`tick_remote_emotes`): their particles, sounds and the lens, at their place.
@@ -48,10 +49,16 @@ pub(super) enum Emote {
     Bruh,
     LDance,
     CelestialWings,
+    Sit,
+    CrouchSpam,
+    SkillIssue,
+    TooEasy,
+    PointAndLaugh,
+    CryAboutIt,
 }
 
 impl Emote {
-    const ALL: [Emote; 9] = [
+    const ALL: [Emote; 15] = [
         Emote::BlackHole,
         Emote::SupernovaCrown,
         Emote::PurpleHollow,
@@ -61,6 +68,12 @@ impl Emote {
         Emote::Bruh,
         Emote::LDance,
         Emote::CelestialWings,
+        Emote::Sit,
+        Emote::CrouchSpam,
+        Emote::SkillIssue,
+        Emote::TooEasy,
+        Emote::PointAndLaugh,
+        Emote::CryAboutIt,
     ];
 
     /// The emote with the Shop's id `id`.
@@ -86,6 +99,12 @@ impl Emote {
             Emote::Bruh => "bruh",
             Emote::LDance => "l_dance",
             Emote::CelestialWings => "celestial_wings",
+            Emote::Sit => "sit",
+            Emote::CrouchSpam => "crouch_spam",
+            Emote::SkillIssue => "skill_issue",
+            Emote::TooEasy => "too_easy",
+            Emote::PointAndLaugh => "point_and_laugh",
+            Emote::CryAboutIt => "cry_about_it",
         }
     }
 
@@ -106,6 +125,14 @@ impl Emote {
             Emote::CelestialWings => {
                 crate::lang::get_or("wisp.emote.celestial_wings", "Celestial Wings")
             }
+            Emote::Sit => crate::lang::get_or("wisp.emote.sit", "Sit"),
+            Emote::CrouchSpam => crate::lang::get_or("wisp.emote.crouch_spam", "Crouch Spam"),
+            Emote::SkillIssue => crate::lang::get_or("wisp.emote.skill_issue", "Skill Issue"),
+            Emote::TooEasy => crate::lang::get_or("wisp.emote.too_easy", "Too Easy"),
+            Emote::PointAndLaugh => {
+                crate::lang::get_or("wisp.emote.point_and_laugh", "Point and Laugh")
+            }
+            Emote::CryAboutIt => crate::lang::get_or("wisp.emote.cry_about_it", "Cry About It"),
         }
     }
 
@@ -121,6 +148,12 @@ impl Emote {
             Emote::Bruh => moves::BRUH_END,
             Emote::LDance => moves::DANCE_END,
             Emote::CelestialWings => moves::WINGS_END,
+            Emote::Sit => moves::SIT_END,
+            Emote::CrouchSpam => moves::CROUCH_END,
+            Emote::SkillIssue => moves::SKILL_END,
+            Emote::TooEasy => moves::EASY_END,
+            Emote::PointAndLaugh => moves::LAUGH_END,
+            Emote::CryAboutIt => moves::CRY_END,
         }
     }
 
@@ -136,25 +169,48 @@ impl Emote {
             Emote::Bruh => 300,
             Emote::LDance => 450,
             Emote::CelestialWings => 1800,
+            Emote::Sit => 300,
+            Emote::CrouchSpam => 250,
+            Emote::SkillIssue => 350,
+            Emote::TooEasy => 400,
+            Emote::PointAndLaugh => 450,
+            Emote::CryAboutIt => 500,
         }
     }
 }
 
 mod moves;
 
-/// The wheel's slots, clockwise from the top.
-const SLOTS: [Option<Emote>; 10] = [
-    Some(Emote::BlackHole),
-    Some(Emote::SupernovaCrown),
-    Some(Emote::PurpleHollow),
-    Some(Emote::FalseDreams),
-    Some(Emote::TheRook),
-    Some(Emote::DarkAscension),
-    Some(Emote::CelestialWings),
-    Some(Emote::Bruh),
-    Some(Emote::LDance),
-    None,
+/// The wheel's pages, each with its slots clockwise from the top.
+const PAGES: [[Option<Emote>; 10]; 2] = [
+    [
+        Some(Emote::BlackHole),
+        Some(Emote::SupernovaCrown),
+        Some(Emote::PurpleHollow),
+        Some(Emote::FalseDreams),
+        Some(Emote::TheRook),
+        Some(Emote::DarkAscension),
+        Some(Emote::CelestialWings),
+        Some(Emote::Bruh),
+        Some(Emote::LDance),
+        None,
+    ],
+    // Sit and the ragebait ones.
+    [
+        Some(Emote::Sit),
+        Some(Emote::CrouchSpam),
+        Some(Emote::SkillIssue),
+        Some(Emote::TooEasy),
+        Some(Emote::PointAndLaugh),
+        Some(Emote::CryAboutIt),
+        None,
+        None,
+        None,
+        None,
+    ],
 ];
+/// Slots on a page.
+const SLOTS: usize = 10;
 
 // The Rook's timeline, in seconds: it starts falling, lands, its badge pops up, it blasts,
 // it crumbles.
@@ -338,6 +394,8 @@ const CAMERA_HEIGHT: f64 = 2.4;
 struct Wheel {
     /// Where the mouse has pushed the selector, in wheel radii (screen y down).
     aim: (f64, f64),
+    /// The page shown (`PAGES`).
+    page: usize,
     /// The Shop ids of the emotes the player has in the wheel.
     owned: Vec<String>,
 }
@@ -352,6 +410,7 @@ impl Wheel {
             .unwrap_or_default();
         Self {
             aim: (0.0, 0.0),
+            page: 0,
             owned,
         }
     }
@@ -378,8 +437,18 @@ impl Wheel {
         }
         // Slot 0 is at the top; the slots go clockwise.
         let angle = y.atan2(x) + PI / 2.0;
-        let n = SLOTS.len();
-        Some(((angle / (TAU / n as f64)).round() as i64).rem_euclid(n as i64) as usize)
+        let n = SLOTS as i64;
+        Some(((angle / (TAU / n as f64)).round() as i64).rem_euclid(n) as usize)
+    }
+
+    /// The emote in `slot` of the page shown.
+    fn at(&self, slot: usize) -> Option<Emote> {
+        PAGES[self.page][slot]
+    }
+
+    /// Turns `steps` pages on (back when negative), round from the last to the first.
+    fn turn(&mut self, steps: i32) {
+        self.page = (self.page as i32 + steps).rem_euclid(PAGES.len() as i32) as usize;
     }
 }
 
@@ -438,6 +507,8 @@ pub(super) struct Emotes {
     playing: Option<Playing>,
     /// Other players' emotes, by their UUID.
     remote: FxHashMap<u128, Remote>,
+    /// How far the mouse has turned the camera round a sitting player, in degrees.
+    look: f64,
 }
 
 fn smoothstep(a: f64, b: f64, x: f64) -> f64 {
@@ -1064,6 +1135,14 @@ impl Game<'_> {
             self.emotes.wheel = None;
             return true;
         }
+        if let Some(wheel) = &mut self.emotes.wheel
+            && matches!(key, KeyCode::KeyQ | KeyCode::KeyE)
+        {
+            wheel.turn(if key == KeyCode::KeyE { 1 } else { -1 });
+            self.audio
+                .play("minecraft:item.book.page_turn", None, 0.6, 1.2);
+            return true;
+        }
         if self.emotes.playing.is_some()
             && matches!(
                 key,
@@ -1100,7 +1179,7 @@ impl Game<'_> {
                 MouseButton::Left => {
                     let chosen = wheel
                         .hovered()
-                        .and_then(|slot| SLOTS[slot])
+                        .and_then(|slot| wheel.at(slot))
                         .filter(|&e| wheel.owns(e));
                     if let Some(emote) = chosen {
                         self.emotes.wheel = None;
@@ -1119,9 +1198,33 @@ impl Game<'_> {
         self.emotes.wheel.is_some() || self.emotes.playing.is_some()
     }
 
-    /// Mouse movement while playing: it steers the wheel, and an emote holds the view still.
-    /// True when it was taken.
+    /// Wheel steps while playing: the open emote wheel turns its pages with them. True when
+    /// they were taken.
+    pub(super) fn emote_scroll(&mut self, steps: f32) -> bool {
+        let Some(wheel) = &mut self.emotes.wheel else {
+            return false;
+        };
+        if steps.abs() >= 0.5 {
+            // Down (negative) goes on, as a list scrolls.
+            wheel.turn(if steps < 0.0 { 1 } else { -1 });
+            self.audio
+                .play("minecraft:item.book.page_turn", None, 0.6, 1.2);
+        }
+        true
+    }
+
+    /// Mouse movement while playing: it steers the wheel, and an emote holds the view still
+    /// (Sit's turns the camera round the player). True when it was taken.
     pub(super) fn emote_look(&mut self, x: f64, y: f64) -> bool {
+        if self
+            .emotes
+            .playing
+            .as_ref()
+            .is_some_and(|p| p.emote == Emote::Sit)
+        {
+            self.emotes.look = (self.emotes.look + x * 0.15).rem_euclid(360.0);
+            return true;
+        }
         if let Some(wheel) = &mut self.emotes.wheel {
             let (ax, ay) = (wheel.aim.0 + x * 0.02, wheel.aim.1 + y * 0.02);
             let length = ax.hypot(ay);
@@ -1137,6 +1240,7 @@ impl Game<'_> {
 
     fn start_emote(&mut self, emote: Emote) {
         self.stop_emote();
+        self.emotes.look = 0.0;
         let Some(p) = self.player.as_ref() else {
             return;
         };
@@ -1378,6 +1482,9 @@ impl Game<'_> {
                 m.extra.previous_emote_tilt = [0.0; 2];
                 m.extra.emote_arms = Default::default();
                 m.extra.previous_emote_arms = Default::default();
+                m.extra.emote_legs = Default::default();
+                m.extra.previous_emote_legs = Default::default();
+                m.extra.crouching = false;
             }
         }
         for (uuid, entity, feet) in &near {
@@ -1403,7 +1510,16 @@ impl Game<'_> {
                 Emote::PurpleHollow => [feet[0], feet[1] + 1.5, feet[2]],
                 Emote::FalseDreams => [feet[0], feet[1] + self.dream_height(*feet), feet[2]],
                 Emote::TheRook => self.rook_spot(*feet, f64::from(body_yaw).to_radians()),
-                Emote::DarkAscension | Emote::Bruh | Emote::LDance | Emote::CelestialWings => *feet,
+                Emote::DarkAscension
+                | Emote::Bruh
+                | Emote::LDance
+                | Emote::CelestialWings
+                | Emote::Sit
+                | Emote::CrouchSpam
+                | Emote::SkillIssue
+                | Emote::TooEasy
+                | Emote::PointAndLaugh
+                | Emote::CryAboutIt => *feet,
             };
             self.emotes.remote.insert(
                 *uuid,
@@ -1465,11 +1581,22 @@ impl Game<'_> {
                     m.head_pitch = d.head_pitch;
                     ([server[0], server[1] + d.lift, server[2]], d.tilt, None)
                 }
-                e
-                @ (Emote::DarkAscension | Emote::Bruh | Emote::LDance | Emote::CelestialWings) => {
+                e @ (Emote::DarkAscension
+                | Emote::Bruh
+                | Emote::LDance
+                | Emote::CelestialWings
+                | Emote::Sit
+                | Emote::CrouchSpam
+                | Emote::SkillIssue
+                | Emote::TooEasy
+                | Emote::PointAndLaugh
+                | Emote::CryAboutIt) => {
                     let mv = moves::moves_at(e, t).unwrap_or_default();
                     m.extra.previous_emote_arms = m.extra.emote_arms;
                     m.extra.emote_arms = mv.arms;
+                    m.extra.previous_emote_legs = m.extra.emote_legs;
+                    m.extra.emote_legs = mv.leg_pose;
+                    m.extra.crouching = mv.crouch;
                     m.previous_body_yaw = m.body_yaw;
                     m.body_yaw = r.body_yaw + mv.turn;
                     m.head_yaw = m.body_yaw + mv.head_turn;
@@ -1550,7 +1677,16 @@ impl Game<'_> {
                 Emote::PurpleHollow => self.hollow_effects(previous, t, ticks, feet, yaw),
                 Emote::FalseDreams => self.dreams_effects(previous, t, feet, anchor[1] - feet[1]),
                 Emote::TheRook => self.rook_effects(previous, t, ticks, anchor, yaw),
-                Emote::DarkAscension | Emote::Bruh | Emote::LDance | Emote::CelestialWings => {
+                Emote::DarkAscension
+                | Emote::Bruh
+                | Emote::LDance
+                | Emote::CelestialWings
+                | Emote::Sit
+                | Emote::CrouchSpam
+                | Emote::SkillIssue
+                | Emote::TooEasy
+                | Emote::PointAndLaugh
+                | Emote::CryAboutIt => {
                     self.moves_effects(emote, previous, t, ticks, feet, yaw);
                 }
             }
@@ -1592,6 +1728,9 @@ impl Game<'_> {
                 m.extra.previous_emote_tilt = [0.0; 2];
                 m.extra.emote_arms = Default::default();
                 m.extra.previous_emote_arms = Default::default();
+                m.extra.emote_legs = Default::default();
+                m.extra.previous_emote_legs = Default::default();
+                m.extra.crouching = false;
             }
         }
     }
@@ -2646,7 +2785,7 @@ impl Game<'_> {
         };
         let t = p.time();
         if !p.emote.has_lens() {
-            return self.moves_camera(p.emote, t, p.feet, p.orbit_angle, view);
+            return self.moves_camera(p.emote, t, p.feet, p.orbit_angle, self.emotes.look, view);
         }
         if p.emote == Emote::SupernovaCrown {
             return self.supernova_camera(p, t, view);
@@ -2955,14 +3094,14 @@ impl Game<'_> {
         let (inner, outer) = (28.0f32, 80.0f32);
         let hovered = wheel.hovered();
         let point = |angle: f32, r: f32| [cx + angle.cos() * r, cy + angle.sin() * r];
-        let slice = TAU as f32 / SLOTS.len() as f32;
+        let slice = TAU as f32 / SLOTS as f32;
         // A dark veil behind it.
         batch.fill(atlas, 0.0, 0.0, batch.width, batch.height, 0x60000000);
-        for slot in 0..SLOTS.len() {
+        for slot in 0..SLOTS {
             let centre = -PI as f32 / 2.0 + slot as f32 * slice;
             let (from, to) = (centre - slice / 2.0 + 0.03, centre + slice / 2.0 - 0.03);
             let on = hovered == Some(slot);
-            let filled = SLOTS[slot].is_some_and(|e| wheel.owns(e));
+            let filled = wheel.at(slot).is_some_and(|e| wheel.owns(e));
             let colour = match (on, filled) {
                 (true, true) => 0xE08A3CF0,
                 (true, false) => 0xC0402A58,
@@ -2998,7 +3137,7 @@ impl Game<'_> {
                 );
             }
             let [ix, iy] = point(centre, (inner + reach) / 2.0);
-            match SLOTS[slot] {
+            match wheel.at(slot) {
                 Some(Emote::BlackHole) => {
                     let lit = wheel.owns(Emote::BlackHole);
                     let dim = |c: u32| {
@@ -3177,8 +3316,16 @@ impl Game<'_> {
                     }
                 }
                 Some(
-                    e
-                    @ (Emote::DarkAscension | Emote::Bruh | Emote::LDance | Emote::CelestialWings),
+                    e @ (Emote::DarkAscension
+                    | Emote::Bruh
+                    | Emote::LDance
+                    | Emote::CelestialWings
+                    | Emote::Sit
+                    | Emote::CrouchSpam
+                    | Emote::SkillIssue
+                    | Emote::TooEasy
+                    | Emote::PointAndLaugh
+                    | Emote::CryAboutIt),
                 ) => moves::draw_moves_icon(batch, atlas, e, ix, iy, wheel.owns(e)),
                 None => batch.fill(atlas, ix - 1.0, iy - 1.0, 2.0, 2.0, 0x60FFFFFF),
             }
@@ -3198,7 +3345,7 @@ impl Game<'_> {
                 0xE00C0814,
             );
         }
-        let chosen = hovered.and_then(|slot| SLOTS[slot]);
+        let chosen = hovered.and_then(|slot| wheel.at(slot));
         let title = chosen.map_or_else(
             || crate::lang::get_or("wisp.emote.title", "Emotes"),
             Emote::name,
@@ -3230,6 +3377,27 @@ impl Game<'_> {
             0xFFB9A6CC,
             true,
         );
+        // The pages: a dot each under the hint, the shown one lit, and how to turn them.
+        let pages = PAGES.len() as f32;
+        for k in 0..PAGES.len() {
+            let x = cx - (pages - 1.0) * 5.0 + k as f32 * 10.0;
+            let colour = if k == wheel.page {
+                0xFFE6B4FF
+            } else {
+                0x80806A8A
+            };
+            batch.fill(atlas, x - 2.0, cy + outer + 22.0, 4.0, 4.0, colour);
+        }
+        let turn = crate::lang::get_or("wisp.emote.pages", "Scroll or Q / E for more emotes");
+        let pw = HudBatch::text_width(atlas, &turn);
+        batch.text(
+            atlas,
+            &turn,
+            (cx - pw / 2.0).floor(),
+            cy + outer + 30.0,
+            0xFF8C7AA0,
+            true,
+        );
     }
 }
 
@@ -3254,10 +3422,26 @@ mod tests {
     }
 
     #[test]
+    fn the_wheel_turns_its_pages_round() {
+        let mut wheel = Wheel::default();
+        assert_eq!(wheel.at(0), Some(Emote::BlackHole));
+        wheel.turn(1);
+        assert_eq!(wheel.at(0), Some(Emote::Sit));
+        wheel.turn(1);
+        assert_eq!(wheel.page, 0, "past the last page comes the first");
+        wheel.turn(-1);
+        assert_eq!(wheel.page, PAGES.len() - 1);
+    }
+
+    #[test]
     fn every_emote_has_a_slot_and_a_shop_id() {
         for emote in Emote::ALL {
             assert_eq!(
-                SLOTS.iter().filter(|s| **s == Some(emote)).count(),
+                PAGES
+                    .iter()
+                    .flatten()
+                    .filter(|s| **s == Some(emote))
+                    .count(),
                 1,
                 "{emote:?}"
             );
@@ -3276,8 +3460,8 @@ mod tests {
     #[test]
     fn only_emotes_from_the_shop_unlock() {
         let wheel = Wheel {
-            aim: (0.0, 0.0),
             owned: parse_owned("black_hole\n\n"),
+            ..Wheel::default()
         };
         assert!(wheel.owns(Emote::BlackHole));
         assert!(!Wheel::default().owns(Emote::BlackHole));
@@ -3293,7 +3477,7 @@ mod tests {
 
     #[test]
     fn the_purple_hollow_gathers_merges_and_fires() {
-        assert_eq!(SLOTS[2], Some(Emote::PurpleHollow));
+        assert_eq!(PAGES[0][2], Some(Emote::PurpleHollow));
         assert_eq!(Emote::from_id("purple_hollow"), Some(Emote::PurpleHollow));
         assert_eq!(Emote::PurpleHollow.price(), 1200);
         const {
@@ -3329,7 +3513,7 @@ mod tests {
 
     #[test]
     fn false_dreams_floats_the_player_for_as_long_as_its_song() {
-        assert_eq!(SLOTS[3], Some(Emote::FalseDreams));
+        assert_eq!(PAGES[0][3], Some(Emote::FalseDreams));
         assert_eq!(Emote::from_id("false_dreams"), Some(Emote::FalseDreams));
         assert_eq!(Emote::FalseDreams.price(), 500);
         // The emote ends with its song.
@@ -3357,7 +3541,7 @@ mod tests {
 
     #[test]
     fn the_supernova_gathers_bursts_and_crowns() {
-        assert_eq!(SLOTS[1], Some(Emote::SupernovaCrown));
+        assert_eq!(PAGES[0][1], Some(Emote::SupernovaCrown));
         assert_eq!(Emote::SupernovaCrown.id(), "supernova_crown");
         const {
             assert!(NOVA_FORMED < NOVA_COLLAPSE && NOVA_COLLAPSE < NOVA_BURST);

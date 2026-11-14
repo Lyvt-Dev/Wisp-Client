@@ -164,6 +164,14 @@ pub const OFFERS: &[Offer] = &[
         item
     ),
     offer!(
+        "party_hat",
+        "Party Hat",
+        "A striped party cone with polka dots, worn at a jaunty angle, a gold foil fringe and a pom-pom on top.",
+        Head,
+        500,
+        item
+    ),
+    offer!(
         "nova_owl",
         "Nova the Star Owl",
         "A small star owl that rides on your shoulder and glows in the dark.",
@@ -249,6 +257,48 @@ pub const OFFERS: &[Offer] = &[
         "Rise wrapped in dark energy, eyes burning violet, as it spirals round you, gathers in and bursts outward.",
         Emote,
         1_400
+    ),
+    offer!(
+        "sit",
+        "Sit",
+        "Sit down on the ground, arms on your knees, for as long as you like. Move to stand up; the mouse turns the camera round you.",
+        Emote,
+        300
+    ),
+    offer!(
+        "cry_about_it",
+        "Cry About It",
+        "Rub your eyes with both fists and fake-sob big tears, then give them a little wave bye-bye.",
+        Emote,
+        500
+    ),
+    offer!(
+        "point_and_laugh",
+        "Point and Laugh",
+        "Point straight at them and double over laughing, \"HA\" after \"HA\", tears of joy and all.",
+        Emote,
+        450
+    ),
+    offer!(
+        "too_easy",
+        "Too Easy",
+        "Check your watch, then let out a long, bored yawn while the z's float up.",
+        Emote,
+        400
+    ),
+    offer!(
+        "skill_issue",
+        "Skill Issue",
+        "A slow shrug, palms up, under a big gold question mark, to a sad trombone.",
+        Emote,
+        350
+    ),
+    offer!(
+        "crouch_spam",
+        "Crouch Spam",
+        "Crouch on and off as fast as you can, right where they fell.",
+        Emote,
+        250
     ),
     offer!(
         "l_dance",

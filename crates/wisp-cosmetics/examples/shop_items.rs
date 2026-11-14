@@ -1135,6 +1135,44 @@ fn composite(card: &mut Canvas, layer: &preview::Image, ox: i32, oy: i32) {
 /// `item` on the wearer, `yaw` degrees round (180 shows the back), `zoom` times the card's height:
 /// `drop` of the figure's size below the card's bottom (a close-up crops the legs), its middle
 /// `centre` of the way across.
+/// `framed_card` for a tall hat: the wearer drawn `lower` blocks down inside the figure, so
+/// the hat's top fits in the room the renderer leaves above the head.
+#[allow(clippy::too_many_arguments)]
+fn tall_hat_card(
+    item: &Item,
+    w: u32,
+    h: u32,
+    yaw: f32,
+    zoom: f32,
+    drop: f32,
+    lower: f32,
+    glow: [f32; 3],
+) -> Canvas {
+    let skin = wearer_skin();
+    let body = preview::player_model(false);
+    let mut draws = vec![Draw {
+        root: &body,
+        base: Mat4::IDENTITY,
+        texture: &skin,
+        poses: Vec::new(),
+    }];
+    draws.extend(Draw::item(item, &body, 0.0));
+    let shift = Mat4::from_translation(glam::Vec3::new(0.0, lower, 0.0));
+    for d in &mut draws {
+        d.base = shift * d.base;
+    }
+    let size = (h as f32 * zoom) as u32;
+    let figure = preview::render(&draws, size, size, yaw, 12.0);
+    let mut card = backdrop(w, h, glow, item.id.len() as u32 * 31);
+    composite(
+        &mut card,
+        &figure,
+        w as i32 / 2 - size as i32 / 2,
+        h as i32 - size as i32 + (size as f32 * drop) as i32,
+    );
+    card
+}
+
 fn framed_card(
     item: &Item,
     w: u32,
@@ -1999,6 +2037,173 @@ fn stray_item(texture: &Canvas) -> Value {
     })
 }
 
+// ---------------------------------------------------------------- Party Hat
+
+/// The party hat's cone round the head's top (model pixels, y down: the head's top is -8):
+/// segments, the base's radius, its height, the apex, the fringe's reach and the pom-pom's size.
+const PARTY_SEGMENTS: usize = 16;
+const PARTY_BASE: f32 = 3.4;
+const PARTY_BASE_Y: f32 = -8.05;
+const PARTY_APEX_Y: f32 = -17.0;
+const PARTY_TOP: f32 = 0.25;
+const PARTY_FRINGE: f32 = 4.4;
+const PARTY_POM: f32 = 1.3;
+/// How far it leans to one side, jauntily, about the middle of the head's top (radians).
+const PARTY_TILT: f32 = 0.2;
+
+/// The party hat's 64×64 texture: rows 0-39 the cone (spiral stripes of magenta, cyan and
+/// yellow, white polka dots; each column a direction round it, apex at the top), 42-49 the
+/// gold foil fringe, 52-63 the fluffy pom-pom.
+fn party_texture() -> Canvas {
+    let mut c = Canvas::new(64, 64);
+    let stripes = [hex(0xff3fa4), hex(0x3fd0ff), hex(0xffd23f)];
+    for y in 0..64i32 {
+        for x in 0..64i32 {
+            let col = if y < 40 {
+                let stripe = ((x + y) / 7).rem_euclid(3) as usize;
+                let mut col = stripes[stripe];
+                // Shaded a little toward the base, lit toward the apex.
+                col = mix(col, hex(0x000000), y as f32 / 40.0 * 0.18);
+                // Polka dots on a staggered grid.
+                let (gx, gy) = (x % 10, y % 10);
+                let off = if (y / 10) % 2 == 0 { 0 } else { 5 };
+                let dx = (gx + off) % 10 - 5;
+                let dy = gy - 5;
+                if dx * dx + dy * dy <= 3 {
+                    col = hex(0xfffaf0);
+                }
+                col
+            } else if (42..50).contains(&y) {
+                // Gold foil, crinkled.
+                let glint = noise(x, y, 31);
+                let mut col = mix(hex(0xd99a1e), hex(0xffe27a), glint);
+                if x % 2 == 0 {
+                    col = mix(col, hex(0xfff3c4), 0.25);
+                }
+                col
+            } else if y >= 52 {
+                mix(hex(0xfff8ec), hex(0xe9dcff), noise(x, y, 33) * 0.6)
+            } else {
+                hex(0xffd23f)
+            };
+            c.set(x, y, col);
+        }
+    }
+    c
+}
+
+/// Party Hat: a cone of party stripes leaning a little on the head, a fringe of gold foil round
+/// its base and a pom-pom on top; every face double-sided so it reads from any side.
+fn party_item(texture: &Canvas) -> Value {
+    let n = PARTY_SEGMENTS;
+    let texel = |t: f32| t / 64.0;
+    // Leaned about the middle of the head's top.
+    let (s, c) = PARTY_TILT.sin_cos();
+    let lean = |p: [f32; 3]| -> [f32; 3] {
+        let (x, y) = (p[0], p[1] - PARTY_BASE_Y);
+        [x * c - y * s, PARTY_BASE_Y + x * s + y * c, p[2]]
+    };
+    let mut quads = Vec::new();
+    let mut both = |p: [[f32; 3]; 4], uv: [[f32; 2]; 4]| {
+        let p = p.map(lean);
+        quads.push(quad(p, uv));
+        quads.push(quad([p[3], p[2], p[1], p[0]], [uv[3], uv[2], uv[1], uv[0]]));
+    };
+    let ring = |a: f32, r: f32, y: f32| [a.cos() * r, y, a.sin() * r];
+    for i in 0..n {
+        let (s0, s1) = (i as f32 / n as f32, (i + 1) as f32 / n as f32);
+        let (a0, a1) = (s0 * std::f32::consts::TAU, s1 * std::f32::consts::TAU);
+        // The cone.
+        both(
+            [
+                ring(a1, PARTY_TOP, PARTY_APEX_Y),
+                ring(a0, PARTY_TOP, PARTY_APEX_Y),
+                ring(a0, PARTY_BASE, PARTY_BASE_Y),
+                ring(a1, PARTY_BASE, PARTY_BASE_Y),
+            ],
+            [
+                [s1, texel(0.5)],
+                [s0, texel(0.5)],
+                [s0, texel(39.5)],
+                [s1, texel(39.5)],
+            ],
+        );
+        // The fringe, flaring out and a little down from the base.
+        both(
+            [
+                ring(a1, PARTY_BASE, PARTY_BASE_Y),
+                ring(a0, PARTY_BASE, PARTY_BASE_Y),
+                ring(a0, PARTY_FRINGE, PARTY_BASE_Y + 0.9),
+                ring(a1, PARTY_FRINGE, PARTY_BASE_Y + 0.9),
+            ],
+            [
+                [s1, texel(42.5)],
+                [s0, texel(42.5)],
+                [s0, texel(49.5)],
+                [s1, texel(49.5)],
+            ],
+        );
+    }
+    // The pom-pom: a little box of quads at the apex.
+    let (h, top) = (PARTY_POM, PARTY_APEX_Y);
+    let v = |x: f32, y: f32, z: f32| [x * h, top - h + y * h, z * h];
+    let uv = [
+        [texel(52.5), texel(52.5)],
+        [texel(63.5), texel(52.5)],
+        [texel(63.5), texel(63.5)],
+        [texel(52.5), texel(63.5)],
+    ];
+    for face in [
+        [
+            v(-1., -1., -1.),
+            v(1., -1., -1.),
+            v(1., 1., -1.),
+            v(-1., 1., -1.),
+        ],
+        [
+            v(1., -1., 1.),
+            v(-1., -1., 1.),
+            v(-1., 1., 1.),
+            v(1., 1., 1.),
+        ],
+        [
+            v(-1., -1., 1.),
+            v(-1., -1., -1.),
+            v(-1., 1., -1.),
+            v(-1., 1., 1.),
+        ],
+        [
+            v(1., -1., -1.),
+            v(1., -1., 1.),
+            v(1., 1., 1.),
+            v(1., 1., -1.),
+        ],
+        [
+            v(-1., -1., 1.),
+            v(1., -1., 1.),
+            v(1., -1., -1.),
+            v(-1., -1., -1.),
+        ],
+        [
+            v(-1., 1., -1.),
+            v(1., 1., -1.),
+            v(1., 1., 1.),
+            v(-1., 1., 1.),
+        ],
+    ] {
+        both(face, uv);
+    }
+    json!({
+        "format": 1, "id": "party_hat", "slot": "head", "bone": "head",
+        "texture": { "png": b64(&texture.png()) },
+        "parts": [{
+            "name": "hat", "pivot": [0, 0, 0], "rotation": [0, 0, 0],
+            "cubes": [],
+            "quads": quads,
+        }],
+    })
+}
+
 // ---------------------------------------------------------------- emote cards
 
 /// An emote's card: the wearer posed (part name → turn about x, y, z in radians), `yaw` degrees
@@ -2317,6 +2522,230 @@ fn celestial_wings_card(w: u32, h: u32) -> Canvas {
     p.card
 }
 
+/// `rows` (`#` lit) in square glowing pixels on a card, centred on the point `side` blocks to
+/// the wearer's right and `up` above their feet, `cell` card pixels a pixel.
+fn card_glyph(p: &mut Posed, rows: &[&str], side: f32, up: f32, cell: i32, colour: [f32; 3]) {
+    let (cx, cy, _) = p.project(side, up, 0.0);
+    let w = rows.iter().map(|r| r.len()).max().unwrap_or(0) as i32;
+    let h = rows.len() as i32;
+    for (y, row) in rows.iter().enumerate() {
+        for (x, ch) in row.chars().enumerate() {
+            if ch != '#' {
+                continue;
+            }
+            let px = cx as i32 + (x as i32 - w / 2) * cell;
+            let py = cy as i32 + (y as i32 - h / 2) * cell;
+            for yy in 0..cell {
+                for xx in 0..cell {
+                    p.card.blend(px + xx, py + yy, colour, 0.95);
+                }
+            }
+            dot(&mut p.card, px as f32, py as f32, cell, colour, 0.25);
+        }
+    }
+}
+
+const QUESTION: [&str; 7] = [
+    ".###.", "#...#", "....#", "...#.", "..#..", ".....", "..#..",
+];
+const HA: [&str; 5] = ["#.#.###", "#.#.#.#", "###.###", "#.#.#.#", "#.#.#.#"];
+const ZED: [&str; 4] = ["####", "..#.", ".#..", "####"];
+const CARD_GOLD: [f32; 3] = [255.0, 215.0, 70.0];
+const CARD_TEAR: [f32; 3] = [100.0, 180.0, 255.0];
+
+fn sit_card(w: u32, h: u32) -> Canvas {
+    let mut p = Posed::new(
+        &[
+            ("right_leg", [-1.45, 0.24, 0.0]),
+            ("left_leg", [-1.45, -0.24, 0.0]),
+            ("right_arm", [-0.78, -0.18, 0.08]),
+            ("left_arm", [-0.78, 0.18, -0.08]),
+            ("head", [0.1, 0.0, 0.0]),
+        ],
+        w,
+        h,
+        75.0,
+        1.0,
+        0.22,
+        [120.0, 170.0, 230.0],
+        59,
+    );
+    // A little dust where they sit.
+    for k in 0..12 {
+        let a = noise(k, 1, 13) * std::f32::consts::TAU;
+        p.dot(
+            a.cos() * 0.5,
+            0.6,
+            a.sin() * 0.5,
+            3,
+            [200.0, 190.0, 175.0],
+            0.25,
+        );
+    }
+    p.card
+}
+
+fn crouch_spam_card(w: u32, h: u32) -> Canvas {
+    let mut p = Posed::new(
+        &[
+            ("body", [0.5, 0.0, 0.0]),
+            ("right_arm", [0.4, 0.0, 0.0]),
+            ("left_arm", [0.4, 0.0, 0.0]),
+            ("head", [0.55, 0.0, 0.0]),
+        ],
+        w,
+        h,
+        30.0,
+        1.0,
+        0.0,
+        [255.0, 200.0, 60.0],
+        61,
+    );
+    let cell = (h as i32 / 32).max(2);
+    // Arrows up and down beside them.
+    card_glyph(
+        &mut p,
+        &["..#..", ".###.", "#####", "..#..", "..#.."],
+        0.95,
+        1.4,
+        cell,
+        CARD_GOLD,
+    );
+    card_glyph(
+        &mut p,
+        &["..#..", "..#..", "#####", ".###.", "..#.."],
+        -0.95,
+        1.0,
+        cell,
+        CARD_GOLD,
+    );
+    for k in 0..8 {
+        p.dot(
+            (noise(k, 1, 17) - 0.5) * 0.8,
+            0.05,
+            0.3,
+            4,
+            [235.0, 235.0, 235.0],
+            0.3,
+        );
+    }
+    p.card
+}
+
+fn skill_issue_card(w: u32, h: u32) -> Canvas {
+    let mut p = Posed::new(
+        &[
+            ("right_arm", [-0.55, 0.0, 0.8]),
+            ("left_arm", [-0.55, 0.0, -0.8]),
+            ("head", [-0.07, 0.14, 0.12]),
+        ],
+        w,
+        h,
+        20.0,
+        1.0,
+        0.0,
+        [255.0, 190.0, 60.0],
+        67,
+    );
+    let cell = (h as i32 / 34).max(2);
+    card_glyph(&mut p, &QUESTION, -1.05, 1.55, cell, CARD_GOLD);
+    p.card
+}
+
+fn too_easy_card(w: u32, h: u32) -> Canvas {
+    let mut p = Posed::new(
+        &[
+            ("right_arm", [-2.05, -0.75, 0.0]),
+            ("left_arm", [-2.9, 0.0, -0.3]),
+            ("head", [-0.45, 0.0, 0.0]),
+        ],
+        w,
+        h,
+        25.0,
+        1.0,
+        0.0,
+        [150.0, 120.0, 255.0],
+        71,
+    );
+    let cell = (h as i32 / 45).max(2);
+    for k in 0..3 {
+        card_glyph(
+            &mut p,
+            &ZED,
+            -0.75 - 0.4 * k as f32,
+            1.2 + 0.25 * k as f32,
+            cell + k,
+            [255.0, 255.0, 255.0],
+        );
+    }
+    p.card
+}
+
+fn point_and_laugh_card(w: u32, h: u32) -> Canvas {
+    let mut p = Posed::new(
+        &[
+            ("right_arm", [-1.57, -0.1, 0.0]),
+            ("left_arm", [-0.65, 0.95, 0.0]),
+            ("head", [-0.3, 0.0, 0.0]),
+        ],
+        w,
+        h,
+        8.0,
+        1.0,
+        0.0,
+        [255.0, 120.0, 90.0],
+        73,
+    );
+    let cell = (h as i32 / 60).max(2);
+    card_glyph(&mut p, &HA, 0.75, 2.2, cell, CARD_GOLD);
+    card_glyph(&mut p, &HA, -0.8, 1.95, cell, CARD_GOLD);
+    for side in [0.12f32, -0.12] {
+        for k in 0..3 {
+            p.dot(
+                side * (1.6 + k as f32),
+                1.62 - 0.06 * k as f32,
+                -0.3,
+                3,
+                CARD_TEAR,
+                0.6,
+            );
+        }
+    }
+    p.card
+}
+
+fn cry_about_it_card(w: u32, h: u32) -> Canvas {
+    let mut p = Posed::new(
+        &[
+            ("right_arm", [-2.25, -0.55, 0.0]),
+            ("left_arm", [-2.25, 0.55, 0.0]),
+            ("head", [0.35, 0.0, 0.0]),
+        ],
+        w,
+        h,
+        15.0,
+        1.0,
+        0.0,
+        [90.0, 160.0, 255.0],
+        79,
+    );
+    // Tears streaming down from both eyes.
+    for side in [0.14f32, -0.14] {
+        for k in 0..5 {
+            let k = k as f32;
+            p.dot(
+                side * (1.15 + 0.15 * k),
+                1.6 - 0.07 * k,
+                -0.34,
+                4,
+                CARD_TEAR,
+                0.7,
+            );
+        }
+    }
+    p.card
+}
+
 fn main() {
     let dir = std::env::args()
         .nth(1)
@@ -2553,8 +2982,30 @@ fn main() {
         ("bruh", bruh_card(cw, ch)),
         ("l_dance", l_dance_card(cw, ch)),
         ("celestial_wings", celestial_wings_card(cw, ch)),
+        ("sit", sit_card(cw, ch)),
+        ("crouch_spam", crouch_spam_card(cw, ch)),
+        ("skill_issue", skill_issue_card(cw, ch)),
+        ("too_easy", too_easy_card(cw, ch)),
+        ("point_and_laugh", point_and_laugh_card(cw, ch)),
+        ("cry_about_it", cry_about_it_card(cw, ch)),
     ] {
         write(dir, &format!("{id}.png"), &card.png());
+    }
+
+    let party = party_texture();
+    let hat = serde_json::to_vec_pretty(&party_item(&party)).unwrap();
+    let item = Item::parse(&hat).unwrap_or_else(|e| panic!("party_hat: {e}"));
+    write(dir, "party_hat.json", &hat);
+    write(
+        dir,
+        "party_hat.png",
+        &tall_hat_card(&item, cw, ch, 25.0, 1.5, 0.36, 0.45, [255.0, 90.0, 190.0]).png(),
+    );
+    if std::env::var_os("PARTY_VIEWS").is_some() {
+        for yaw in [25.0, 110.0, 200.0] {
+            let view = tall_hat_card(&item, 420, 420, yaw, 1.0, 0.05, 0.45, [255.0, 90.0, 190.0]);
+            write(dir, &format!("party_view_{yaw}.png"), &view.png());
+        }
     }
 
     let feathers = wing_feathers();

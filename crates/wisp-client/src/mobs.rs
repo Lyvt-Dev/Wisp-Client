@@ -1101,6 +1101,9 @@ pub struct Extra {
     /// last tick's. Zero for everyone else.
     pub emote_arms: ([[f32; 3]; 2], f32),
     pub previous_emote_arms: ([[f32; 3]; 2], f32),
+    /// The same for the legs (right, left), as an emote that sits holds them.
+    pub emote_legs: ([[f32; 3]; 2], f32),
+    pub previous_emote_legs: ([[f32; 3]; 2], f32),
     /// `Entity.deltaMovementOnPreviousTick`: the velocity before this tick's
     /// move, which the elytra lean interpolates from (`getDeltaMovementLerped`).
     pub previous_velocity: Vec3,

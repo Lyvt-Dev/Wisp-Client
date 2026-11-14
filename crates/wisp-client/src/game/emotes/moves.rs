@@ -12,6 +12,12 @@
 //!   swaying, the free fist pumping; halfway through the hands swap.
 //! - Celestial Wings: starlight gathers at the player's back and unfurls into two great wings
 //!   of light that beat slowly, lifting them off the ground, then scatter into stardust.
+//! - Sit: the player sits down on the ground, arms on their knees, until they move; the mouse
+//!   turns the camera round them.
+//! - The ragebait ones, page two of the wheel: Crouch Spam (crouching on and off over the spot),
+//!   Skill Issue (a slow shrug under a "?" to a sad trombone), Too Easy (a look at the wrist, then
+//!   a long yawn), Point and Laugh (pointing at the viewer and doubling over) and Cry About It
+//!   (mock crying, fists at the eyes, then a little wave bye-bye).
 use super::super::Game;
 use super::{Emote, VIOLET, WHITE, direction, smoothstep, wrap, yaw_of};
 use std::f64::consts::{PI, TAU};
@@ -47,6 +53,36 @@ pub(super) const DANCE_END: f64 = DANCE_START + DANCE_BEATS as f64 * BEAT + 0.6;
 /// The bass line, one note a beat (pitch).
 const DANCE_BASS: [f32; 8] = [1.0, 1.0, 1.19, 1.0, 0.89, 0.89, 1.06, 0.94];
 
+// Sit: down, and as long as the player stays (moving stops it).
+const SIT_DOWN: f64 = 0.6;
+pub(super) const SIT_END: f64 = 600.0;
+/// How far the model sinks to sit on the ground: the hips (12 pixels up) to a leg's half width.
+pub(super) const SIT_DROP: f64 = 0.62;
+
+// Crouch Spam: on and off every `CROUCH_TOGGLE` seconds.
+const CROUCH_START: f64 = 0.3;
+const CROUCH_TOGGLE: f64 = 0.16;
+pub(super) const CROUCH_END: f64 = 4.0;
+
+// Skill Issue: the shrug, held, and a sad trombone's three falling notes (time, pitch).
+pub(super) const SKILL_END: f64 = 3.6;
+const SKILL_NOTES: [(f64, f32); 3] = [(0.9, 0.84), (1.35, 0.79), (1.8, 0.63)];
+
+// Too Easy: a look at the wrist, then the yawn.
+const EASY_WATCH: f64 = 0.3;
+const EASY_YAWN: f64 = 2.4;
+pub(super) const EASY_END: f64 = 5.2;
+
+// Point and Laugh: the point, then the laughing.
+const LAUGH_START: f64 = 0.9;
+pub(super) const LAUGH_END: f64 = 4.8;
+
+// Cry About It: the crying, then the wave.
+const CRY_WAVE: f64 = 3.7;
+pub(super) const CRY_END: f64 = 5.6;
+const TEAR: [f32; 3] = [0.4, 0.7, 1.0];
+const GOLD_TEXT: [f32; 3] = [1.0, 0.85, 0.25];
+
 // Celestial Wings: they start unfurling, are open, scatter, and it ends.
 const WINGS_OPEN: f64 = 0.6;
 const WINGS_OPENED: f64 = 2.6;
@@ -80,6 +116,10 @@ pub(super) struct Moves {
     pub turn: f32,
     /// How fast the legs step (the walk animation's speed), 0 standing.
     pub legs: f32,
+    /// The legs (right, left: x, y, z in radians) and how far they hold, as the arms.
+    pub leg_pose: ([[f32; 3]; 2], f32),
+    /// Crouching (the model's sneaking pose).
+    pub crouch: bool,
 }
 
 fn lerp3(a: [f64; 3], b: [f64; 3], k: f64) -> [f64; 3] {
@@ -102,7 +142,132 @@ pub(super) fn moves_at(emote: Emote, t: f64) -> Option<Moves> {
         Emote::Bruh => Some(bruh_at(t)),
         Emote::LDance => Some(dance_at(t)),
         Emote::CelestialWings => Some(wings_at(t)),
+        Emote::Sit => Some(sit_at(t)),
+        Emote::CrouchSpam => Some(crouch_at(t)),
+        Emote::SkillIssue => Some(skill_at(t)),
+        Emote::TooEasy => Some(easy_at(t)),
+        Emote::PointAndLaugh => Some(laugh_at(t)),
+        Emote::CryAboutIt => Some(cry_at(t)),
         _ => None,
+    }
+}
+
+/// How far into the sitting pose, 0 to 1.
+fn sat(t: f64) -> f64 {
+    smoothstep(0.0, SIT_DOWN, t) * (1.0 - smoothstep(SIT_END - SIT_DOWN, SIT_END, t))
+}
+
+fn sit_at(t: f64) -> Moves {
+    let down = sat(t);
+    // Legs out in front, a little apart; hands resting on the knees; breathing slowly.
+    let breathe = (t * 1.6).sin();
+    let right = [-0.78 + 0.02 * breathe, -0.18, 0.08];
+    Moves {
+        lift: -SIT_DROP * down,
+        tilt: [(3.0 * down) as f32, 0.0],
+        arms: ([arm(right), arm(mirrored(right))], down as f32),
+        head_pitch: ((6.0 + 2.0 * breathe) * down) as f32,
+        leg_pose: ([[-1.45, 0.24, 0.0], [-1.45, -0.24, 0.0]], down as f32),
+        ..Moves::default()
+    }
+}
+
+/// Whether Crouch Spam has the player crouched at `t`.
+fn crouched(t: f64) -> bool {
+    (CROUCH_START..CROUCH_END - 0.3).contains(&t)
+        && ((t - CROUCH_START) / CROUCH_TOGGLE).floor() as i64 % 2 == 0
+}
+
+fn crouch_at(t: f64) -> Moves {
+    let on = smoothstep(0.0, 0.2, t) * (1.0 - smoothstep(CROUCH_END - 0.3, CROUCH_END, t));
+    // Looking down at whoever is on the ground there.
+    Moves {
+        head_pitch: (32.0 * on) as f32,
+        crouch: crouched(t),
+        ..Moves::default()
+    }
+}
+
+fn skill_at(t: f64) -> Moves {
+    let up = smoothstep(0.3, 0.8, t) * (1.0 - smoothstep(SKILL_END - 0.7, SKILL_END - 0.1, t));
+    // Forearms out to the sides, palms up, the shoulders bobbing with each note.
+    let bob = SKILL_NOTES
+        .iter()
+        .map(|&(at, _)| (-((t - at) * 9.0).powi(2)).exp())
+        .sum::<f64>()
+        * up;
+    let right = [-0.55 - 0.1 * bob, 0.0, 0.8 + 0.1 * bob];
+    Moves {
+        tilt: [0.0, (7.0 * up) as f32],
+        arms: ([arm(right), arm(mirrored(right))], up as f32),
+        head_pitch: (-4.0 * up) as f32,
+        head_turn: (8.0 * up) as f32,
+        ..Moves::default()
+    }
+}
+
+fn easy_at(t: f64) -> Moves {
+    let watch = smoothstep(EASY_WATCH, EASY_WATCH + 0.4, t)
+        * (1.0 - smoothstep(EASY_YAWN - 0.4, EASY_YAWN, t));
+    let yawn = smoothstep(EASY_YAWN, EASY_YAWN + 0.5, t)
+        * (1.0 - smoothstep(EASY_END - 0.8, EASY_END - 0.2, t));
+    // The left wrist held up in front to look at; then the right hand at the mouth while the
+    // left arm stretches up and the head tips back.
+    let rest = [0.0, 0.0, -0.06];
+    let wrist = [-1.35, 0.75, 0.0];
+    let stretch = [-2.9, 0.0, -0.3];
+    let left = lerp3(lerp3(rest, wrist, watch), stretch, yawn);
+    let right = lerp3([0.0, 0.0, 0.06], [-2.05, -0.75, 0.0], yawn);
+    Moves {
+        tilt: [(6.0 * yawn) as f32, 0.0],
+        arms: ([arm(right), arm(left)], watch.max(yawn) as f32),
+        head_pitch: (28.0 * watch - 26.0 * yawn) as f32,
+        head_turn: (-14.0 * watch) as f32,
+        ..Moves::default()
+    }
+}
+
+/// How hard Point and Laugh is laughing, 0 to 1, and its shaking.
+fn laughing(t: f64) -> (f64, f64) {
+    let laugh = smoothstep(LAUGH_START, LAUGH_START + 0.3, t)
+        * (1.0 - smoothstep(LAUGH_END - 0.9, LAUGH_END - 0.3, t));
+    (laugh, laugh * (t * 18.0).sin())
+}
+
+fn laugh_at(t: f64) -> Moves {
+    let point = smoothstep(0.15, 0.5, t) * (1.0 - smoothstep(LAUGH_END - 0.6, LAUGH_END - 0.1, t));
+    let (laugh, shake) = laughing(t);
+    // The right arm points straight at the viewer, the left hand holds the belly.
+    let right = [-1.57 + 0.1 * shake, -0.1, 0.0];
+    let left = [-0.65, 0.95, 0.0];
+    Moves {
+        lift: 0.03 * shake.abs(),
+        tilt: [(-14.0 * laugh + 3.0 * shake) as f32, 0.0],
+        arms: ([arm(right), arm(left)], point as f32),
+        head_pitch: (-18.0 * laugh + 8.0 * shake) as f32,
+        ..Moves::default()
+    }
+}
+
+fn cry_at(t: f64) -> Moves {
+    let rub = smoothstep(0.3, 0.7, t) * (1.0 - smoothstep(CRY_WAVE - 0.3, CRY_WAVE + 0.1, t));
+    let wave = smoothstep(CRY_WAVE - 0.1, CRY_WAVE + 0.3, t);
+    let away = smoothstep(CRY_END - 0.6, CRY_END - 0.1, t);
+    let wobble = (t * 14.0).sin();
+    // Both fists at the eyes, twisting; then the right hand up, waving bye-bye.
+    let fist = [-2.25 + 0.08 * wobble, -0.55, 0.0];
+    let waving = [-2.8, 0.0, 0.3 + 0.35 * (t * 9.0).sin()];
+    let right = lerp3(fist, waving, wave);
+    let left = lerp3(mirrored(fist), [0.0, 0.0, -0.06], wave);
+    Moves {
+        tilt: [(-6.0 * rub) as f32, 0.0],
+        arms: (
+            [arm(right), arm(left)],
+            ((rub + wave) * (1.0 - away)).min(1.0) as f32,
+        ),
+        head_pitch: (20.0 * rub - 4.0 * wave * (1.0 - away)) as f32,
+        head_turn: (7.0 * wobble * rub) as f32,
+        ..Moves::default()
     }
 }
 
@@ -146,6 +311,7 @@ fn dark_at(t: f64) -> Moves {
         head_turn: 0.0,
         turn: 0.0,
         legs: 0.0,
+        ..Moves::default()
     }
 }
 
@@ -170,6 +336,7 @@ fn bruh_at(t: f64) -> Moves {
         head_turn: (11.0 * shake * (t * 6.5).sin() + 14.0 * glance) as f32,
         turn: 0.0,
         legs: 0.0,
+        ..Moves::default()
     }
 }
 
@@ -198,6 +365,7 @@ fn dance_at(t: f64) -> Moves {
         head_turn: (-0.5 * turn * on) as f32,
         turn: (turn * on) as f32,
         legs: (0.55 * on) as f32,
+        ..Moves::default()
     }
 }
 
@@ -241,6 +409,7 @@ fn wings_at(t: f64) -> Moves {
         head_turn: 0.0,
         turn: 0.0,
         legs: 0.0,
+        ..Moves::default()
     }
 }
 
@@ -354,6 +523,11 @@ impl Game<'_> {
         m.extra.emote_tilt = mv.tilt;
         m.extra.previous_emote_arms = m.extra.emote_arms;
         m.extra.emote_arms = mv.arms;
+        m.extra.previous_emote_legs = m.extra.emote_legs;
+        m.extra.emote_legs = mv.leg_pose;
+        if mv.crouch {
+            m.extra.crouching = true;
+        }
         m.previous_body_yaw = m.body_yaw;
         m.body_yaw = p.body_yaw + mv.turn;
         m.yaw = m.body_yaw + mv.head_turn;
@@ -383,7 +557,233 @@ impl Game<'_> {
             Emote::Bruh => self.bruh_effects(previous, t, ticks, &f),
             Emote::LDance => self.dance_effects(previous, t, &f),
             Emote::CelestialWings => self.wings_effects(previous, t, ticks, &f),
+            Emote::Sit => self.sit_effects(previous, t, &f),
+            Emote::CrouchSpam => self.crouch_effects(previous, t, &f),
+            Emote::SkillIssue => self.skill_effects(previous, t, &f),
+            Emote::TooEasy => self.easy_effects(previous, t, ticks, &f),
+            Emote::PointAndLaugh => self.laugh_effects(previous, t, ticks, &f),
+            Emote::CryAboutIt => self.cry_effects(previous, t, ticks, &f),
             _ => {}
+        }
+    }
+
+    /// `rows` (`#` lit) as glowing dots over the player, read from in front: `cell` blocks a
+    /// dot, its middle `side` to the player's right and `up` above the feet.
+    #[allow(clippy::too_many_arguments)]
+    fn glyph(&mut self, f: &Frame, rows: &[&str], side: f64, up: f64, cell: f64, colour: [f32; 3]) {
+        let width = rows.iter().map(|r| r.len()).max().unwrap_or(0) as f64;
+        let height = rows.len() as f64;
+        for (y, row) in rows.iter().enumerate() {
+            for (x, c) in row.chars().enumerate() {
+                if c == '#' {
+                    // Seen from in front, the player's right is the viewer's left.
+                    let across = side - (x as f64 - (width - 1.0) / 2.0) * cell;
+                    let at = f.at(across, up + ((height - 1.0) / 2.0 - y as f64) * cell, 0.0);
+                    self.particles
+                        .add_glowing(&ParticleOptions::dust(colour, 0.5), at, [0.0; 3]);
+                }
+            }
+        }
+    }
+
+    fn sit_effects(&mut self, previous: f64, t: f64, f: &Frame) {
+        let crossed = |at: f64| previous < at && t >= at;
+        if crossed(SIT_DOWN * 0.8) {
+            // Dust where they sit.
+            for k in 0..10 {
+                let a = f64::from(k) * TAU / 10.0;
+                self.particles.add(
+                    &ParticleOptions::dust([0.72, 0.68, 0.62], 0.9),
+                    f.at(a.cos() * 0.3, 0.05, a.sin() * 0.3 + 0.2),
+                    f.dir(a.cos() * 0.6, 0.1, a.sin() * 0.6),
+                );
+            }
+            self.audio.play(
+                "minecraft:block.wool.place",
+                Some(f.at(0.0, 0.2, 0.0)),
+                0.6,
+                0.8,
+            );
+        }
+    }
+
+    fn crouch_effects(&mut self, previous: f64, t: f64, f: &Frame) {
+        // A soft thump at every crouch, and a puff from the ground.
+        if crouched(t) && !crouched(previous) {
+            let at = f.at(0.0, 0.1, 0.0);
+            self.audio
+                .play("minecraft:block.wool.step", Some(at), 0.5, 1.4);
+            let r = self.particles.random();
+            let side = (r.next_double() - 0.5) * 0.4;
+            self.particles.add(
+                &ParticleOptions::simple(ParticleType::Poof),
+                f.at(side, 0.1, 0.35),
+                [0.0, 0.02, 0.0],
+            );
+        }
+        if previous < CROUCH_END - 0.4 && t >= CROUCH_END - 0.4 {
+            self.audio.play(
+                "minecraft:entity.player.levelup",
+                Some(f.at(0.0, 1.6, 0.0)),
+                0.4,
+                1.8,
+            );
+        }
+    }
+
+    fn skill_effects(&mut self, previous: f64, t: f64, f: &Frame) {
+        let crossed = |at: f64| previous < at && t >= at;
+        if (0.6..SKILL_END - 0.4).contains(&t) {
+            self.glyph(
+                f,
+                &[
+                    ".###.", "#...#", "....#", "...#.", "..#..", ".....", "..#..",
+                ],
+                0.0,
+                2.55,
+                0.07,
+                GOLD_TEXT,
+            );
+        }
+        // A sad trombone: three falling notes, the last the loudest.
+        let at = Some(f.at(0.0, 1.6, 0.0));
+        for (k, &(when, pitch)) in SKILL_NOTES.iter().enumerate() {
+            if crossed(when) {
+                let volume = if k == 2 { 0.9 } else { 0.7 };
+                self.audio
+                    .play("minecraft:block.note_block.didgeridoo", at, volume, pitch);
+                self.audio
+                    .play("minecraft:block.note_block.bass", at, 0.5, pitch);
+            }
+        }
+    }
+
+    fn easy_effects(&mut self, previous: f64, t: f64, ticks: u32, f: &Frame) {
+        if (EASY_WATCH + 0.4..EASY_YAWN - 0.4).contains(&t) {
+            // The watch glinting and ticking.
+            if ticks.is_multiple_of(4) {
+                self.particles.add_glowing(
+                    &ParticleOptions::dust(GOLD_TEXT, 0.5),
+                    f.at(-0.15, 1.25, 0.45),
+                    [0.0; 3],
+                );
+            }
+            if ticks.is_multiple_of(10) {
+                self.audio.play(
+                    "minecraft:block.note_block.hat",
+                    Some(f.at(0.0, 1.3, 0.3)),
+                    0.35,
+                    1.9,
+                );
+            }
+        }
+        if (EASY_YAWN + 0.4..EASY_END - 0.5).contains(&t) {
+            // "z z z" drifting up over the head, one after another.
+            for k in 0..3 {
+                let since = t - (EASY_YAWN + 0.4 + 0.5 * f64::from(k));
+                if since > 0.0 {
+                    let k = f64::from(k);
+                    self.glyph(
+                        f,
+                        &["####", "..#.", ".#..", "####"],
+                        -0.3 * k,
+                        2.25 + 0.25 * k + (since * 0.25).min(0.4),
+                        0.05,
+                        WHITE,
+                    );
+                }
+            }
+        }
+        if previous < EASY_YAWN + 0.2 && t >= EASY_YAWN + 0.2 {
+            let at = Some(f.at(0.0, 1.6, 0.0));
+            self.audio.play("minecraft:entity.fox.sleep", at, 0.9, 0.7);
+            self.audio
+                .play("minecraft:entity.villager.ambient", at, 0.5, 0.55);
+        }
+    }
+
+    fn laugh_effects(&mut self, previous: f64, t: f64, ticks: u32, f: &Frame) {
+        let at = Some(f.at(0.0, 1.6, 0.0));
+        if previous < 0.45 && t >= 0.45 {
+            // The point lands: a spark off the fingertip.
+            let tip = f.at(-0.35, 1.4, 0.75);
+            for _ in 0..5 {
+                let r = self.particles.random();
+                let d = direction(r);
+                self.particles.add(
+                    &ParticleOptions::simple(ParticleType::Crit),
+                    tip,
+                    d.map(|c| c * 0.2),
+                );
+            }
+            self.audio
+                .play("minecraft:entity.experience_orb.pickup", at, 0.5, 1.6);
+        }
+        if laughing(t).0 > 0.5 {
+            // "HA" after "HA", and tears of joy.
+            let (since, last) = (t - LAUGH_START, previous - LAUGH_START);
+            if (since / 0.45).floor() > (last / 0.45).floor() {
+                let r = self.particles.random();
+                let pitch = 1.3 + 0.3 * r.next_float();
+                self.audio
+                    .play("minecraft:entity.witch.celebrate", at, 0.8, pitch);
+            }
+            if ticks.is_multiple_of(5) {
+                for side in [0.12, -0.12] {
+                    self.particles.add(
+                        &ParticleOptions::dust(TEAR, 0.5),
+                        f.at(side, 1.65, 0.28),
+                        f.dir(side * 2.0, 0.15, 0.05),
+                    );
+                }
+            }
+            if ticks.is_multiple_of(9) {
+                let side = if ticks.is_multiple_of(18) {
+                    0.55
+                } else {
+                    -0.55
+                };
+                self.glyph(
+                    f,
+                    &["#.#.###", "#.#.#.#", "###.###", "#.#.#.#", "#.#.#.#"],
+                    side,
+                    2.45,
+                    0.045,
+                    GOLD_TEXT,
+                );
+            }
+        }
+    }
+
+    fn cry_effects(&mut self, previous: f64, t: f64, ticks: u32, f: &Frame) {
+        let crossed = |at: f64| previous < at && t >= at;
+        let at = Some(f.at(0.0, 1.6, 0.0));
+        if (0.6..CRY_WAVE - 0.2).contains(&t) {
+            // Fake tears streaming from both eyes.
+            if ticks.is_multiple_of(2) {
+                for side in [0.13, -0.13] {
+                    self.particles.add(
+                        &ParticleOptions::dust(TEAR, 0.6),
+                        f.at(side, 1.6, 0.3),
+                        f.dir(side * 1.5, -0.4, 0.1),
+                    );
+                }
+            }
+            if ticks.is_multiple_of(16) {
+                self.audio.play("minecraft:entity.wolf.whine", at, 0.6, 1.3);
+            }
+        }
+        for sob in [0.8, 1.6, 2.4] {
+            if crossed(sob) {
+                self.audio
+                    .play("minecraft:entity.villager.hurt", at, 0.5, 1.7);
+            }
+        }
+        if crossed(CRY_WAVE + 0.2) {
+            self.audio
+                .play("minecraft:block.note_block.bell", at, 0.6, 1.5);
+            self.audio
+                .play("minecraft:block.note_block.bell", at, 0.4, 1.19);
         }
     }
 
@@ -806,14 +1206,17 @@ impl Game<'_> {
     }
 
     /// The camera for `emote` (one of these) in place of `view`: framing a player whose feet
-    /// were at `feet` facing `yaw`, from in front (Celestial Wings from behind at first),
-    /// closer where something is in the way, blended in and out of the player's own.
+    /// were at `feet` facing `yaw`, from in front (Celestial Wings from behind at first; Sit
+    /// turned `look` degrees round by the mouse), closer where something is in the way,
+    /// blended in and out of the player's own.
+    #[allow(clippy::too_many_arguments)]
     pub(super) fn moves_camera(
         &self,
         emote: Emote,
         t: f64,
         feet: [f64; 3],
         yaw: f64,
+        look: f64,
         view: (glam::DVec3, f32, f32),
     ) -> (glam::DVec3, f32, f32) {
         let Some(m) = moves_at(emote, t) else {
@@ -844,6 +1247,14 @@ impl Game<'_> {
                 1.5,
                 WINGS_END,
             ),
+            // The mouse turns the camera round the sitting player.
+            Emote::Sit => (0.5 + look.to_radians(), 3.6, 0.6, 1.0, SIT_END),
+            Emote::CrouchSpam => (0.5, 3.8, 0.9, 0.9, CROUCH_END),
+            Emote::SkillIssue => (0.3, 3.6, 0.2, 1.4, SKILL_END),
+            Emote::TooEasy => (0.45, 3.4, 0.1, 1.4, EASY_END),
+            // Straight in front: it points at whoever watches.
+            Emote::PointAndLaugh => (0.05, 3.6, 0.1, 1.35, LAUGH_END),
+            Emote::CryAboutIt => (0.2, 3.2, 0.05, 1.45, CRY_END),
             _ => return view,
         };
         let a = yaw + round;
@@ -993,6 +1404,101 @@ pub(super) fn draw_moves_icon(
             }
             disc(batch, atlas, ix, iy, 2.6, c(0xffffff));
         }
+        Emote::Sit => {
+            // A figure sitting on the ground: head, back, thighs out in front, shins down.
+            disc(batch, atlas, ix - 3.0, iy - 8.0, 3.2, c(0xe0b090));
+            batch.fill(atlas, ix - 5.0, iy - 4.5, 4.0, 8.0, c(0x4aa3df));
+            batch.fill(atlas, ix - 5.0, iy + 3.0, 11.0, 3.5, c(0x3b4a8c));
+            batch.fill(atlas, ix + 3.0, iy + 3.0, 3.5, 7.0, c(0x3b4a8c));
+            batch.fill(atlas, ix - 10.0, iy + 10.0, 20.0, 1.5, c(0x9a8f80));
+        }
+        Emote::CrouchSpam => {
+            // A squat figure between an up and a down arrow.
+            disc(batch, atlas, ix, iy - 1.0, 3.0, c(0xe0b090));
+            batch.fill(atlas, ix - 3.0, iy + 2.0, 6.0, 5.0, c(0x4aa3df));
+            batch.fill(atlas, ix - 3.0, iy + 7.0, 6.0, 3.0, c(0x3b4a8c));
+            let gold = c(0xffd84a);
+            let (lx, rx) = (ix - 9.0, ix + 9.0);
+            batch.fill_quad(
+                atlas,
+                [
+                    [lx, iy - 9.0],
+                    [lx + 3.5, iy - 4.0],
+                    [lx - 3.5, iy - 4.0],
+                    [lx, iy - 9.0],
+                ],
+                gold,
+            );
+            batch.fill(atlas, lx - 1.0, iy - 4.0, 2.0, 5.0, gold);
+            batch.fill_quad(
+                atlas,
+                [
+                    [rx, iy + 9.0],
+                    [rx - 3.5, iy + 4.0],
+                    [rx + 3.5, iy + 4.0],
+                    [rx, iy + 9.0],
+                ],
+                gold,
+            );
+            batch.fill(atlas, rx - 1.0, iy - 1.0, 2.0, 5.0, gold);
+        }
+        Emote::SkillIssue => {
+            // A big gold "?".
+            let gold = c(0xffd84a);
+            batch.fill(atlas, ix - 4.0, iy - 10.0, 8.0, 2.5, gold);
+            batch.fill(atlas, ix - 5.5, iy - 9.0, 2.5, 3.0, gold);
+            batch.fill(atlas, ix + 3.0, iy - 9.0, 2.5, 6.0, gold);
+            batch.fill(atlas, ix - 1.0, iy - 4.0, 4.5, 2.5, gold);
+            batch.fill(atlas, ix - 1.0, iy - 2.0, 2.5, 4.0, gold);
+            batch.fill(atlas, ix - 1.0, iy + 4.0, 2.5, 2.5, gold);
+        }
+        Emote::TooEasy => {
+            // A watch face and a "z".
+            disc(batch, atlas, ix - 3.0, iy + 2.0, 7.0, c(0xffd84a));
+            disc(batch, atlas, ix - 3.0, iy + 2.0, 5.5, c(0xfff6dc));
+            batch.fill(atlas, ix - 3.5, iy - 2.0, 1.2, 4.5, c(0x302030));
+            batch.fill(atlas, ix - 3.5, iy + 1.8, 3.5, 1.2, c(0x302030));
+            let white = c(0xffffff);
+            batch.fill(atlas, ix + 4.0, iy - 10.0, 6.0, 1.5, white);
+            batch.fill_quad(
+                atlas,
+                [
+                    [ix + 8.5, iy - 8.5],
+                    [ix + 10.0, iy - 8.5],
+                    [ix + 5.5, iy - 5.0],
+                    [ix + 4.0, iy - 5.0],
+                ],
+                white,
+            );
+            batch.fill(atlas, ix + 4.0, iy - 5.0, 6.0, 1.5, white);
+        }
+        Emote::PointAndLaugh => {
+            // A laughing face with tears of joy.
+            disc(batch, atlas, ix, iy, 9.0, c(0xffcc4d));
+            batch.fill(atlas, ix - 5.0, iy - 3.0, 3.0, 1.2, c(0x5a3a2a));
+            batch.fill(atlas, ix + 2.0, iy - 3.0, 3.0, 1.2, c(0x5a3a2a));
+            batch.fill_quad(
+                atlas,
+                [
+                    [ix - 5.5, iy + 1.5],
+                    [ix + 5.5, iy + 1.5],
+                    [ix + 3.0, iy + 6.0],
+                    [ix - 3.0, iy + 6.0],
+                ],
+                c(0x5a2a2a),
+            );
+            disc(batch, atlas, ix - 7.5, iy - 0.5, 1.8, c(0x66b3ff));
+            disc(batch, atlas, ix + 7.5, iy - 0.5, 1.8, c(0x66b3ff));
+        }
+        Emote::CryAboutIt => {
+            // A face with fists at its eyes, tears running down.
+            disc(batch, atlas, ix, iy, 9.0, c(0xe0b090));
+            disc(batch, atlas, ix - 4.0, iy - 2.0, 3.0, c(0xc08060));
+            disc(batch, atlas, ix + 4.0, iy - 2.0, 3.0, c(0xc08060));
+            batch.fill(atlas, ix - 3.0, iy + 4.5, 6.0, 1.2, c(0x5a3a2a));
+            batch.fill(atlas, ix - 7.5, iy + 0.5, 1.6, 7.0, c(0x66b3ff));
+            batch.fill(atlas, ix + 6.0, iy + 0.5, 1.6, 7.0, c(0x66b3ff));
+        }
         _ => {}
     }
 }
@@ -1008,6 +1514,12 @@ mod tests {
             (Emote::Bruh, BRUH_END),
             (Emote::LDance, DANCE_END),
             (Emote::CelestialWings, WINGS_END),
+            (Emote::Sit, SIT_END),
+            (Emote::CrouchSpam, CROUCH_END),
+            (Emote::SkillIssue, SKILL_END),
+            (Emote::TooEasy, EASY_END),
+            (Emote::PointAndLaugh, LAUGH_END),
+            (Emote::CryAboutIt, CRY_END),
         ] {
             assert_eq!(emote.length(), end);
             for t in [0.0, end] {
@@ -1022,12 +1534,19 @@ mod tests {
                     m.tilt[0].abs() < 1e-3 && m.tilt[1].abs() < 1e-3,
                     "{emote:?} at {t}"
                 );
+                assert!(m.leg_pose.1.abs() < 1e-6 && !m.crouch, "{emote:?} at {t}");
             }
-            // Never under the ground on the way.
+            // Never under the ground on the way (Sit only as far as sitting on it).
+            let (floor, step) = if emote == Emote::Sit {
+                (-SIT_DROP, 1.7)
+            } else {
+                (0.0, 0.05)
+            };
             let mut t = 0.0;
             while t < end {
-                assert!(moves_at(emote, t).unwrap().lift >= 0.0, "{emote:?} at {t}");
-                t += 0.05;
+                let lift = moves_at(emote, t).unwrap().lift;
+                assert!(lift >= floor - 1e-9, "{emote:?} at {t}: {lift}");
+                t += step;
             }
         }
         assert_eq!(moves_at(Emote::BlackHole, 1.0), None);
@@ -1091,6 +1610,45 @@ mod tests {
         assert!(hi - lo > 0.8, "the tip moves {lo} to {hi}");
         assert_eq!(wings_spread(WINGS_END), 0.0);
         assert!(wings_lift(WINGS_OPENED + 1.0) > 0.3);
+    }
+
+    #[test]
+    fn sit_lowers_the_player_onto_the_ground_with_the_legs_out_in_front() {
+        let m = sit_at(SIT_DOWN + 5.0);
+        assert!((m.lift + SIT_DROP).abs() < 1e-9);
+        let (legs, held) = m.leg_pose;
+        assert_eq!(held, 1.0);
+        assert!(legs[0][0] < -1.3 && legs[1][0] < -1.3, "{legs:?}");
+        // Still sitting minutes later.
+        assert_eq!(sit_at(300.0).lift, m.lift);
+    }
+
+    #[test]
+    fn crouch_spam_crouches_on_and_off_many_times() {
+        let (mut toggles, mut was, mut t) = (0, false, 0.0);
+        while t < CROUCH_END {
+            let now = crouch_at(t).crouch;
+            toggles += usize::from(now != was);
+            was = now;
+            t += 0.01;
+        }
+        assert!(toggles >= 16, "{toggles} toggles");
+    }
+
+    #[test]
+    fn point_and_laugh_points_straight_ahead_and_doubles_over() {
+        let m = laugh_at(2.0);
+        assert!(m.arms.1 > 0.99);
+        assert!((m.arms.0[0][0] + 1.57).abs() < 0.15, "{:?}", m.arms.0[0]);
+        assert!(m.tilt[0] < -8.0, "{:?}", m.tilt);
+    }
+
+    #[test]
+    fn cry_about_it_rubs_the_eyes_then_waves() {
+        let crying = cry_at(1.5).arms;
+        assert!(crying.0[0][0] < -2.0 && crying.0[1][0] < -2.0);
+        let waving = cry_at(CRY_WAVE + 0.8).arms;
+        assert!(waving.0[0][0] < -2.6 && waving.0[1][0] > -0.2);
     }
 
     #[test]

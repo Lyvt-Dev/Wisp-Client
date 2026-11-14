@@ -2578,7 +2578,7 @@ impl Game<'_> {
     }
     /// Wheel steps while playing: set `claimed` to keep them from the hotbar.
     pub(super) fn native_wheel(&mut self, steps: f32, claimed: &mut bool) {
-        if self.amod_wheel(steps) {
+        if self.emote_scroll(steps) || self.amod_wheel(steps) {
             *claimed = true;
             return;
         }

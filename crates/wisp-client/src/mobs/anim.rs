@@ -962,15 +962,28 @@ pub fn setup(
             }
             humanoid(p, s, &h);
             // An Wisp emote holds the arms where it wants them.
-            let (arms, weight) = m.extra.emote_arms;
-            let (arms_before, weight_before) = m.extra.previous_emote_arms;
-            if player && (weight > 0.0 || weight_before > 0.0) {
+            for (limbs, now, before) in [
+                (
+                    ["right_arm", "left_arm"],
+                    m.extra.emote_arms,
+                    m.extra.previous_emote_arms,
+                ),
+                (
+                    ["right_leg", "left_leg"],
+                    m.extra.emote_legs,
+                    m.extra.previous_emote_legs,
+                ),
+            ] {
+                let ((pose_now, weight), (pose_before, weight_before)) = (now, before);
+                if !player || (weight <= 0.0 && weight_before <= 0.0) {
+                    continue;
+                }
                 let w = weight_before + (weight - weight_before) * s.partial;
-                for (side, arm) in ["right_arm", "left_arm"].into_iter().enumerate() {
-                    let pose = p.get(arm);
+                for (side, limb) in limbs.into_iter().enumerate() {
+                    let pose = p.get(limb);
                     for axis in 0..3 {
-                        let to = arms_before[side][axis]
-                            + (arms[side][axis] - arms_before[side][axis]) * s.partial;
+                        let to = pose_before[side][axis]
+                            + (pose_now[side][axis] - pose_before[side][axis]) * s.partial;
                         pose[3 + axis] += (to - pose[3 + axis]) * w;
                     }
                 }
