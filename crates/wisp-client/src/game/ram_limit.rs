@@ -11,7 +11,10 @@ const MIB: u64 = 1024 * 1024;
 impl Game<'_> {
     /// The render distance in use: the player's, unless memory holds it lower.
     pub(super) fn render_distance_in_use(&self) -> i32 {
-        self.ram_limit.distance(self.settings.render_distance)
+        self.ram_limit
+            .distance(wisp_client::options_file::streamed_render_distance(
+                self.settings.render_distance,
+            ))
     }
 
     /// Once a second, on the window's game while a world is open.

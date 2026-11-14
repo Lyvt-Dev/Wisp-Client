@@ -1020,7 +1020,9 @@ impl Game<'_> {
                 7,
             )),
             decoder: ChunkDecoder::new(),
-            view_distance: self.settings.render_distance,
+            view_distance: wisp_client::options_file::streamed_render_distance(
+                self.settings.render_distance,
+            ),
             simulation_distance: self.settings.simulation_distance,
             sequence: 0,
             position_sender: Default::default(),

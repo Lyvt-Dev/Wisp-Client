@@ -593,6 +593,19 @@ impl Options {
                 .and_then(|()| std::env::set_current_dir(&dir))
                 .map_err(|e| format!("game folder {}: {e}", dir.display()))?;
         }
+        // Max Render (a client module of this game folder) lifts the cap before options.txt loads.
+        wisp_client::options_file::set_unlimited_render_distance(wisp_mods::amod::max_render_on(
+            &std::env::current_dir().unwrap_or_default(),
+        ));
+        if let Some(d) = o.distance_override {
+            let max = wisp_client::options_file::render_distance_max();
+            if d > max {
+                return Err(format!(
+                    "render distance must be 2..{max} (the Max Render module allows more)"
+                )
+                .into());
+            }
+        }
         // Vanilla's quick play (Main, QuickPlay.joinSingleplayerWorld): only a
         // world that exists opens; else the title screen. --world also creates one.
         if let Some(world) = o.quick_play.take() {
@@ -666,7 +679,7 @@ impl Options {
             match arg.as_str() {
                 "--help" | "-h" => {
                     println!(
-                        "Wisp — Minecraft Java Edition {} in Rust\n\n  --resources PATH        Prepared resources (wisp-prepare)\n  --render-distance N     Chunks, 2..128 (default 12)\n  --world NAME            World folder under saves/ (default \"New World\")\n  --seed N                World seed for new worlds (default 0)\n  --width N, --height N   Window size (default 1280 x 720)\n  --creative              Creative mode (default survival)\n  --test-terrain          Simple test terrain instead of vanilla generation\n  --frames N              Exit after N frames (testing)\n  --world-frames N        Exit after N frames drawn in the world (testing)\n  --smoke-report PATH     Write a JSON report on exit\n  --benchmark SCENARIO    Run a benchmark (standard, village, forest, ocean, mountain), write its report to benchmarks/ and quit\n  --control               Accept wisp-ctl commands on a local socket\n  --control-socket PATH   Control socket path (default $XDG_RUNTIME_DIR/wisp-control.sock)\n  --server HOST[:PORT]    Join a multiplayer server (offline mode) at start\n  --quickPlaySingleplayer WORLD  Open this world of saves/ at start, only if it exists (vanilla's)\n  --quickPlayMultiplayer HOST[:PORT]  The same as --server (vanilla's name)\n  --name NAME             Player name for multiplayer (default: generated once, kept in wisp-player.txt)\n  --session-file PATH     Signed-in account from the launcher (read once, then deleted)\n  --session-stdin         The same account as JSON on standard input\n  --game-dir DIR          Game folder: saves, options.txt, packs, mods (default: the working directory)\n  --home DIR              Logs and crash reports (default $WISP_HOME, else the platform data folder)\n  --player-dir DIR        This player's own files when several play in one game folder: options.txt, logs, wisp-player.txt, servers.dat, screenshots\n  --fullscreen            Open the window fullscreen\n  --launch-api            Print the Launch API version and options as JSON (docs/api/launch.md)\n  --dev-mod PATH          A content mod (.hmod or folder) to develop: always on\n  --pregen                Add Wisp's /pregen command (docs/pregeneration.md)\n\nControls: mouse look, WASD move, Space jump, Left Shift sneak, Left Ctrl sprint,\nleft click break, right click place/use, 1-9/scroll hotbar, E inventory,\nQ drop, F3 debug, Esc pause.",
+                        "Wisp — Minecraft Java Edition {} in Rust\n\n  --resources PATH        Prepared resources (wisp-prepare)\n  --render-distance N     Chunks, 2..128, more with Max Render (default 12)\n  --world NAME            World folder under saves/ (default \"New World\")\n  --seed N                World seed for new worlds (default 0)\n  --width N, --height N   Window size (default 1280 x 720)\n  --creative              Creative mode (default survival)\n  --test-terrain          Simple test terrain instead of vanilla generation\n  --frames N              Exit after N frames (testing)\n  --world-frames N        Exit after N frames drawn in the world (testing)\n  --smoke-report PATH     Write a JSON report on exit\n  --benchmark SCENARIO    Run a benchmark (standard, village, forest, ocean, mountain), write its report to benchmarks/ and quit\n  --control               Accept wisp-ctl commands on a local socket\n  --control-socket PATH   Control socket path (default $XDG_RUNTIME_DIR/wisp-control.sock)\n  --server HOST[:PORT]    Join a multiplayer server (offline mode) at start\n  --quickPlaySingleplayer WORLD  Open this world of saves/ at start, only if it exists (vanilla's)\n  --quickPlayMultiplayer HOST[:PORT]  The same as --server (vanilla's name)\n  --name NAME             Player name for multiplayer (default: generated once, kept in wisp-player.txt)\n  --session-file PATH     Signed-in account from the launcher (read once, then deleted)\n  --session-stdin         The same account as JSON on standard input\n  --game-dir DIR          Game folder: saves, options.txt, packs, mods (default: the working directory)\n  --home DIR              Logs and crash reports (default $WISP_HOME, else the platform data folder)\n  --player-dir DIR        This player's own files when several play in one game folder: options.txt, logs, wisp-player.txt, servers.dat, screenshots\n  --fullscreen            Open the window fullscreen\n  --launch-api            Print the Launch API version and options as JSON (docs/api/launch.md)\n  --dev-mod PATH          A content mod (.hmod or folder) to develop: always on\n  --pregen                Add Wisp's /pregen command (docs/pregeneration.md)\n\nControls: mouse look, WASD move, Space jump, Left Shift sneak, Left Ctrl sprint,\nleft click break, right click place/use, 1-9/scroll hotbar, E inventory,\nQ drop, F3 debug, Esc pause.",
                         wisp_core::VANILLA_VERSION
                     );
                     return Ok(None);
@@ -710,9 +723,9 @@ impl Options {
                             "--render-distance" | "--radius" => {
                                 o.distance = value.parse()?;
                                 o.distance_override = Some(o.distance);
-                                let max = wisp_client::options_file::MAX_RENDER_DISTANCE;
-                                if !(2..=max).contains(&o.distance) {
-                                    return Err(format!("render distance must be 2..{max}").into());
+                                // The top is checked once the game folder (its mods) is known.
+                                if o.distance < 2 {
+                                    return Err("render distance must be at least 2".into());
                                 }
                             }
                             "--seed" => {

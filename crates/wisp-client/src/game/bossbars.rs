@@ -510,7 +510,9 @@ impl Game<'_> {
                 here: true,
                 local: true,
                 conn: None,
-                view_chunks: self.settings.render_distance,
+                view_chunks: wisp_client::options_file::streamed_render_distance(
+                    self.settings.render_distance,
+                ),
             });
         }
         if let Some(host) = &self.lan {

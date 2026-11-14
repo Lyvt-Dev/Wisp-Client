@@ -813,7 +813,7 @@ impl Game<'_> {
             }
             "render-distance" => {
                 let n: i32 = arg(1)?.parse()?;
-                let max = wisp_client::options_file::MAX_RENDER_DISTANCE;
+                let max = wisp_client::options_file::render_distance_max();
                 if !(2..=max).contains(&n) {
                     return Err(format!("render distance must be 2..{max}").into());
                 }

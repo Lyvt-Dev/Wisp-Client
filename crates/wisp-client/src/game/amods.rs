@@ -15,11 +15,17 @@ impl Game<'_> {
         paths.sort();
         paths.dedup();
         self.voicechat_module = false;
+        let mut max_render = false;
         for path in paths {
             match Definition::read(&path) {
                 // Voice chat runs on its own (`game/voicechat.rs`): the zoom state is the rest's.
                 Ok(definition) if definition.is_voicechat() => {
                     self.voicechat_module = amod::enabled(&game, &definition.id);
+                }
+                // Max Render only lifts the render distance cap (`options_file`).
+                Ok(definition) if definition.is_max_render() => {
+                    max_render |= amod::enabled(&game, &definition.id)
+                        && !self.settings.mods.disabled.contains(&definition.id);
                 }
                 Ok(definition)
                     if !self
@@ -34,6 +40,12 @@ impl Game<'_> {
                 Ok(_) => log::warn!("Wisp: duplicate client mod skipped: {}", path.display()),
                 Err(e) => log::warn!("Wisp: client mod {}: {e}", path.display()),
             }
+        }
+        wisp_client::options_file::set_unlimited_render_distance(max_render);
+        let max = wisp_client::options_file::render_distance_max();
+        if self.settings.render_distance > max {
+            self.settings.render_distance = max;
+            self.apply_settings();
         }
     }
     pub(super) fn amod_key(&mut self, key: &str, pressed: bool) {

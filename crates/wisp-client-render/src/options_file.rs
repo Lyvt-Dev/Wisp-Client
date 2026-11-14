@@ -27,6 +27,8 @@ pub enum Spec {
     Int(i32, i32),
     /// `ClampingLazyMaxIntRange(min, ..)` while the game is not running.
     LazyInt(i32),
+    /// `renderDistance`: `Int(2, render_distance_max())`.
+    RenderDistance,
     /// `IntRange(imin, imax).xmap(i / k, (int)(v * k))` with `doubleRange(lo, hi)`.
     Scaled(i32, i32, f64, f64, f64),
     /// The frame rate limit: `IntRange(1, 26).xmap(i * 10, v / 10)`, codec 10..=260.
@@ -88,8 +90,32 @@ const MODEL_PARTS: [&str; 7] = [
 const GRAPHICS_BACKEND: &[&str] = &["default", "opengl", "vulkan"];
 const GRAPHICS_PRESET: &[&str] = &["fast", "fancy", "fabulous", "custom"];
 /// Wisp's render distance cap (vanilla stops at 32): the server protocol's
-/// view distance tops out at 127 anyway.
+/// view distance tops out at 127 anyway. The Max Render module lifts it to `i32::MAX`.
 pub const MAX_RENDER_DISTANCE: i32 = 128;
+/// The furthest the engine streams, whatever the render distance says: the world
+/// (±29,999,984 blocks) is 3,750,000 chunks across, so a radius past that shows
+/// nothing more, and centre ± radius stays far inside `i32`.
+pub const WORLD_RENDER_DISTANCE: i32 = 3_750_000;
+static RENDER_DISTANCE_MAX: std::sync::atomic::AtomicI32 =
+    std::sync::atomic::AtomicI32::new(MAX_RENDER_DISTANCE);
+
+/// The highest render distance the options accept: 128, or `i32::MAX` with Max Render.
+pub fn render_distance_max() -> i32 {
+    RENDER_DISTANCE_MAX.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// Lifts the render distance cap to `i32::MAX` (Max Render on) or puts back 128.
+pub fn set_unlimited_render_distance(on: bool) {
+    RENDER_DISTANCE_MAX.store(
+        if on { i32::MAX } else { MAX_RENDER_DISTANCE },
+        std::sync::atomic::Ordering::Relaxed,
+    );
+}
+
+/// The radius the engine works with for a render distance.
+pub fn streamed_render_distance(distance: i32) -> i32 {
+    distance.min(WORLD_RENDER_DISTANCE)
+}
 const INACTIVITY: &[&str] = &["minimized", "afk"];
 const CLOUDS: &[&str] = &["false", "fast", "true"];
 const MAIN_HAND: &[&str] = &["left", "right"];
@@ -162,7 +188,7 @@ static TABLE: LazyLock<Vec<Def>> = LazyLock::new(|| {
         b("reducedDebugInfo", false),
         def("renderClouds", O(Clouds), V::Int(2)),
         i("cloudRange", 2, 128, 128),
-        i("renderDistance", 2, MAX_RENDER_DISTANCE, 12),
+        def("renderDistance", O(Spec::RenderDistance), V::Int(12)),
         i("simulationDistance", 5, 32, 12),
         u("screenEffectScale", 1.0),
         def("soundDevice", O(AnyStr), V::Str(String::new())),
@@ -310,9 +336,16 @@ fn unit_alt(json: &Json) -> Option<f64> {
 }
 
 impl Spec {
+    /// The render distance is an `IntRange` whose top the Max Render module can lift.
+    fn resolved(self) -> Spec {
+        match self {
+            Spec::RenderDistance => Spec::Int(2, render_distance_max()),
+            spec => spec,
+        }
+    }
     /// `codec.parse(JsonOps.INSTANCE, element)`.
     fn decode(self, json: &Json) -> Option<V> {
-        match self {
+        match self.resolved() {
             Spec::Bool => codec_bool(json).map(V::Bool),
             Spec::Int(lo, hi) => {
                 let v = codec_int(json)?;
@@ -322,6 +355,8 @@ impl Spec {
                 let v = codec_int(json)?;
                 (v >= lo).then_some(V::Int(v))
             }
+            // `resolved` made it an `Int`.
+            Spec::RenderDistance => None,
             Spec::Scaled(.., lo, hi) => double_range(codec_double(json)?, lo, hi).map(V::Double),
             Spec::FrameLimit => {
                 let v = codec_int(json)?;
@@ -355,7 +390,7 @@ impl Spec {
     /// `ValueSet.validateValue`; `None` makes `OptionInstance.set` fall back
     /// to the option's initial value.
     fn validate(self, v: &V) -> Option<V> {
-        match (self, v) {
+        match (self.resolved(), v) {
             (Spec::Bool, V::Bool(_)) => Some(v.clone()),
             (Spec::Int(lo, hi), V::Int(x)) => (*x >= lo && *x <= hi).then(|| v.clone()),
             (Spec::LazyInt(lo), V::Int(x)) => Some(V::Int((*x).clamp(lo, 2_147_483_646))),
@@ -392,7 +427,7 @@ impl Spec {
     /// `codec.encodeStart(JsonOps.INSTANCE, value)` rendered by Gson.
     fn encode(self, v: &V) -> Option<String> {
         let double = |x: f64| java_text::double_to_string(x);
-        Some(match (self, v) {
+        Some(match (self.resolved(), v) {
             (Spec::Bool, V::Bool(b)) => b.to_string(),
             (Spec::Int(lo, hi), V::Int(x)) => {
                 if *x < lo || i64::from(*x) > i64::from(hi) + 1 {
@@ -736,6 +771,9 @@ fn accepts(kind: Kind) -> serde_json::Value {
     match kind {
         Kind::Option(Spec::Bool) | Kind::PlainBool => json!({ "type": "bool" }),
         Kind::Option(Spec::Int(lo, hi)) => json!({ "type": "int", "min": lo, "max": hi }),
+        Kind::Option(Spec::RenderDistance) => {
+            json!({ "type": "int", "min": 2, "max": render_distance_max() })
+        }
         Kind::Option(Spec::LazyInt(lo)) => json!({ "type": "int", "min": lo }),
         Kind::Option(Spec::Scaled(imin, imax, k, ..)) => json!({
             "type": "double",

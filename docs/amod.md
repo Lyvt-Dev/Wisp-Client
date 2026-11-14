@@ -26,6 +26,15 @@ It cannot reveal chunks the server has not sent or increase texture resolution.
 The spyglass retains its own camera behavior. Leaving gameplay or losing window focus
 resets the module's held key state.
 
+## Max Render
+
+`module = "max_render"`, `capabilities = ["render-distance"]`: lifts the render distance cap
+from 128 to 2,147,483,647 chunks (`options_file::set_unlimited_render_distance`). The slider's
+right half then climbs logarithmically; exact values go in `options.txt`, `--render-distance`
+or `wisp-ctl render-distance`. The engine never streams past the world's 3,750,000 chunks
+(`options_file::WORLD_RENDER_DISTANCE`), and memory, not the number, decides how much loads.
+Source: `mods/wisp-mods/max_render/`.
+
 ## Package format, API 1
 
 A client `.amod` is a ZIP containing exactly one UTF-8 `wisp-client-mod.toml`:

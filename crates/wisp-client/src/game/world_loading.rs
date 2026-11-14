@@ -237,7 +237,8 @@ impl WorldRequest {
             &level.enabled_features,
         )?;
         drop(streaming_step);
-        streaming.radius = settings.render_distance;
+        streaming.radius =
+            wisp_client::options_file::streamed_render_distance(settings.render_distance);
         let mut world = World::new(res.facts().air, level.seed);
         world.attachments = save.load_attachments();
         world.shape = shape;
@@ -862,7 +863,8 @@ pub(super) fn make_streaming(
         )
     };
     streaming.forced = save.load_forced_chunks();
-    streaming.radius = settings.render_distance;
+    streaming.radius =
+        wisp_client::options_file::streamed_render_distance(settings.render_distance);
     streaming.biome_blend = settings.biome_blend;
     streaming.smooth_lighting = settings.smooth_lighting;
     streaming.cutout_leaves = settings.cutout_leaves;

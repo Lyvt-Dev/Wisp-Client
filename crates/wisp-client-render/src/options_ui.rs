@@ -314,11 +314,7 @@ impl Opt {
             | Opt::GlintStrength
             | Opt::PanoramaSpeed => Kind::Slider(s.file.double(self.file_key().unwrap()) as f32),
             Opt::Fov => unit(s.fov, 30.0, 110.0),
-            Opt::RenderDistance => unit(
-                s.render_distance as f32,
-                2.0,
-                crate::options_file::MAX_RENDER_DISTANCE as f32,
-            ),
+            Opt::RenderDistance => Kind::Slider(render_distance_slider(s.render_distance)),
             Opt::SimulationDistance => unit(s.simulation_distance as f32, 5.0, 32.0),
             Opt::Sensitivity => Kind::Slider(s.sensitivity),
             Opt::WheelSensitivity => unit(s.mouse_wheel_sensitivity, 0.01, 10.0),
@@ -412,7 +408,7 @@ impl Opt {
     pub fn slider_steps(self) -> Option<u32> {
         match self {
             Opt::Fov => Some(80),
-            Opt::RenderDistance => Some((crate::options_file::MAX_RENDER_DISTANCE - 2) as u32),
+            Opt::RenderDistance => Some(render_distance_steps()),
             Opt::SimulationDistance => Some(27),
             Opt::MaxFps => Some(25),
             Opt::CloudRange => Some(126),
@@ -849,10 +845,7 @@ impl Opt {
                 crate::options_file::V::Double(f64::from(v)),
             ),
             Opt::Fov => s.fov = step(30.0, 110.0),
-            Opt::RenderDistance => {
-                s.render_distance =
-                    step(2.0, crate::options_file::MAX_RENDER_DISTANCE as f32) as i32
-            }
+            Opt::RenderDistance => s.render_distance = render_distance_at(v),
             Opt::SimulationDistance => s.simulation_distance = step(5.0, 32.0) as i32,
             Opt::Sensitivity => s.sensitivity = v,
             Opt::WheelSensitivity => s.mouse_wheel_sensitivity = 0.01 + v * 9.99,
@@ -5323,8 +5316,83 @@ impl OptionsUi {
     }
 }
 
+/// Render distance slider steps: one per chunk up to 128, and with Max Render as many again
+/// on the right half, each about 14% further, up to `i32::MAX`.
+const RD_LINEAR: u32 = (crate::options_file::MAX_RENDER_DISTANCE - 2) as u32;
+fn render_distance_steps() -> u32 {
+    if crate::options_file::render_distance_max() > crate::options_file::MAX_RENDER_DISTANCE {
+        RD_LINEAR * 2
+    } else {
+        RD_LINEAR
+    }
+}
+fn render_distance_slider(distance: i32) -> f32 {
+    render_distance_slider_in(distance, crate::options_file::render_distance_max())
+}
+fn render_distance_at(v: f32) -> i32 {
+    render_distance_at_in(v, crate::options_file::render_distance_max())
+}
+/// The slider position of a render distance, under the cap `max`.
+fn render_distance_slider_in(distance: i32, max: i32) -> f32 {
+    let cap = f64::from(crate::options_file::MAX_RENDER_DISTANCE);
+    let linear = ((f64::from(distance) - 2.0) / (cap - 2.0)).clamp(0.0, 1.0);
+    if f64::from(max) <= cap {
+        return linear as f32;
+    }
+    if f64::from(distance) <= cap {
+        return (linear * 0.5) as f32;
+    }
+    let max = f64::from(max);
+    (0.5 + 0.5 * ((f64::from(distance) / cap).ln() / (max / cap).ln()).clamp(0.0, 1.0)) as f32
+}
+/// The render distance at a slider position, under the cap `max`.
+fn render_distance_at_in(v: f32, max: i32) -> i32 {
+    let cap = f64::from(crate::options_file::MAX_RENDER_DISTANCE);
+    let v = f64::from(v.clamp(0.0, 1.0));
+    if f64::from(max) <= cap {
+        return (2.0 + v * (cap - 2.0)).round() as i32;
+    }
+    if v <= 0.5 {
+        return (2.0 + v * 2.0 * (cap - 2.0)).round() as i32;
+    }
+    let max = f64::from(max);
+    // Snapped to the step the position is on, so a step always lands on the same distance.
+    let t = ((v - 0.5) * 2.0 * f64::from(RD_LINEAR)).round() / f64::from(RD_LINEAR);
+    (cap * (max / cap).powf(t)).round().clamp(cap, max) as i32
+}
+
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn max_render_slider_reaches_i32_max_and_keeps_chunk_steps_below_128() {
+        let max = i32::MAX;
+        // Without the module the slider is the plain 2..=128.
+        assert_eq!(render_distance_at_in(1.0, 128), 128);
+        assert_eq!(render_distance_at_in(0.0, 128), 2);
+        // With it: the left half is still chunk by chunk, the right end is i32::MAX.
+        assert_eq!(render_distance_at_in(0.0, max), 2);
+        assert_eq!(render_distance_at_in(0.5, max), 128);
+        assert_eq!(render_distance_at_in(1.0, max), max);
+        assert_eq!(render_distance_at_in(0.25, max), 65);
+        // Each step past 128 lands further, and 5000 is within one ~14% step.
+        let step = 1.0 / (RD_LINEAR * 2) as f32;
+        let mut last = 128;
+        let mut near_5000 = false;
+        for k in 1..=RD_LINEAR {
+            let d = render_distance_at_in(0.5 + step * k as f32, max);
+            assert!(d > last, "step {k}: {d} after {last}");
+            near_5000 |= (4400..=5700).contains(&d);
+            last = d;
+        }
+        assert!(near_5000);
+        // Positions read back from distances stay on the same distance.
+        for d in [2, 12, 64, 128, 5000, 1_000_000, max] {
+            let back = render_distance_at_in(render_distance_slider_in(d, max), max);
+            let ratio = f64::from(back) / f64::from(d);
+            assert!((0.93..=1.07).contains(&ratio), "{d} -> {back}");
+        }
+    }
+
     use super::*;
 
     /// The window allows the input method only while `typing` says a search

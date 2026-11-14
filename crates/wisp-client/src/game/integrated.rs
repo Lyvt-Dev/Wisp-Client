@@ -173,7 +173,10 @@ impl Integrated {
     /// The window's render and simulation distances and its Entity Distance
     /// option, for the server to follow.
     pub fn set_distances(&self, render: i32, simulation: i32, entity: f32) {
-        self.flags.render_distance.store(render, Ordering::Relaxed);
+        self.flags.render_distance.store(
+            wisp_client::options_file::streamed_render_distance(render),
+            Ordering::Relaxed,
+        );
         self.flags
             .simulation_distance
             .store(simulation, Ordering::Relaxed);
@@ -407,9 +410,10 @@ impl Game<'_> {
         self.world_biomes_base = self.world_biomes.clone();
         let (res, pack, settings) = (self.res.clone(), self.pack.clone(), self.settings.clone());
         let flags = Arc::new(Flags::default());
-        flags
-            .render_distance
-            .store(settings.render_distance, Ordering::Relaxed);
+        flags.render_distance.store(
+            wisp_client::options_file::streamed_render_distance(settings.render_distance),
+            Ordering::Relaxed,
+        );
         flags
             .simulation_distance
             .store(settings.simulation_distance, Ordering::Relaxed);
@@ -735,7 +739,9 @@ impl Game<'_> {
         startup::time("server.start_mods", || self.start_mods());
         // Math.max(2, options.renderDistance): past vanilla's 32 when the
         // window's render distance is (Wisp's options go to 64).
-        let view_distance = self.settings.render_distance.max(2);
+        let view_distance =
+            wisp_client::options_file::streamed_render_distance(self.settings.render_distance)
+                .max(2);
         let config = HubConfig {
             allow_flight: true,
             default_game_mode: self.level.mode(),

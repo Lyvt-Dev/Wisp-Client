@@ -15,6 +15,9 @@ pub const ZOOM_SOURCE: &str = include_str!("../../../mods/wisp-mods/zoom/wisp-cl
 /// Proximity voice chat compatible with Simple Voice Chat servers (`wisp-voicechat`).
 pub const VOICECHAT_SOURCE: &str =
     include_str!("../../../mods/wisp-mods/voicechat/wisp-client-mod.toml");
+/// Lifts the render distance cap to `i32::MAX` chunks.
+pub const MAX_RENDER_SOURCE: &str =
+    include_str!("../../../mods/wisp-mods/max_render/wisp-client-mod.toml");
 const MAX_PACKAGE: u64 = 1024 * 1024;
 const MAX_MANIFEST: u64 = 64 * 1024;
 /// A floating-point precision guard, rather than the previous gameplay limit of 10x.
@@ -95,9 +98,11 @@ impl Definition {
         match (m.module.as_str(), m.capabilities.as_slice()) {
             ("zoom", [c]) if c == "camera-zoom" => m.zoom.validate()?,
             ("voicechat", [c]) if c == "voice-chat" => {}
+            ("max_render", [c]) if c == "render-distance" => {}
             _ => {
                 return Err(
-                    "This Wisp build supports the camera-zoom and voice-chat client modules".into(),
+                    "This Wisp build supports the camera-zoom, voice-chat and render-distance client modules"
+                        .into(),
                 );
             }
         }
@@ -109,6 +114,9 @@ impl Definition {
     }
     pub fn is_voicechat(&self) -> bool {
         self.module == "voicechat"
+    }
+    pub fn is_max_render(&self) -> bool {
+        self.module == "max_render"
     }
     pub fn read(path: &Path) -> Result<Self, String> {
         if path.is_dir() {
@@ -176,6 +184,12 @@ pub fn find(game: &Path) -> Vec<PathBuf> {
         .collect();
     paths.sort();
     paths
+}
+/// Whether the game folder has a Max Render module installed and not switched off.
+pub fn max_render_on(game: &Path) -> bool {
+    find(game)
+        .iter()
+        .any(|p| Definition::read(p).is_ok_and(|m| m.is_max_render() && enabled(game, &m.id)))
 }
 /// Client modules are installed by explicit user choice, and may be switched off afterwards.
 pub fn enabled(game: &Path, id: &str) -> bool {
@@ -354,6 +368,22 @@ mod tests {
         let voice = Definition::parse(VOICECHAT_SOURCE).unwrap();
         assert!(voice.is_voicechat() && !voice.is_zoom());
         assert!(Definition::parse(&VOICECHAT_SOURCE.replace("voice-chat", "camera-zoom")).is_err());
+        let max = Definition::parse(MAX_RENDER_SOURCE).unwrap();
+        assert!(max.is_max_render() && !max.is_zoom());
+        assert!(
+            Definition::parse(&MAX_RENDER_SOURCE.replace("render-distance", "voice-chat")).is_err()
+        );
+        let installed = p.join("game");
+        fs::create_dir_all(installed.join(DIR)).unwrap();
+        assert!(!max_render_on(&installed));
+        fs::write(
+            installed.join(DIR).join("max_render.amod"),
+            package(MAX_RENDER_SOURCE).unwrap(),
+        )
+        .unwrap();
+        assert!(max_render_on(&installed));
+        set_enabled(&installed, "max_render", false).unwrap();
+        assert!(!max_render_on(&installed));
         assert!(Definition::parse(&ZOOM_SOURCE.replace("api = 1", "api = 2")).is_err());
         fs::remove_dir_all(p).unwrap();
     }
