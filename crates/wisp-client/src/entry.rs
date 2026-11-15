@@ -1,6 +1,22 @@
 //! Startup shared by the gameplay library and its executable.
 use crate::{crash, game, logging, ram_limit};
 
+/// The command line given by a host that has none (the phone app), instead of the process's.
+static ARGS: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
+
+/// The game's command line from its host (Android starts no process with arguments). Once,
+/// before [`main`].
+pub fn set_args(args: Vec<String>) {
+    let _ = ARGS.set(args);
+}
+
+/// The arguments after the program's name: the host's ([`set_args`]), else the process's.
+pub fn args() -> Vec<String> {
+    ARGS.get()
+        .cloned()
+        .unwrap_or_else(|| std::env::args().skip(1).collect())
+}
+
 /// Start the game. The executable supplies the allocator and retains the mod API marker.
 pub fn main() {
     main_with(Default::default());
@@ -15,7 +31,7 @@ pub fn main_with(mods: crate::mod_api::Mods) {
     wisp_threads::configure_allocator();
     wisp_client::telemetry::mark_start();
     wisp_client::spans::startup::init(std::time::Instant::now());
-    let args: Vec<String> = std::env::args().skip(1).collect();
+    let args: Vec<String> = args();
     let game_args = args.iter().take_while(|a| *a != "--dedicated");
     let help = game_args
         .clone()

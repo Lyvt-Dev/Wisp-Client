@@ -1118,6 +1118,9 @@ pub struct Renderer {
     /// this one on the same device: reused, not created again, as a new
     /// surface for the window can come back lost (Wayland on Mesa).
     spare_surface: std::sync::Mutex<Option<wgpu::Surface<'static>>>,
+    /// The window has no surface to draw on (Android: the app went to the background and the
+    /// system destroyed its native window). Frames are skipped until `resume_surface`.
+    surface_gone: bool,
     /// The offscreen colour target, sized like `config`.
     offscreen: Option<wgpu::Texture>,
     /// Offscreen submissions still on the GPU: at most two frames run ahead.
@@ -4573,6 +4576,7 @@ impl Renderer {
             adapter,
             surface: surface.map(Arc::new),
             spare_surface: std::sync::Mutex::new(None),
+            surface_gone: false,
             offscreen,
             in_flight: std::collections::VecDeque::new(),
             paced_elsewhere: false,
@@ -4938,6 +4942,25 @@ impl Renderer {
             .get_mut()
             .unwrap_or_else(std::sync::PoisonError::into_inner) =
             self.surface.take().and_then(|s| Arc::try_unwrap(s).ok());
+    }
+    /// The window's surface is going away (Android's `suspended`): drop it after the GPU is
+    /// done with it, and draw nothing until [`Self::resume_surface`].
+    pub fn suspend_surface(&mut self) {
+        if self.offscreen.is_some() || self.surface_gone {
+            return;
+        }
+        self.queue.wait();
+        self.frame_gen.stop();
+        self.surface = None;
+        self.surface_gone = true;
+    }
+    /// The window is back (Android's `resumed` after `suspended`): a new surface for it.
+    pub fn resume_surface(&mut self) -> Result<()> {
+        if !self.surface_gone {
+            return Ok(());
+        }
+        self.surface_gone = false;
+        self.recreate_surface()
     }
     /// Reattach a window after surface loss or a failed renderer replacement.
     pub fn recreate_surface(&mut self) -> Result<()> {
@@ -6993,6 +7016,9 @@ impl Renderer {
     }
     /// `checks`: the error scopes of a scaled screenshot's frame, checked before its PNG is written.
     fn draw_frame(&mut self, frame: &Frame, checks: Option<GpuChecks>) -> Result<bool> {
+        if self.surface_gone {
+            return Ok(false);
+        }
         // Its steps as spans (WISP_SPIKES): each lap names the step that just ended.
         let mut laps = crate::spans::laps();
         let landing = Instant::now();

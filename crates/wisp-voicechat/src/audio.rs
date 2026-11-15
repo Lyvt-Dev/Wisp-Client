@@ -169,10 +169,16 @@ impl Mixer {
     }
 }
 
+/// An output stream only kept open. Android's AAudio stream is `Send` but not `Sync`; nothing
+/// can be called through a shared reference to this, so sharing one is harmless.
+struct Playing(#[allow(dead_code)] cpal::Stream);
+// SAFETY: the stream is private and never used after it starts, so no `&Playing` reaches it.
+unsafe impl Sync for Playing {}
+
 /// The voices: decoded on a thread of their own, mixed into an output stream of their own.
 pub struct Speaker {
     mixer: Arc<Mutex<Mixer>>,
-    _stream: Option<cpal::Stream>,
+    _stream: Option<Playing>,
     decoder: Option<Sender<Sound>>,
 }
 
@@ -192,7 +198,7 @@ impl Speaker {
         };
         Self {
             mixer,
-            _stream: stream,
+            _stream: stream.map(Playing),
             decoder: None,
         }
     }

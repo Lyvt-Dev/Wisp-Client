@@ -9,6 +9,7 @@ pub mod installation;
 pub mod local_content;
 pub mod mods;
 mod mojang;
+pub mod phone_link;
 pub mod prefs;
 pub mod server_ping;
 pub mod shaders;

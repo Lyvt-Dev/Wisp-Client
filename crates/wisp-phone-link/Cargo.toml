@@ -1,0 +1,19 @@
+[package]
+name = "wisp-phone-link"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Sending the prepared game files from the PC's launcher to the phone app over the local network"
+
+[dependencies]
+getrandom = "0.3"
+sha2 = "0.10.9"
+serde_json = "1.0.151"
+
+[dev-dependencies]
+# Only for the test that keeps RESOURCES_SCHEMA equal to the preparer's.
+wisp-prepare = { path = "../wisp-prepare" }
+
+[lints]
+workspace = true

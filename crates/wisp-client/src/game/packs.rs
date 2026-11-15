@@ -45,6 +45,11 @@ pub fn open_folder(dir: &Path) {
 }
 /// `Util.getPlatform().openUri`: the system browser on the link.
 pub fn open_uri(uri: &str) {
+    // The phone app opens links through Android (`wisp-android`).
+    if crate::phone::on_phone() {
+        crate::phone::open_url(uri);
+        return;
+    }
     // URLs need Windows' registered protocol handler, not Explorer's path
     // handling. ShellExecute also preserves the URL as one Unicode value,
     // without interpolating its query string into a command interpreter.

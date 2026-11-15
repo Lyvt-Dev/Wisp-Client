@@ -17,6 +17,7 @@ pub(super) enum Section {
     Appearance,
     Cosmetics,
     Accounts,
+    Phone,
     Storage,
     About,
 }
@@ -35,12 +36,13 @@ impl Section {
             })
             .unwrap_or_default()
     }
-    const ALL: [Self; 7] = [
+    const ALL: [Self; 8] = [
         Self::General,
         Self::Game,
         Self::Appearance,
         Self::Cosmetics,
         Self::Accounts,
+        Self::Phone,
         Self::Storage,
         Self::About,
     ];
@@ -51,6 +53,7 @@ impl Section {
             Self::Appearance => "Appearance",
             Self::Cosmetics => "Cosmetics & emotes",
             Self::Accounts => "Accounts",
+            Self::Phone => "Phone",
             Self::Storage => "Storage",
             Self::About => "About",
         }
@@ -62,6 +65,7 @@ impl Section {
             Self::Appearance => "spark",
             Self::Cosmetics => "star",
             Self::Accounts => "user-circle",
+            Self::Phone => "compass",
             Self::Storage => "folder",
             Self::About => "info",
         }
@@ -73,6 +77,7 @@ impl Section {
             Self::Appearance => "Colours, background, banner and layout of the launcher.",
             Self::Cosmetics => "What you show other Wisp players, and what you see of theirs.",
             Self::Accounts => "Your Microsoft account and how each instance signs in.",
+            Self::Phone => "Play Wisp on your Android phone with this PC's game files.",
             Self::Storage => "Where Wisp keeps its files, and how much room they take.",
             Self::About => "Versions, licenses and where to get help.",
         }
@@ -335,6 +340,7 @@ impl Launcher {
             Section::Appearance => self.settings_appearance(cx),
             Section::Cosmetics => self.settings_cosmetics(cx),
             Section::Accounts => self.settings_accounts(cx),
+            Section::Phone => self.settings_phone(cx),
             Section::Storage => self.settings_storage(cx),
             Section::About => self.settings_about(cx),
         };
@@ -1070,6 +1076,103 @@ impl Launcher {
                     .on_click(cx.listener(|this, _, _, cx| this.measure_storage(cx))),
                 s,
             ))
+    }
+
+    fn settings_phone(&self, cx: &mut Context<Self>) -> Div {
+        use wisp_launcher::phone_link::Status;
+        let s = self.ui_scale;
+        let running = self.phone_link.is_some();
+        let toggle = cat_button(
+            "phone-link",
+            if running { "Stop" } else { "Connect a phone" },
+            "compass",
+            !running,
+            s,
+        )
+        .on_click(cx.listener(|this, _, _, cx| this.toggle_phone_link(cx)));
+        let mut page = div()
+            .flex()
+            .flex_col()
+            .child(heading("Wisp on your phone", s))
+            .child(row(
+                "Connect a phone",
+                "The Wisp app for Android plays with the game files this PC prepared from your Minecraft. Open the app on your phone, choose Get them from my PC, and type the code shown here. Both need the same Wi-Fi; about 800 MB are copied. If Windows asks, allow Wisp on private networks.",
+                toggle,
+                s,
+            ));
+        if let Some(link) = &self.phone_link {
+            let state = match link.status() {
+                Status::Waiting => tr("Waiting for your phone…"),
+                Status::Sending { sent, total } => trf(
+                    "Copying to your phone: {sent} of {total} MB",
+                    &[
+                        ("sent", &(sent / 1_000_000).to_string()),
+                        ("total", &(total / 1_000_000).to_string()),
+                    ],
+                ),
+                Status::Sent(_) => tr("Done: the game files are on your phone."),
+                Status::Closed => tr("Closed. Press Stop, then Connect a phone for a new code."),
+            };
+            let mut card = div()
+                .w_full()
+                .mb(px(8. * s))
+                .px(px(18. * s))
+                .py(px(18. * s))
+                .rounded(px(10. * s))
+                .border_1()
+                .border_color(rgb(tone(0x2a2b30)))
+                .bg(rgb(tone(0x17181b)))
+                .flex()
+                .flex_col()
+                .gap(px(8. * s))
+                .child(
+                    div()
+                        .text_size(px(14. * s))
+                        .text_color(rgb(MUTED))
+                        .child(tr("Code for the phone")),
+                )
+                .child(
+                    div()
+                        .text_size(px(44. * s))
+                        .font_family("Geist Mono")
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .child(format!("{} {}", &link.code[..3], &link.code[3..])),
+                );
+            if let Some(address) = &link.address {
+                card = card.child(mono(
+                    trf("This PC's address: {address}", &[("address", address)]),
+                    s,
+                ));
+            }
+            if !link.discoverable {
+                card = card.child(mono(
+                    tr("The phone can't find this PC by itself here: type the address in the app."),
+                    s,
+                ));
+            }
+            page = page.child(card.child(div().text_size(px(15. * s)).child(state)));
+        }
+        page
+    }
+
+    /// Starts or stops offering the selected instance's game files to a phone.
+    fn toggle_phone_link(&mut self, cx: &mut Context<Self>) {
+        if self.phone_link.take().is_some() {
+            cx.notify();
+            return;
+        }
+        let Some(profile) = self.settings.current() else {
+            self.error(tr(
+                "Create an instance and press Play once, then connect the phone.",
+            ));
+            cx.notify();
+            return;
+        };
+        match wisp_launcher::phone_link::PhoneLink::start(&profile.resources, engine::version()) {
+            Ok(link) => self.phone_link = Some(link),
+            Err(e) => self.error(tr(&e)),
+        }
+        cx.notify();
     }
 
     fn settings_about(&self, _cx: &mut Context<Self>) -> Div {

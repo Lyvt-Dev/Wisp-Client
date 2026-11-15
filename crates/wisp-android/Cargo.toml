@@ -1,0 +1,25 @@
+[package]
+name = "wisp-android"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "The Wisp phone app: Android's entry point (NativeActivity) around the game"
+publish = false
+
+[lib]
+# libwisp_android.so, loaded by the APK's NativeActivity (packaging/android/AndroidManifest.xml).
+crate-type = ["cdylib"]
+path = "src/lib.rs"
+
+[target.'cfg(target_os = "android")'.dependencies]
+wisp-client = { path = "../wisp-client", default-features = false, features = ["audio"] }
+wisp-threads = { path = "../wisp-threads" }
+wisp-core = { path = "../wisp-core" }
+winit = { version = "0.30.13", features = ["android-native-activity"] }
+jni = "0.21.1"
+libc = "0.2"
+log = "0.4"
+
+[lints]
+workspace = true

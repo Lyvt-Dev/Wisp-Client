@@ -468,6 +468,7 @@ impl Game<'_> {
         }
         self.draw_friend_toasts(batch);
         self.native_hud(batch, &mut corners);
+        self.draw_touch(batch);
     }
     fn draw_wisp_hud(&self, batch: &mut HudBatch, corners: &mut Corners) {
         use wisp_client::lang;

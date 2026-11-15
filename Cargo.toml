@@ -40,6 +40,8 @@ members = [
     "crates/wisp-shaders",
     "crates/wisp-optifine",
     "crates/wisp-voicechat",
+    "crates/wisp-phone-link",
+    "crates/wisp-android",
     "crates/wisp-shader-api",
     "crates/wisp-release-sign",
     "xtask",

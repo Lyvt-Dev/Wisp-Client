@@ -111,6 +111,27 @@ pub fn helper_clipboard_contents(clipboard: &str) -> String {
     strip_formatting(&clipboard.replace('\r', ""))
 }
 
+/// Android has no clipboard arboard can reach (NativeActivity has no Java side to ask the
+/// ClipboardManager): text copied in the game is pasted in the game.
+#[cfg(target_os = "android")]
+mod arboard {
+    pub enum Error {
+        ContentNotAvailable,
+    }
+    pub struct Clipboard;
+    impl Clipboard {
+        pub fn new() -> Result<Self, Error> {
+            Err(Error::ContentNotAvailable)
+        }
+        pub fn get_text(&mut self) -> Result<String, Error> {
+            Err(Error::ContentNotAvailable)
+        }
+        pub fn set_text(&mut self, _: String) -> Result<(), Error> {
+            Err(Error::ContentNotAvailable)
+        }
+    }
+}
+
 /// A clipboard: the system's, or an in-memory one in tests.
 pub trait Clipboard {
     /// `KeyboardHandler.getClipboard`: empty when there is no text.
@@ -151,6 +172,7 @@ impl Clipboard for SystemClipboard {
         match system.get_text() {
             Ok(text) => text,
             Err(arboard::Error::ContentNotAvailable) => String::new(),
+            #[allow(unreachable_patterns)]
             Err(_) => {
                 // A lost connection (a restarted compositor): reconnect next time.
                 self.system = None;

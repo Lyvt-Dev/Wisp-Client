@@ -265,6 +265,7 @@ mod particle_culling;
 mod passengers;
 mod persist;
 mod perspective;
+mod phone_setup;
 mod pick_entity;
 mod pickups;
 mod piglins;
@@ -342,6 +343,7 @@ mod text_displays;
 mod titles;
 mod tnt;
 mod totem;
+mod touch;
 mod trading;
 mod transient_blocks;
 mod trial_spawner;
@@ -538,6 +540,9 @@ struct Options {
     session_file: Option<String>,
     /// `--session-stdin`: the session file's JSON comes on standard input instead.
     session_stdin: bool,
+    /// `--phone-private DIR`: the phone app's private folder; the phone's setup screen (sign-in,
+    /// game files from the PC) comes before the game (`phone`).
+    phone_private: Option<PathBuf>,
 }
 impl Options {
     /// The name to join servers with: the one given, else the offline name kept
@@ -553,7 +558,7 @@ impl Options {
     /// The command line, then what it asks of the process: the game folder, the account.
     /// A bad command line is a [`launch_api::UsageError`] (exit code 2, no crash report).
     fn read() -> Result<Option<Self>> {
-        let Some(mut o) = Self::parse(std::env::args().skip(1))
+        let Some(mut o) = Self::parse(crate::entry::args().into_iter())
             .map_err(|e| launch_api::UsageError(e.to_string()))?
         else {
             return Ok(None);
@@ -674,6 +679,7 @@ impl Options {
             quick_play: None,
             session_file: wisp_compat::var("WISP_SESSION_FILE").ok(),
             session_stdin: false,
+            phone_private: None,
         };
         while let Some(arg) = args.next() {
             match arg.as_str() {
@@ -723,6 +729,7 @@ impl Options {
                     let read = || -> Result<()> {
                         match arg.as_str() {
                             "--resources" => o.resources = value.into(),
+                            "--phone-private" => o.phone_private = Some(value.into()),
                             "--render-distance" | "--radius" => {
                                 o.distance = value.parse()?;
                                 o.distance_override = Some(o.distance);
@@ -2553,6 +2560,8 @@ struct Game<'a> {
     last_input: Instant,
     /// Controllers (Wisp's own).
     pad: pad::Pads,
+    /// Touch controls (`touch`): a phone's, or any touchscreen's.
+    touch: touch::TouchControls,
     frames: u64,
     /// The glint clock and options, read once at the start of each frame
     /// (game/item_draw.rs).
@@ -17249,7 +17258,14 @@ fn autosave_interval(rate: f32) -> i64 {
 }
 impl ApplicationHandler for Game<'_> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        if self.window.is_some() {
+        if let Some(window) = &self.window {
+            // Back from the background (Android): a new surface for the same window.
+            if let Some(renderer) = &mut self.renderer
+                && let Err(e) = renderer.resume_surface()
+            {
+                log::warn!("Wisp renderer: the window surface did not come back: {e}");
+            }
+            window.request_redraw();
             return;
         }
         // The Window constructor: created fullscreen when options.txt or --fullscreen says so.
@@ -17338,6 +17354,25 @@ impl ApplicationHandler for Game<'_> {
             self.last_input = Instant::now();
         }
     }
+    fn suspended(&mut self, event_loop: &ActiveEventLoop) {
+        // Android: the app went to the background and its native window goes away. The game
+        // loses focus and pauses at once (pausing a singleplayer world saves it, and the system
+        // may end a background app at any time), then stops drawing until `resumed`.
+        if let Some(id) = self.window.as_ref().map(|w| w.id()) {
+            self.handle_window_event(
+                event_loop,
+                id,
+                WindowEvent::Focused(false),
+                input_trace::InputOrigin::User,
+            );
+        }
+        self.focus_lost = Some(Instant::now() - Duration::from_secs(1));
+        self.pause_if_inactive();
+        self.settings.save(&Game::options_path());
+        if let Some(renderer) = &mut self.renderer {
+            renderer.suspend_surface();
+        }
+    }
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
         self.idle(event_loop);
     }
@@ -17368,6 +17403,27 @@ impl Game<'_> {
             None => self.options.headless,
         };
         if !ours {
+            return;
+        }
+        // A finger: the touch controls turn it into play or a pointer (`touch`).
+        if let WindowEvent::Touch(touch) = event {
+            if let Err(e) = self.touch_event(event_loop, touch) {
+                log::warn!("Wisp: touch input failed: {e}");
+            }
+            return;
+        }
+        // Android's back button: what Escape (or a controller's B) does where the player is.
+        if let WindowEvent::KeyboardInput { event: key, .. } = &event
+            && key.logical_key
+                == winit::keyboard::Key::Named(winit::keyboard::NamedKey::BrowserBack)
+            && key.physical_key != PhysicalKey::Code(KeyCode::BrowserBack)
+        {
+            if key.state == ElementState::Pressed
+                && !key.repeat
+                && let Err(e) = self.pad_back()
+            {
+                log::warn!("Wisp: back failed: {e}");
+            }
             return;
         }
         follow_keymap(&mut event);
@@ -18939,6 +18995,9 @@ impl Game<'_> {
             return;
         }
         wisp_client::spans::time("pads", || self.poll_pads(event_loop));
+        if let Err(e) = self.touch_frame(event_loop) {
+            log::warn!("Wisp: touch input failed: {e}");
+        }
         self.pause_if_inactive();
         if self.options.frames.is_some() && self.started.elapsed() > self.options.timeout {
             self.error = Some("frame-limited run timed out".into());
@@ -19166,6 +19225,7 @@ impl<'a> Game<'a> {
             frame_end: now,
             last_input: now,
             pad: Default::default(),
+            touch: Default::default(),
             frames: 0,
             glint_frame: Default::default(),
             kept_block_entities: Default::default(),
@@ -21254,7 +21314,7 @@ fn run_event_loop(mut game: Game<'_>) -> Result<()> {
         return game.error.take().map_or(Ok(()), Err);
     }
     let mut split = split::Split::new(game);
-    let result = event_loop()?.run_app(&mut split);
+    let result = run_app(&mut split);
     game = split.host;
     narrator::stop();
     leave_fullscreen_after(&result, &mut game.settings);
@@ -21309,8 +21369,19 @@ impl Loading {
             || self.menu.pending.is_some()
             || self.ui_at.is_none_or(|at| at.elapsed() >= TITLE_FRAME_WAIT)
     }
+    fn suspended(&mut self) {
+        if let Some(renderer) = &mut self.renderer {
+            renderer.suspend_surface();
+        }
+    }
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        if self.window.is_some() {
+        if let Some(window) = &self.window {
+            if let Some(renderer) = &mut self.renderer
+                && let Err(e) = renderer.resume_surface()
+            {
+                log::warn!("Wisp renderer: the window surface did not come back: {e}");
+            }
+            window.request_redraw();
             return;
         }
         // The Window constructor: created fullscreen when options.txt or --fullscreen says so.
@@ -21612,6 +21683,12 @@ impl ApplicationHandler for App {
             App::Ready(game) => game.resumed(event_loop),
         }
     }
+    fn suspended(&mut self, event_loop: &ActiveEventLoop) {
+        match self {
+            App::Loading(loading) => loading.suspended(),
+            App::Ready(game) => game.suspended(event_loop),
+        }
+    }
     fn window_event(&mut self, event_loop: &ActiveEventLoop, id: WindowId, event: WindowEvent) {
         match self {
             App::Loading(loading) => loading.window_event(event_loop, id, event),
@@ -21750,7 +21827,7 @@ fn run_loading(
         error: None,
     };
     let mut app = App::Loading(Box::new(loading));
-    let result = event_loop()?.run_app(&mut app);
+    let result = run_app(&mut app);
     narrator::stop();
     match &mut app {
         // Ready: splitscreen around P1's game.
@@ -21781,6 +21858,20 @@ pub fn run_with() -> Result<()> {
     let Some(mut options) = Options::read()? else {
         return Ok(());
     };
+    // The phone app: its setup screen is its launcher (sign in, get the files, Play).
+    if let Some(private) = options.phone_private.clone() {
+        let paths = wisp_client::phone::Paths {
+            resources: options.resources.clone(),
+            private,
+        };
+        let settings = Settings::load(&Game::options_path());
+        if !phone_setup::show(&paths, &settings)? {
+            return Ok(());
+        }
+        if let Some(name) = wisp_client::phone::start_session(&paths) {
+            options.player_name = Some(name);
+        }
+    }
     if options.execution_role == execution_role::ExecutionRole::DedicatedServer
         && !dedicated::preflight(&mut options)?
     {
@@ -23021,9 +23112,114 @@ fn write_level_for_role(
 pub(crate) static FORCE_X11: std::sync::atomic::AtomicBool =
     std::sync::atomic::AtomicBool::new(false);
 
+/// The phone app's activity, which the event loop needs (set by `wisp-android` at start).
+#[cfg(target_os = "android")]
+static ANDROID_APP: std::sync::OnceLock<winit::platform::android::activity::AndroidApp> =
+    std::sync::OnceLock::new();
+
+/// Hands the game the activity `android_main` got. Once, before the game starts.
+#[cfg(target_os = "android")]
+pub fn set_android_app(app: winit::platform::android::activity::AndroidApp) {
+    let _ = ANDROID_APP.set(app);
+}
+
+/// `Util.getPlatform().openUri`: the system browser on the link.
+pub fn open_link(uri: &str) {
+    packs::open_uri(uri);
+}
+
+#[cfg(target_os = "android")]
+thread_local! {
+    /// Android allows one event loop per process: the setup screen and the game share it.
+    static LOOP: std::cell::RefCell<Option<EventLoop<()>>> = const { std::cell::RefCell::new(None) };
+    static RUNS: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+}
+
+/// Runs `app` on the window system's event loop until it exits. On Android the one loop is kept
+/// and run again for the next app (the game after the setup screen).
+pub(crate) fn run_app<A: ApplicationHandler>(
+    app: &mut A,
+) -> std::result::Result<(), EventLoopError> {
+    #[cfg(target_os = "android")]
+    {
+        use winit::platform::run_on_demand::EventLoopExtRunOnDemand;
+        let again = RUNS.with(|r| {
+            r.set(r.get() + 1);
+            r.get() > 1
+        });
+        // winit sends `resumed` when the native window appears, which happens once: an app after
+        // the first gets it at its start while the window is there.
+        let kick = again
+            && ANDROID_APP
+                .get()
+                .is_some_and(|a| a.native_window().is_some());
+        LOOP.with(|cell| {
+            let mut cell = cell.borrow_mut();
+            if cell.is_none() {
+                *cell = Some(event_loop()?);
+            }
+            let event_loop = cell.as_mut().expect("event loop made above");
+            event_loop.run_app_on_demand(&mut android_rerun::Rerun { app, kick })
+        })
+    }
+    #[cfg(not(target_os = "android"))]
+    event_loop()?.run_app(app)
+}
+
+#[cfg(target_os = "android")]
+mod android_rerun {
+    use winit::application::ApplicationHandler;
+    use winit::event::{DeviceEvent, DeviceId, StartCause, WindowEvent};
+    use winit::event_loop::ActiveEventLoop;
+    use winit::window::WindowId;
+
+    /// An app on the kept event loop: `resumed` at its start when the window already exists.
+    pub(super) struct Rerun<'a, A> {
+        pub app: &'a mut A,
+        pub kick: bool,
+    }
+
+    impl<A: ApplicationHandler> ApplicationHandler for Rerun<'_, A> {
+        fn new_events(&mut self, event_loop: &ActiveEventLoop, cause: StartCause) {
+            self.app.new_events(event_loop, cause);
+            if self.kick && cause == StartCause::Init {
+                self.kick = false;
+                self.app.resumed(event_loop);
+            }
+        }
+        fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+            self.kick = false;
+            self.app.resumed(event_loop);
+        }
+        fn window_event(&mut self, l: &ActiveEventLoop, id: WindowId, event: WindowEvent) {
+            self.app.window_event(l, id, event);
+        }
+        fn device_event(&mut self, l: &ActiveEventLoop, id: DeviceId, event: DeviceEvent) {
+            self.app.device_event(l, id, event);
+        }
+        fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+            self.app.about_to_wait(event_loop);
+        }
+        fn suspended(&mut self, event_loop: &ActiveEventLoop) {
+            self.app.suspended(event_loop);
+        }
+        fn exiting(&mut self, event_loop: &ActiveEventLoop) {
+            self.app.exiting(event_loop);
+        }
+        fn memory_warning(&mut self, event_loop: &ActiveEventLoop) {
+            self.app.memory_warning(event_loop);
+        }
+    }
+}
+
 /// The window system's event loop: X11 when `--x11` asked for it (Linux), else winit's choice.
 pub(crate) fn event_loop() -> std::result::Result<EventLoop<()>, winit::error::EventLoopError> {
     let mut builder = EventLoop::builder();
+    #[cfg(target_os = "android")]
+    if let Some(app) = ANDROID_APP.get() {
+        use winit::platform::android::EventLoopBuilderExtAndroid;
+        builder.with_android_app(app.clone());
+    }
     #[cfg(all(unix, not(target_os = "macos"), not(target_os = "android")))]
     if FORCE_X11.load(std::sync::atomic::Ordering::Relaxed) {
         use winit::platform::x11::EventLoopBuilderExtX11;

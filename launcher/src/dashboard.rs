@@ -262,6 +262,8 @@ struct Launcher {
     settings: Settings,
     prefs: wisp_launcher::prefs::Prefs,
     settings_section: settings_view::Section,
+    /// Settings › Phone: the game files offered to a phone while it is open.
+    phone_link: Option<wisp_launcher::phone_link::PhoneLink>,
     storage: Option<Vec<settings_view::Folder>>,
     /// Minimize the window at the next frame (after the game started).
     minimize_pending: bool,
@@ -432,6 +434,9 @@ impl Launcher {
                     }
                     changed = true;
                 }
+                if this.phone_link.as_mut().is_some_and(|link| link.tick()) {
+                    changed = true;
+                }
                 this.renew_ticks = (this.renew_ticks + 1) % 10;
                 if this.renew_ticks == 0 && this.child.is_some() && !this.renewing {
                     let dir = wisp_launcher::session_renewal::dir(&this.home);
@@ -509,6 +514,7 @@ impl Launcher {
             settings,
             prefs,
             settings_section: settings_view::Section::from_env(),
+            phone_link: None,
             storage: None,
             minimize_pending: false,
             hero_ticks: 0,

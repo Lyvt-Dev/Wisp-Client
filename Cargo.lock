@@ -4633,6 +4633,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "wisp-android"
+version = "0.1.0"
+dependencies = [
+ "jni 0.21.1",
+ "libc",
+ "log",
+ "winit",
+ "wisp-client",
+ "wisp-core",
+ "wisp-threads",
+]
+
+[[package]]
 name = "wisp-anticheat"
 version = "0.1.0"
 dependencies = [
@@ -4727,6 +4740,7 @@ dependencies = [
  "wisp-mods",
  "wisp-narrator",
  "wisp-optifine",
+ "wisp-phone-link",
  "wisp-protocol",
  "wisp-server-files",
  "wisp-shader-api",
@@ -5027,6 +5041,16 @@ dependencies = [
  "regex",
  "wisp-bench",
  "wisp-core",
+]
+
+[[package]]
+name = "wisp-phone-link"
+version = "0.1.0"
+dependencies = [
+ "getrandom 0.3.4",
+ "serde_json",
+ "sha2",
+ "wisp-prepare",
 ]
 
 [[package]]
