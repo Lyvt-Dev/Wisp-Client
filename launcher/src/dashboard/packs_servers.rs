@@ -709,7 +709,7 @@ impl Launcher {
         let status = self.pings.get(server_ping::FEATURED_ADDRESS);
         let (dot, line) = match status {
             Some(Some(Ok(st))) => (
-                accent_tone(0x3ccf6a),
+                0x3ccf6a,
                 if st.motd.is_empty() {
                     tr("Online")
                 } else {
@@ -735,13 +735,13 @@ impl Launcher {
                         .gap(px(6. * s))
                         .text_size(px(18. * s))
                         .font_weight(FontWeight::SEMIBOLD)
-                        .child(icon("user-multiple-02", 0xd9c8ff).size(px(17. * s)))
+                        .child(icon("user-multiple-02", 0xbff0cf).size(px(17. * s)))
                         .child(format!("{} / {}", st.online, st.max)),
                 )
                 .child(
                     div()
                         .text_size(px(12. * s))
-                        .text_color(rgb(0xc9b8e8))
+                        .text_color(rgb(0x9fd4b2))
                         .child(trf("{ms} ms ping", &[("ms", &st.latency_ms.to_string())])),
                 ),
             _ => div(),
@@ -753,10 +753,10 @@ impl Launcher {
             .rounded(px(14. * s))
             .overflow_hidden()
             .border_1()
-            .border_color(rgb(0x5b3a8c))
+            .border_color(rgb(0x2a7a48))
             .bg(gpui::linear_gradient(
                 100.,
-                gpui::linear_color_stop(rgb(0x2b1650), 0.),
+                gpui::linear_color_stop(rgb(0x0f3d24), 0.),
                 gpui::linear_color_stop(rgba(tone_a(0x17181bff)), 0.85),
             ))
             .flex()
@@ -768,9 +768,9 @@ impl Launcher {
                     .flex_none()
                     .rounded(px(14. * s))
                     .overflow_hidden()
-                    .bg(rgb(0x1a0f30))
+                    .bg(rgb(0x0b2a18))
                     .border_1()
-                    .border_color(rgb(0x6b45a8))
+                    .border_color(rgb(0x2f9e5a))
                     .map(|d| match icon_from_list {
                         Some(icon) => d.child(img(icon).size_full()),
                         None => d.child(
@@ -823,7 +823,7 @@ impl Launcher {
                             .child(
                                 div()
                                     .text_size(px(13. * s))
-                                    .text_color(rgb(0xb7a6d6))
+                                    .text_color(rgb(0x9fd4b2))
                                     .child(server_ping::FEATURED_ADDRESS),
                             ),
                     )
@@ -831,7 +831,7 @@ impl Launcher {
                         div()
                             .truncate()
                             .text_size(px(13. * s))
-                            .text_color(rgb(0xd9d0ea))
+                            .text_color(rgb(0xd2ecdc))
                             .child(line),
                     ),
             )
@@ -843,8 +843,18 @@ impl Launcher {
                     .h(px(46. * s))
                     .px(px(26. * s))
                     .rounded(px(10. * s))
-                    .bg(luminous())
-                    .shadow(glow(s * 0.7))
+                    .bg(gpui::linear_gradient(
+                        180.,
+                        gpui::linear_color_stop(rgb(0x46d36f), 0.),
+                        gpui::linear_color_stop(rgb(0x23a04a), 1.),
+                    ))
+                    .shadow(vec![gpui::BoxShadow {
+                        color: rgba(0x2fbf5a55).into(),
+                        offset: gpui::point(px(0.), px(4. * s)),
+                        blur_radius: px(18. * s),
+                        spread_radius: px(0.),
+                        inset: false,
+                    }])
                     .flex()
                     .items_center()
                     .gap(px(8. * s))

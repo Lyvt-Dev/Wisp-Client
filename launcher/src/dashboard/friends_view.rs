@@ -520,8 +520,8 @@ impl Launcher {
                 }
             }
         }
-        // Daily coins, at the bottom.
-        column.child(self.side_heading("Daily reward")).child(
+        // Daily coins, then the saved servers.
+        let column = column.child(self.side_heading("Daily reward")).child(
             div()
                 .id("side-daily")
                 .p(px(12. * s))
@@ -567,6 +567,98 @@ impl Launcher {
                     this.page = Page::Shop;
                     cx.notify();
                 })),
-        )
+        );
+        self.side_servers(column, busy, cx)
+    }
+
+    /// The saved servers (the featured one has its own card on Home), each with its live
+    /// players and ping, joined with a click.
+    fn side_servers(
+        &self,
+        column: Stateful<Div>,
+        busy: bool,
+        cx: &mut Context<Self>,
+    ) -> Stateful<Div> {
+        let s = self.ui_scale;
+        let servers: Vec<_> = self
+            .content
+            .servers
+            .iter()
+            .filter(|sv| !wisp_launcher::server_ping::is_featured(&sv.item.address))
+            .take(5)
+            .collect();
+        if servers.is_empty() {
+            return column;
+        }
+        let mut column = column.child(self.side_heading("Your servers"));
+        for (i, server) in servers.into_iter().enumerate() {
+            let address = server.item.address.clone();
+            let (colour, line) = match self.pings.get(&server.item.address) {
+                Some(Some(Ok(st))) => (
+                    accent_tone(0x3ccf6a),
+                    trf(
+                        "{online} / {max} · {ping} ms",
+                        &[
+                            ("online", &st.online.to_string()),
+                            ("max", &st.max.to_string()),
+                            ("ping", &st.latency_ms.to_string()),
+                        ],
+                    ),
+                ),
+                Some(Some(Err(_))) => (0xd9534f, tr("Offline")),
+                _ => (0x9a9ca4, tr("Checking…")),
+            };
+            column = column.child(
+                div()
+                    .id(("side-server", i))
+                    .px(px(6. * s))
+                    .py(px(6. * s))
+                    .rounded(px(8. * s))
+                    .flex()
+                    .items_center()
+                    .gap(px(10. * s))
+                    .hover(|d| d.bg(rgb(tone(0x1c1d21))))
+                    .child(content::thumb(server.icon.as_ref(), "server", 30., s))
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .child(
+                                div()
+                                    .truncate()
+                                    .text_size(px(14. * s))
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .child(server.item.name.clone()),
+                            )
+                            .child(
+                                div()
+                                    .flex()
+                                    .items_center()
+                                    .gap(px(6. * s))
+                                    .text_size(px(12. * s))
+                                    .text_color(rgb(MUTED))
+                                    .child(
+                                        div()
+                                            .size(px(7. * s))
+                                            .flex_none()
+                                            .rounded_full()
+                                            .bg(rgb(colour)),
+                                    )
+                                    .child(div().truncate().child(line)),
+                            ),
+                    )
+                    .when(busy, |d| d.opacity(0.5))
+                    .when(!busy, |d| {
+                        d.cursor_pointer()
+                            .on_click(cx.listener(move |this, _, _, cx| {
+                                this.launch_with(
+                                    vec!["--quickPlayMultiplayer".into(), address.clone()],
+                                    cx,
+                                )
+                            }))
+                    }),
+            );
+        }
+        column
     }
 }

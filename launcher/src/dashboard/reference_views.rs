@@ -504,30 +504,53 @@ impl Launcher {
 
     pub(super) fn home(&self, cx: &mut Context<Self>) -> Div {
         let s = self.ui_scale;
+        let gap = px(16. * s);
+        let greeting = match &self.account {
+            Some(a) => trf("Welcome back, {name}", &[("name", &a.account.name)]),
+            None => tr("Welcome to Wisp"),
+        };
         div()
             .flex()
             .flex_col()
-            .pb(px(20. * s))
+            .gap(gap)
+            .pt(px(14. * s))
+            .pb(px(22. * s))
             .child(
                 div()
-                    .h(px(50. * s))
-                    .flex_none()
                     .flex()
-                    .items_center()
-                    .gap(px(8. * s))
-                    .text_size(px(17. * s))
-                    .child(div().text_color(rgb(MUTED)).child(tr("Welcome back,")))
-                    .child(self.avatar(22.))
+                    .items_end()
+                    .justify_between()
                     .child(
                         div()
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .child(self.account_name()),
+                            .flex()
+                            .flex_col()
+                            .gap(px(2. * s))
+                            .child(
+                                div()
+                                    .text_size(px(24. * s))
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .child(greeting),
+                            )
+                            .child(
+                                div()
+                                    .text_size(px(14. * s))
+                                    .text_color(rgb(MUTED))
+                                    .child(tr(if self.account.is_some() {
+                                        "Pick up where you left off."
+                                    } else {
+                                        "Sign in with your Microsoft account to play online."
+                                    })),
+                            ),
                     )
-                    .child(dot(self.account.is_some(), s))
-                    .child(div().flex_1())
                     .child(
                         div()
-                            .text_size(px(13. * s))
+                            .px(px(10. * s))
+                            .py(px(5. * s))
+                            .rounded(px(8. * s))
+                            .bg(rgb(tone(SURFACE)))
+                            .border_1()
+                            .border_color(rgb(tone(RULE)))
+                            .text_size(px(12. * s))
                             .text_color(rgb(MUTED))
                             .child(trf(
                                 "Wisp {wisp} · Minecraft {minecraft}",
@@ -539,72 +562,58 @@ impl Launcher {
                     ),
             )
             .child(self.hero(cx))
-            .child(div().mt(px(14. * s)).child(self.featured_server(cx)))
+            .child(self.featured_server(cx))
             .child(
                 div()
-                    .mt(px(14. * s))
                     .flex()
-                    .items_start()
-                    .gap(px(14. * s))
+                    .items_stretch()
+                    .gap(gap)
                     .child(self.home_worlds(cx))
                     .child(self.home_shortcuts(cx)),
             )
             .child(
                 div()
-                    .h(px(52. * s))
-                    .flex_none()
                     .flex()
-                    .items_center()
-                    .justify_between()
+                    .flex_col()
+                    .gap(px(10. * s))
                     .child(
                         div()
                             .flex()
-                            .items_baseline()
-                            .gap(px(8. * s))
+                            .items_center()
+                            .justify_between()
                             .child(
                                 div()
-                                    .text_size(px(20. * s))
+                                    .text_size(px(18. * s))
                                     .font_weight(FontWeight::SEMIBOLD)
                                     .child(tr("Latest News")),
                             )
                             .child(
                                 div()
-                                    .text_size(px(15. * s))
+                                    .id("all-updates")
+                                    .flex()
+                                    .items_center()
+                                    .gap(px(6. * s))
+                                    .text_size(px(13. * s))
                                     .text_color(rgb(MUTED))
-                                    .child(trf(
-                                        "({count} posts)",
-                                        &[("count", &NEWS.len().to_string())],
-                                    )),
+                                    .cursor_pointer()
+                                    .hover(|d| d.text_color(rgb(INK)))
+                                    .child(tr("Explore Wisp"))
+                                    .child(icon("arrow", MUTED).size(px(13. * s)))
+                                    .on_click(cx.listener(|this, _, _, cx| {
+                                        this.page = Page::About;
+                                        cx.notify();
+                                    })),
                             ),
                     )
                     .child(
-                        div()
-                            .id("all-updates")
-                            .flex()
-                            .items_center()
-                            .gap(px(6. * s))
-                            .text_size(px(14. * s))
-                            .text_color(rgb(MUTED))
-                            .cursor_pointer()
-                            .hover(|d| d.text_color(rgb(INK)))
-                            .child(tr("Explore Wisp"))
-                            .child(icon("arrow", MUTED).size(px(14. * s)))
-                            .on_click(cx.listener(|this, _, _, cx| {
-                                this.page = Page::About;
-                                cx.notify();
-                            })),
+                        div().flex().gap(gap).children(
+                            NEWS.iter()
+                                .take(3)
+                                .enumerate()
+                                .map(|(i, news)| self.news_card(i, news, cx)),
+                        ),
                     ),
             )
-            .child(div().flex().flex_col().gap(px(14. * s)).children(
-                NEWS.chunks(3).enumerate().map(|(row, cards)| {
-                    div().flex().gap(px(14. * s)).children(
-                        cards
-                            .iter()
-                            .enumerate()
-                            .map(|(i, news)| self.news_card(row * 3 + i, news, cx)),
-                    )
-                }),
-            ))
     }
 
     fn news_card(&self, index: usize, news: &News, cx: &mut Context<Self>) -> Stateful<Div> {
@@ -620,7 +629,7 @@ impl Launcher {
             .relative()
             .flex_1()
             .min_w_0()
-            .h(px(184. * s))
+            .h(px(156. * s))
             .rounded(px(12. * s))
             .overflow_hidden()
             .border_1()
@@ -807,7 +816,7 @@ impl Launcher {
                         ),
                 );
         }
-        card.child(
+        card.child(div().flex_1()).child(
             div()
                 .id("worlds-folder")
                 .mt(px(2. * s))
@@ -905,8 +914,8 @@ impl Launcher {
             "{n} saved servers",
         );
         self.home_card("Shortcuts", None)
-            .w(px(460. * s))
-            .flex_none()
+            .flex_1()
+            .min_w_0()
             .child(
                 div()
                     .flex()
@@ -923,22 +932,17 @@ impl Launcher {
                     .child(
                         tile("quick-mods", "Mods", tr("Client features"), "puzzle")
                             .on_click(go(Page::Mods)),
+                    )
+                    .child(
+                        tile("quick-shaders", "Shaders", tr("Light and shadows"), "sun")
+                            .on_click(go(Page::Shaders)),
                     ),
             )
             .child(
                 div()
                     .flex()
                     .gap(px(8. * s))
-                    .child(
-                        tile("quick-shaders", "Shaders", tr("Light and shadows"), "sun")
-                            .on_click(go(Page::Shaders)),
-                    )
-                    .child(tile("quick-packs", "Packs", packs, "layers").on_click(go(Page::Packs))),
-            )
-            .child(
-                div()
-                    .flex()
-                    .gap(px(8. * s))
+                    .child(tile("quick-packs", "Packs", packs, "layers").on_click(go(Page::Packs)))
                     .child(
                         tile("quick-servers", "Servers", servers, "server")
                             .on_click(go(Page::Servers)),
@@ -966,67 +970,61 @@ impl Launcher {
         } else {
             "Launch game"
         };
-        let detail = match profile {
-            Some(p) => trf(
-                "{instance} · Minecraft {version}",
-                &[("instance", &p.name), ("version", engine::version())],
-            ),
-            None => trf("Minecraft {version}", &[("version", engine::version())]),
+        // Plain white with black type on black and white, the accent otherwise.
+        let white = theme::mono();
+        let (ink, rule, hover) = if white {
+            (0x0b0b0d, 0x0000001f, 0x0000000f)
+        } else {
+            (INK, 0xffffff40, 0xffffff14)
         };
         let launch = div()
             .relative()
             .flex()
-            .h(px(78. * s))
+            .h(px(56. * s))
             .rounded(px(10. * s))
-            .border_1()
-            .border_color(rgb(accent_tone(0x6fe792)))
-            .bg(luminous())
-            .shadow(glow(s))
-            .when(busy, |d| d.opacity(0.65))
+            .when(white, |d| d.bg(rgb(0xffffff)))
+            .when(!white, |d| {
+                d.border_1()
+                    .border_color(rgb(accent_tone(0x6fe792)))
+                    .bg(luminous())
+                    .shadow(glow(s))
+            })
+            .when(busy, |d| d.opacity(0.6))
             .child(
                 div()
                     .id("hero-play")
-                    .w(px(300. * s))
+                    .w(px(280. * s))
                     .h_full()
                     .flex()
-                    .flex_col()
                     .items_center()
                     .justify_center()
-                    .gap(px(3. * s))
                     .rounded_l(px(10. * s))
                     .when(!busy, |d| {
                         d.cursor_pointer()
-                            .hover(|d| d.bg(rgba(0xffffff14)))
+                            .hover(move |d| d.bg(rgba(hover)))
                             .on_click(cx.listener(|this, _, _, cx| this.play(cx)))
                     })
                     .child(
                         div()
-                            .text_size(px(27. * s))
+                            .text_size(px(21. * s))
                             .font_weight(FontWeight::SEMIBOLD)
+                            .text_color(rgb(ink))
                             .child(tr(label).to_uppercase()),
-                    )
-                    .child(
-                        div()
-                            .max_w(px(270. * s))
-                            .truncate()
-                            .text_size(px(14. * s))
-                            .text_color(rgb(accent_tone(0xe3f8e9)))
-                            .child(detail),
                     ),
             )
-            .child(div().w(px(1.)).my(px(14. * s)).bg(rgba(0xffffff40)))
+            .child(div().w(px(1.)).my(px(14. * s)).bg(rgba(rule)))
             .child(
                 div()
                     .id("instance-selector")
-                    .w(px(46. * s))
+                    .w(px(48. * s))
                     .h_full()
                     .flex()
                     .items_center()
                     .justify_center()
                     .rounded_r(px(10. * s))
                     .cursor_pointer()
-                    .hover(|d| d.bg(rgba(0xffffff14)))
-                    .child(icon("down", INK).size(px(18. * s)))
+                    .hover(move |d| d.bg(rgba(hover)))
+                    .child(icon("down", ink).size(px(18. * s)))
                     .on_click(cx.listener(|this, _, _, cx| {
                         this.instance_menu = !this.instance_menu;
                         cx.notify();
@@ -1040,10 +1038,43 @@ impl Launcher {
             .launched
             .iter()
             .max_by_key(|(_, t)| **t)
-            .map(|(name, t)| (name.clone(), content::ago(*t)));
+            .map(|(_, t)| content::ago(*t));
+        let name = profile.map_or_else(|| tr("No instance yet"), |p| p.name.clone());
+        let stat = |value: String, label: &str, glyph: &'static str| {
+            div()
+                .flex_none()
+                .flex()
+                .items_center()
+                .gap(px(10. * s))
+                .child(
+                    div()
+                        .size(px(34. * s))
+                        .rounded(px(9. * s))
+                        .bg(rgba(0xffffff14))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .child(icon(glyph, INK).size(px(17. * s))),
+                )
+                .child(
+                    div()
+                        .child(
+                            div()
+                                .text_size(px(17. * s))
+                                .font_weight(FontWeight::SEMIBOLD)
+                                .child(value),
+                        )
+                        .child(
+                            div()
+                                .text_size(px(12. * s))
+                                .text_color(rgb(0xc4c6cc))
+                                .child(tr(label)),
+                        ),
+                )
+        };
         div()
             .relative()
-            .h(px(330. * s))
+            .h(px(270. * s))
             .flex_none()
             .rounded(px(14. * s))
             .border_1()
@@ -1062,76 +1093,132 @@ impl Launcher {
                     .inset_0()
                     .rounded(px(14. * s))
                     .bg(gpui::linear_gradient(
-                        180.,
-                        gpui::linear_color_stop(rgba(tone_a(0x0b0b0d40)), 0.),
-                        gpui::linear_color_stop(rgba(tone_a(0x0b0b0dc0)), 1.),
+                        90.,
+                        gpui::linear_color_stop(rgba(tone_a(0x0b0b0de8)), 0.),
+                        gpui::linear_color_stop(rgba(tone_a(0x0b0b0d18)), 0.72),
                     )),
             )
-            .when_some(last_played, |d, (name, when)| {
-                d.child(
-                    div()
-                        .absolute()
-                        .left(px(14. * s))
-                        .top(px(14. * s))
-                        .px(px(10. * s))
-                        .py(px(6. * s))
-                        .rounded(px(8. * s))
-                        .bg(rgba(tone_a(0x0b0b0dc0)))
-                        .flex()
-                        .items_center()
-                        .gap(px(8. * s))
-                        .text_size(px(13. * s))
-                        .child(icon("clock", MUTED).size(px(14. * s)))
-                        .child(div().text_color(rgb(MUTED)).child(tr("Last played")))
-                        .child(div().font_weight(FontWeight::SEMIBOLD).child(name))
-                        .child(div().text_color(rgb(MUTED)).child(when)),
-                )
-            })
             .child(
                 div()
                     .absolute()
                     .inset_0()
+                    .p(px(26. * s))
                     .flex()
                     .flex_col()
-                    .items_center()
-                    .justify_center()
-                    .gap(px(12. * s))
-                    .child(launch)
-                    .when_some(self.setup_fraction, |d, fraction| {
-                        d.child(
-                            div()
-                                .w(px(346. * s))
-                                .h(px(5. * s))
-                                .rounded_full()
-                                .bg(rgba(0xffffff26))
-                                .child(
-                                    div()
-                                        .h_full()
-                                        .w(relative(fraction.clamp(0., 1.)))
-                                        .rounded_full()
-                                        .bg(rgb(accent_tone(ACCENT))),
-                                ),
-                        )
-                    })
+                    .justify_between()
                     .child(
                         div()
-                            .max_w(px(560. * s))
-                            .px(px(12. * s))
-                            .py(px(5. * s))
-                            .rounded(px(6. * s))
-                            .bg(rgba(tone_a(0x0b0b0da0)))
-                            .truncate()
-                            .text_size(px(14. * s))
-                            .text_color(rgb(if self.failed { 0xf08a96 } else { 0xc4c6cc }))
-                            .child(tr(&self.status)),
+                            .flex()
+                            .flex_col()
+                            .gap(px(6. * s))
+                            .child(
+                                div()
+                                    .text_size(px(12. * s))
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(rgb(accent_tone(0x6fe792)))
+                                    .child(tr("SELECTED INSTANCE")),
+                            )
+                            .child(
+                                div()
+                                    .max_w(px(520. * s))
+                                    .truncate()
+                                    .text_size(px(34. * s))
+                                    .line_height(px(40. * s))
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .child(name),
+                            )
+                            .child(
+                                div()
+                                    .flex()
+                                    .items_center()
+                                    .gap(px(8. * s))
+                                    .text_size(px(14. * s))
+                                    .text_color(rgb(0xd9dadd))
+                                    .child(trf(
+                                        "Minecraft {version}",
+                                        &[("version", engine::version())],
+                                    ))
+                                    .when_some(last_played, |d, when| {
+                                        d.child("·").child(trf("Played {when}", &[("when", &when)]))
+                                    }),
+                            ),
+                    )
+                    .child(
+                        div()
+                            .flex()
+                            .items_end()
+                            .justify_between()
+                            .gap(px(20. * s))
+                            .child(
+                                div()
+                                    .flex()
+                                    .flex_col()
+                                    .gap(px(10. * s))
+                                    .child(launch)
+                                    .when_some(self.setup_fraction, |d, fraction| {
+                                        d.child(
+                                            div()
+                                                .w(px(300. * s))
+                                                .h(px(5. * s))
+                                                .rounded_full()
+                                                .bg(rgba(0xffffff26))
+                                                .child(
+                                                    div()
+                                                        .h_full()
+                                                        .w(relative(fraction.clamp(0., 1.)))
+                                                        .rounded_full()
+                                                        .bg(rgb(accent_tone(ACCENT))),
+                                                ),
+                                        )
+                                    })
+                                    .child(
+                                        div()
+                                            .max_w(px(420. * s))
+                                            .truncate()
+                                            .text_size(px(13. * s))
+                                            .text_color(rgb(if self.failed {
+                                                0xf08a96
+                                            } else {
+                                                0xc4c6cc
+                                            }))
+                                            .child(tr(&self.status)),
+                                    ),
+                            )
+                            .child(
+                                div()
+                                    .flex_none()
+                                    .flex()
+                                    .gap(px(22. * s))
+                                    .px(px(16. * s))
+                                    .py(px(12. * s))
+                                    .rounded(px(12. * s))
+                                    .bg(rgba(tone_a(0x0b0b0dd0)))
+                                    .border_1()
+                                    .border_color(rgba(0xffffff14))
+                                    .child(stat(
+                                        self.content.world_count.to_string(),
+                                        "Worlds",
+                                        "earth",
+                                    ))
+                                    .child(stat(
+                                        self.content.packs.len().to_string(),
+                                        "Resource packs",
+                                        "layers",
+                                    ))
+                                    .child(stat(
+                                        self.content.servers.len().to_string(),
+                                        "Servers",
+                                        "server",
+                                    )),
+                            ),
                     ),
             )
             .child(
                 div()
                     .id("hero-settings")
                     .absolute()
-                    .right(px(14. * s))
-                    .bottom(px(14. * s))
+                    .right(px(16. * s))
+                    .top(px(16. * s))
                     .size(px(34. * s))
                     .rounded_full()
                     .bg(rgba(tone_a(0x0b0b0dc0)))
@@ -1169,7 +1256,7 @@ impl Launcher {
         };
         div()
             .absolute()
-            .top(px(84. * s))
+            .top(px(62. * s))
             .left_0()
             .right_0()
             .p(px(6. * s))

@@ -82,6 +82,11 @@ pub(super) fn accent_tone(c: u32) -> u32 {
     from_hsl(ha + (h - hb), s * sa / sb.max(0.01), l + (la - lb))
 }
 
+/// Whether the accent is black and white.
+pub(super) fn mono() -> bool {
+    ACCENT.load(Relaxed) == 0xffffff
+}
+
 /// `accent_tone` for `0xRRGGBBAA`.
 pub(super) fn accent_tone_a(c: u32) -> u32 {
     (accent_tone(c >> 8) << 8) | (c & 0xff)
