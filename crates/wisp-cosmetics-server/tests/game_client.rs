@@ -47,7 +47,9 @@ fn wait_for<T>(mut found: impl FnMut() -> Option<T>) -> T {
 
 /// The Shop's real Nebula Wings, as the launcher writes them for the game.
 fn wings() -> Value {
-    let wings = wisp_shop::offer("nebula_wings").and_then(|o| o.item).unwrap();
+    let wings = wisp_shop::offer("nebula_wings")
+        .and_then(|o| o.item)
+        .unwrap();
     serde_json::from_slice(wings).unwrap()
 }
 

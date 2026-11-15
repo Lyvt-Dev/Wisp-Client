@@ -376,7 +376,11 @@ mod tests {
         // Nobody supported, nothing collected yet: no discount, no bonus day.
         let plain = Wallet::parse(&json!({ "coins": 5, "supporting": null }));
         assert_eq!(
-            (plain.discount, plain.supporting.clone(), plain.as_shop().bonus_day),
+            (
+                plain.discount,
+                plain.supporting.clone(),
+                plain.as_shop().bonus_day
+            ),
             (0, None, None)
         );
     }
