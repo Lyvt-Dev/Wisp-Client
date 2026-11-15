@@ -153,9 +153,12 @@ impl SessionLock {
             .open(world.join("session.lock"))?;
         match file.try_lock() {
             Ok(()) => {}
-            // A file system without locks (a phone's shared storage): only one game runs there.
-            Err(fs::TryLockError::Error(e)) if e.kind() == std::io::ErrorKind::Unsupported => {}
-            Err(_) => {
+            // A file system without locks (a phone's shared storage, which answers ENOSYS or
+            // the like): only one game runs there. Only WouldBlock means another holds it.
+            Err(fs::TryLockError::Error(e)) => {
+                log::warn!("Wisp: {} can't be locked ({e}); opening it anyway", world.display());
+            }
+            Err(fs::TryLockError::WouldBlock) => {
                 return Err(
                     format!("{} is already open in another instance", world.display()).into(),
                 );

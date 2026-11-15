@@ -116,7 +116,8 @@ impl Layout {
         let (w, h) = (self.w, self.h);
         // The hotbar's ends (vanilla: 182 × 22 GUI pixels, centred at the bottom).
         let bar = 91.0 * self.gui;
-        let bar_y = h - 11.0 * self.gui;
+        // Level with the hotbar, but never off the bottom edge.
+        let bar_y = (h - 11.0 * self.gui).min(h - 0.5 * u);
         match button {
             Button::Jump => ((w - 1.35 * u, h - 1.7 * u), 0.8 * u),
             Button::Sneak => ((w - 3.2 * u, h - 1.1 * u), 0.6 * u),
@@ -333,6 +334,11 @@ impl Game<'_> {
                                 self.touch_pointer_button(event_loop, MouseButton::Left, true);
                                 self.touch_pointer_button(event_loop, MouseButton::Left, false);
                             }
+                        }
+                        // No finger, no hover: the pointer leaves, so no button stays lit and
+                        // no tooltip stays open where the last tap was.
+                        if self.touch.fingers.is_empty() {
+                            self.touch_pointer_to(event_loop, (-1.0e4, -1.0e4));
                         }
                     }
                 }

@@ -254,8 +254,7 @@ pub fn open_latest(dir: &Path) -> io::Result<Option<Latest>> {
         Ok(()) => {}
         Err(fs::TryLockError::WouldBlock) => return Ok(None),
         // A file system without locks (a phone's shared storage): only one game runs there.
-        Err(fs::TryLockError::Error(e)) if e.kind() == io::ErrorKind::Unsupported => {}
-        Err(fs::TryLockError::Error(e)) => return Err(e),
+        Err(fs::TryLockError::Error(_)) => {}
     }
     let mut file = OpenOptions::new()
         .read(true)
