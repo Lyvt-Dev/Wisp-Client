@@ -176,24 +176,24 @@ impl Launcher {
 
     /// Makes the selection what is worn in game.
     fn locker_equip(&mut self, cx: &mut Context<Self>) {
-        let selection = self.locker_selection();
-        let mut wallet = self.wallet.clone();
-        wallet.equipped.clear();
-        let mut result = Ok(());
-        for id in &selection {
-            if let Err(e) = wallet.equip(id) {
-                result = Err(e.to_string());
-            }
+        if let Some(why) = self.shop_state.clone() {
+            self.error(why);
+            cx.notify();
+            return;
         }
-        match result.and_then(|()| wallet.save(&self.home).map_err(|e| e.to_string())) {
-            Ok(()) => {
-                self.wallet = wallet;
-                self.locker.trying = None;
-                self.failed = false;
-                self.status = tr("Equipped. You'll wear these the next time you play.");
-            }
-            Err(e) => self.error(e),
-        }
+        // The Wisp server keeps what is worn; its answer updates the wallet.
+        let selection: Vec<String> = self
+            .locker_selection()
+            .iter()
+            .map(|id| id.to_string())
+            .collect();
+        self.friends_send(super::friends_view::FriendCmd::Outfit(
+            selection,
+            tr("Equipped. You'll wear these the next time you play."),
+        ));
+        self.locker.trying = None;
+        self.failed = false;
+        self.status = tr("Equipped. You'll wear these the next time you play.");
         cx.notify();
     }
 

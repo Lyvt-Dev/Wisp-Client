@@ -14,6 +14,7 @@ members = [
     "crates/wisp-client-input",
     "crates/wisp-client-render",
     "crates/wisp-cosmetics",
+    "crates/wisp-shop",
     "crates/wisp-command",
     "crates/wisp-items",
     "crates/wisp-server-files",

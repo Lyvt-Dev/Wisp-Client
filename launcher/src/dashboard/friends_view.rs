@@ -20,6 +20,31 @@ pub(super) enum FriendCmd {
     Accept(String),
     Decline(String),
     Remove(String),
+    /// The Shop, on the same server and session: read the wallet again.
+    Wallet,
+    /// Buy an item (the server prices it and checks the coins), then wear it; the message to
+    /// show when it worked.
+    Buy(String, String),
+    Equip(String, String),
+    Unequip(String, String),
+    /// Wear exactly these (the Locker's outfit).
+    Outfit(Vec<String>, String),
+    /// Support the creator with this code, or nobody.
+    Support(Option<String>),
+}
+
+impl FriendCmd {
+    fn shop(&self) -> bool {
+        matches!(
+            self,
+            Self::Wallet
+                | Self::Buy(..)
+                | Self::Equip(..)
+                | Self::Unequip(..)
+                | Self::Outfit(..)
+                | Self::Support(..)
+        )
+    }
 }
 
 pub(super) enum FriendsUpdate {
@@ -28,6 +53,12 @@ pub(super) enum FriendsUpdate {
     Unavailable(String),
     /// What an action did; `true` when it failed.
     Notice(String, bool),
+    /// The wallet the server keeps.
+    Wallet(wisp_launcher::friends::Wallet),
+    /// What a Shop action did; `true` when it failed.
+    ShopNotice(String, bool),
+    /// The Shop can't work now, and why.
+    ShopUnavailable(String),
 }
 
 /// Runs for as long as the launcher: one command at a time, a sync when nothing happened for a
@@ -40,6 +71,8 @@ pub(super) fn worker(
     let mut client: Option<Client> = None;
     let mut presence: (&'static str, Option<String>) = ("launcher", None);
     let mut command = FriendCmd::Sync;
+    // The welcome gift and the daily bonus, collected once the server is reached.
+    let mut collected = false;
     let send = |update: FriendsUpdate| events.send(Event::Friends(update)).is_ok();
     loop {
         if let FriendCmd::Presence(status, server) = &command {
@@ -47,17 +80,36 @@ pub(super) fn worker(
         }
         if matches!(command, FriendCmd::Reset) {
             client = None;
+            collected = false;
         }
         let keep_going = match wisp_launcher::shop::service() {
-            None => send(FriendsUpdate::Unavailable(tr(
-                "Friends need the Wisp server. Set its address in Settings, General.",
-            ))),
+            None => {
+                send(FriendsUpdate::Unavailable(tr(
+                    "Friends need the Wisp server. Set its address in Settings, General.",
+                ))) && send(FriendsUpdate::ShopUnavailable(tr(
+                    "The Shop needs the Wisp server: your coins and items are kept there.",
+                )))
+            }
             Some(base) => {
                 if client.as_ref().is_none_or(|c| c.base() != base) {
                     client = Some(Client::new(&base));
                 }
                 let c = client.as_mut().expect("just made");
-                run(c, &home, &command, &presence, &send)
+                if command.shop() {
+                    run_shop(c, &home, &command, &send)
+                } else {
+                    let mut going = run(c, &home, &command, &presence, &send);
+                    // Each sync reads the wallet too: a creator's share arrives by itself.
+                    if going && matches!(command, FriendCmd::Sync | FriendCmd::Reset) {
+                        going = if collected {
+                            run_shop(c, &home, &FriendCmd::Wallet, &send)
+                        } else {
+                            collected = collect(c, &home, &send);
+                            true
+                        };
+                    }
+                    going
+                }
             }
         };
         if !keep_going {
@@ -91,6 +143,13 @@ fn run(
         FriendCmd::Sync | FriendCmd::Reset | FriendCmd::Presence(..) => {
             c.presence(presence.0, presence.1.as_deref())
         }
+        // The Shop's commands go to `run_shop`.
+        FriendCmd::Wallet
+        | FriendCmd::Buy(..)
+        | FriendCmd::Equip(..)
+        | FriendCmd::Unequip(..)
+        | FriendCmd::Outfit(..)
+        | FriendCmd::Support(..) => c.presence(presence.0, presence.1.as_deref()),
         FriendCmd::Request(name) => c.request(name),
         FriendCmd::Accept(uuid) => c.accept(uuid),
         FriendCmd::Decline(uuid) => c.decline(uuid),
@@ -135,6 +194,106 @@ fn run(
         }
         Err(e) if action => send(FriendsUpdate::Notice(e.message(), true)),
         Err(e) => send(FriendsUpdate::Unavailable(e.message())),
+    }
+}
+
+/// The welcome gift and today's bonus: true once the server answered.
+fn collect(client: &mut Client, home: &Path, send: &dyn Fn(FriendsUpdate) -> bool) -> bool {
+    if !client.signed_in() && sign_in(client, home).is_err() {
+        return false;
+    }
+    match client.collect() {
+        Ok((given, wallet)) => {
+            send(FriendsUpdate::Wallet(wallet));
+            if given > 0 {
+                send(FriendsUpdate::ShopNotice(
+                    trf(
+                        "+{coins} Wisp Coins collected.",
+                        &[("coins", &given.to_string())],
+                    ),
+                    false,
+                ));
+            }
+            true
+        }
+        Err(Failure::SignIn) => {
+            client.sign_out();
+            false
+        }
+        Err(e) => {
+            send(FriendsUpdate::ShopUnavailable(e.message()));
+            false
+        }
+    }
+}
+
+/// One Shop command, signing in (again) when needed. False when the launcher is gone.
+fn run_shop(
+    client: &mut Client,
+    home: &Path,
+    command: &FriendCmd,
+    send: &dyn Fn(FriendsUpdate) -> bool,
+) -> bool {
+    let attempt =
+        |c: &Client| -> Result<(wisp_launcher::friends::Wallet, Option<String>), Failure> {
+            match command {
+                FriendCmd::Buy(id, done) => {
+                    c.buy(id)?;
+                    Ok((c.equip(id)?, Some(done.clone())))
+                }
+                FriendCmd::Equip(id, done) => Ok((c.equip(id)?, Some(done.clone()))),
+                FriendCmd::Unequip(id, done) => Ok((c.unequip(id)?, Some(done.clone()))),
+                FriendCmd::Outfit(items, done) => {
+                    let mut wallet = c.wallet()?;
+                    for id in wallet.equipped.clone() {
+                        if !items.contains(&id) {
+                            wallet = c.unequip(&id)?;
+                        }
+                    }
+                    for id in items {
+                        if !wallet.equipped.contains(id) {
+                            wallet = c.equip(id)?;
+                        }
+                    }
+                    Ok((wallet, Some(done.clone())))
+                }
+                FriendCmd::Support(code) => {
+                    c.support(code.as_deref())?;
+                    let wallet = c.wallet()?;
+                    let done = match &wallet.supporting {
+                        Some((name, _)) => trf(
+                            "You support {name}: {percent} % off everything in the Shop.",
+                            &[("name", name), ("percent", &wallet.discount.to_string())],
+                        ),
+                        None => tr("You don't support a creator now."),
+                    };
+                    Ok((wallet, Some(done)))
+                }
+                _ => Ok((c.wallet()?, None)),
+            }
+        };
+    let mut result = Err(Failure::SignIn);
+    for _ in 0..2 {
+        if !client.signed_in() {
+            if let Err(e) = sign_in(client, home) {
+                return send(FriendsUpdate::ShopUnavailable(e));
+            }
+        }
+        result = attempt(client);
+        if result != Err(Failure::SignIn) {
+            break;
+        }
+        client.sign_out();
+    }
+    match result {
+        Ok((wallet, done)) => {
+            send(FriendsUpdate::Wallet(wallet))
+                && done.is_none_or(|d| send(FriendsUpdate::ShopNotice(d, false)))
+        }
+        Err(e) if matches!(command, FriendCmd::Wallet) => {
+            send(FriendsUpdate::ShopUnavailable(e.message()))
+        }
+        Err(e) => send(FriendsUpdate::ShopNotice(tr(&e.message()), true)),
     }
 }
 

@@ -889,6 +889,12 @@ impl HudAtlas {
         }
         // The on-screen keyboard's text and corner masks (ui_theme), rasterized at run time.
         images.push(("wisp/ui-text".into(), 2048, 1024, vec![0; 2048 * 1024 * 4]));
+        // The Shop's item cards (`shop/<id>`), for the Wisp Menu's Store.
+        for offer in wisp_shop::OFFERS {
+            if let Ok((w, h, rgba)) = decode_image_bytes(offer.art) {
+                images.push((format!("shop/{}", offer.id), w, h, rgba));
+            }
+        }
     }
     /// Only the font's metrics, for a game that draws nothing (the
     /// integrated or dedicated server): text measures as with the full atlas,

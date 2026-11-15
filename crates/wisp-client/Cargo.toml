@@ -13,6 +13,8 @@ autotests = false
 [dependencies]
 wisp-compat = { path = "../wisp-compat" }
 wisp-cosmetics = { path = "../wisp-cosmetics" }
+# The Shop's items and prices for the Wisp Menu's Store (the wallet itself is the server's).
+wisp-shop = { path = "../wisp-shop" }
 wisp-client-lib = { path = "../wisp-client-lib", default-features = false }
 wisp-assets = { path = "../wisp-assets" }
 wisp-client-core = { path = "../wisp-client-core" }

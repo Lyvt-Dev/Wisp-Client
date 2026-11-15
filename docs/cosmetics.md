@@ -51,7 +51,7 @@ y points down, as in vanilla's `ModelPart`s and Blockbench's "Modded Entity" mod
 - A part's **`quads`** (optional) are faces given corner by corner, `{"vertices": [[x, y, z, u, v] ×4]}`
   in model pixels and UV in 0..1, in vanilla's corner order: how a Blockbench model with rotated cubes
   and per-face UVs is carried. `examples/shop_items.rs` (`bbmodel_quads`) converts a `.bbmodel`
-  (Daylight, `launcher/assets/shop/daylight.bbmodel`).
+  (Daylight, `crates/wisp-shop/assets/daylight.bbmodel`).
 - A **top-level part's `bone`** (optional) makes it ride another bone than the item's, under the
   same attachment: a shirt's sleeves (`"bone": "right_arm"`) follow the arms as they swing. Only
   top-level parts take one; the reach limit counts from each part's own bone.

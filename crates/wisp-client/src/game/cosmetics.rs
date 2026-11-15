@@ -84,6 +84,9 @@ pub(super) struct Cosmetics {
     pub(super) sharing: Option<wisp_cosmetics::share::Sharing>,
     /// "Show my cosmetics" as last published through `sharing`.
     shared_mine: Option<bool>,
+    /// What the Wisp server's wallet said is worn when last looked at: a change (a purchase or
+    /// a change in the Store) dresses the player again at once.
+    worn_seen: Option<Vec<String>>,
 }
 
 /// The player's own avatar among the trail wearers (no entity id is this).
@@ -535,6 +538,32 @@ impl Game<'_> {
             } else {
                 Vec::new()
             });
+        }
+        // Bought or changed in the Store: the worn folder is written again, the player's own items
+        // are read from it and published, without waiting for the next start.
+        let worn_now = c
+            .sharing
+            .as_ref()
+            .and_then(|s| s.shop_state().wallet)
+            .map(|w| w.equipped);
+        if let Some(worn) = worn_now
+            && c.worn_seen.as_ref() != Some(&worn)
+        {
+            let first = c.worn_seen.is_none();
+            c.worn_seen = Some(worn.clone());
+            if !first && let Some(dir) = wisp_compat::var_os("WISP_COSMETICS_LOCAL") {
+                let wallet = wisp_shop::Wallet {
+                    equipped: worn,
+                    ..Default::default()
+                };
+                if wallet.dress(std::path::Path::new(&dir)).is_ok() {
+                    let (client, local) = Cosmetics::client();
+                    c.client = Some(client);
+                    c.local = local;
+                    c.baked.borrow_mut().clear();
+                    c.shared_mine = None;
+                }
+            }
         }
         c.frame.set(c.frame.get().wrapping_add(1));
         // Show my cosmetics: sent once per change of the wish, then retried until confirmed.

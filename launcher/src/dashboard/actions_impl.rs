@@ -38,6 +38,7 @@ impl Launcher {
         self.auth_cancel = Arc::new(AtomicBool::new(false));
         let cancel = self.auth_cancel.clone();
         let home = self.home.clone();
+        let wallet = self.wallet.clone();
         let cached = self.account.clone();
         let sender = self.sender.clone();
         std::thread::spawn(move || {
@@ -53,7 +54,8 @@ impl Launcher {
                     return Err(tr("Launch cancelled."));
                 }
                 let credentials = account.as_ref().map(auth::SignedIn::credentials);
-                let worn = wisp_launcher::shop::Wallet::load(&home)
+                // What the Wisp server says is worn.
+                let worn = wallet
                     .dress(&wisp_launcher::shop::worn_dir(&home))
                     .ok()
                     .filter(|n| *n > 0)

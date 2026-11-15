@@ -1,6 +1,6 @@
-//! Builds the launcher shop's items and their card art (`launcher/assets/shop`).
+//! Builds the launcher shop's items and their card art (`crates/wisp-shop/assets`).
 //!
-//! `cargo run -p wisp-cosmetics --example shop_items -- launcher/assets/shop`
+//! `cargo run -p wisp-cosmetics --example shop_items -- crates/wisp-shop/assets`
 //!
 //! Every model item is checked by `Item::parse` and its card is drawn with `preview::render`, so a
 //! card shows exactly what the game draws.

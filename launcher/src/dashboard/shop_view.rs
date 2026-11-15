@@ -6,6 +6,7 @@
 //! rows of four. On the Featured tab the cards are grouped by category. Each card's tier colour
 //! follows its price.
 use super::catalog_views::cat_panel;
+use super::friends_view::FriendCmd;
 use super::reference_views::{glow, luminous};
 use super::*;
 use wisp_launcher::{
@@ -40,6 +41,8 @@ pub(super) struct ShopUi {
     pub slide_ticks: u32,
     /// What the last purchase or change did, shown above the items.
     pub notice: Option<(String, bool)>,
+    /// A purchase or change is with the Wisp server: the buttons wait for its answer.
+    pub busy: bool,
 }
 
 /// The carousel's slides: an item, its chip, title and text.
@@ -130,7 +133,10 @@ fn field(s: f32) -> Div {
         .bg(rgb(tone(0x17181b)))
 }
 
-fn price(offer: &Offer, size: f32, s: f32) -> Div {
+/// An item's price: with a creator's `discount` (percent) the lower price, the full one struck
+/// through beside it. The Wisp server charges the same.
+fn price(offer: &Offer, discount: u32, size: f32, s: f32) -> Div {
+    let paid = shop::discounted(offer.price, discount);
     div()
         .flex()
         .items_center()
@@ -140,49 +146,125 @@ fn price(offer: &Offer, size: f32, s: f32) -> Div {
         .when(offer.founders(), |d| d.child(tr("Free")))
         .when(!offer.founders(), |d| {
             d.child(icon("coin", GOLD).size(px((size + 1.) * s)))
-                .child(coins(offer.price))
+                .child(coins(paid))
+                .when(paid < offer.price, |d| {
+                    d.child(
+                        div()
+                            .text_size(px(size * 0.7 * s))
+                            .text_color(rgb(MUTED))
+                            .line_through()
+                            .child(coins(offer.price)),
+                    )
+                })
         })
 }
 
 impl Launcher {
+    /// Buys, equips or takes off `id` on the Wisp server, which keeps the coins and checks
+    /// every purchase; its answer updates the wallet (`FriendsUpdate::Wallet`).
     fn shop_act(&mut self, id: &'static str, cx: &mut Context<Self>) {
-        let mut wallet = self.wallet.clone();
+        if self.shop.busy {
+            return;
+        }
+        if let Some(why) = &self.shop_state {
+            self.shop.notice = Some((why.clone(), true));
+            cx.notify();
+            return;
+        }
         let emote = shop::offer(id).is_some_and(|o| o.kind == Kind::Emote);
-        let result = if wallet.wears(id) {
-            wallet.unequip(id);
-            Ok(tr(if emote {
-                "Taken out of your emote wheel."
-            } else {
-                "Taken off. You won't wear it the next time you play."
-            }))
-        } else if wallet.owns(id) {
-            wallet.equip(id).map(|()| {
+        let command = if self.wallet.wears(id) {
+            FriendCmd::Unequip(
+                id.to_owned(),
+                tr(if emote {
+                    "Taken out of your emote wheel."
+                } else {
+                    "Taken off. You won't wear it the next time you play."
+                }),
+            )
+        } else if self.wallet.owns(id) {
+            FriendCmd::Equip(
+                id.to_owned(),
                 tr(if emote {
                     "In your emote wheel: press B in game to play it."
                 } else {
                     "Equipped. You'll wear it the next time you play."
-                })
-            })
+                }),
+            )
         } else {
-            wallet.buy(id).and_then(|()| wallet.equip(id)).map(|()| {
+            FriendCmd::Buy(
+                id.to_owned(),
                 tr(if emote {
                     "Bought and added to your emote wheel: press B in game to play it."
                 } else {
                     "Added to your items and equipped."
-                })
-            })
+                }),
+            )
         };
-        self.shop.notice = Some(match result {
-            Ok(message) => match wallet.save(&self.home) {
-                Ok(()) => {
-                    self.wallet = wallet;
-                    (message, false)
-                }
-                Err(error) => (error.to_string(), true),
-            },
-            Err(refused) => (refused.to_string(), true),
-        });
+        self.shop.busy = true;
+        self.shop.notice = Some((tr("Asking the Wisp server…"), false));
+        self.friends_send(command);
         cx.notify();
+    }
+
+    /// The creator code row: who is supported, or a field to enter a code.
+    fn shop_creator(&self, cx: &mut Context<Self>) -> Div {
+        let s = self.ui_scale;
+        let row = field(s)
+            .px(px(14. * s))
+            .py(px(10. * s))
+            .flex()
+            .items_center()
+            .gap(px(12. * s))
+            .child(icon("star", accent_tone(ACCENT)).size(px(18. * s)));
+        match &self.server_wallet.supporting {
+            Some((name, code)) => row
+                .child(
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .text_size(px(14. * s))
+                        .child(trf(
+                            "You support {name} ({code}): {percent} % off everything, and {name} earns from every item you buy.",
+                            &[
+                                ("name", name),
+                                ("code", code.as_deref().unwrap_or("")),
+                                ("percent", &self.server_wallet.discount.to_string()),
+                            ],
+                        )),
+                )
+                .child(
+                    button("shop-creator-clear", "Remove code", "close").on_click(cx.listener(
+                        |this, _, _, cx| {
+                            this.shop.notice = Some((tr("Asking the Wisp server…"), false));
+                            this.friends_send(FriendCmd::Support(None));
+                            cx.notify();
+                        },
+                    )),
+                ),
+            None => row
+                .child(
+                    div()
+                        .flex_none()
+                        .text_size(px(14. * s))
+                        .text_color(rgb(MUTED))
+                        .child(tr("Creator code")),
+                )
+                .child(div().flex_1().min_w_0().child(self.creator_input.clone()))
+                .child(
+                    button("shop-creator-use", "Use code", "check-circle").on_click(cx.listener(
+                        |this, _, _, cx| {
+                            let code = this.creator_input.read(cx).value.trim().to_owned();
+                            if code.is_empty() {
+                                return;
+                            }
+                            this.creator_input.update(cx, |input, cx| input.set("", cx));
+                            this.shop.notice = Some((tr("Asking the Wisp server…"), false));
+                            this.friends_send(FriendCmd::Support(Some(code)));
+                            cx.notify();
+                        },
+                    )),
+                ),
+        }
     }
 
     /// Buy, claim, equip or take off: `big` is the carousel's button.
@@ -194,8 +276,9 @@ impl Launcher {
         cx: &mut Context<Self>,
     ) -> Stateful<Div> {
         let s = self.ui_scale;
-        let short =
-            !self.wallet.owns(offer.id) && !offer.founders() && self.wallet.coins < offer.price;
+        let short = !self.wallet.owns(offer.id)
+            && !offer.founders()
+            && self.wallet.coins < shop::discounted(offer.price, self.server_wallet.discount);
         let (label, glyph, bright) = if self.wallet.wears(offer.id) {
             ("Take off", "check-circle", false)
         } else if self.wallet.owns(offer.id) {
@@ -449,7 +532,7 @@ impl Launcher {
                                     .items_center()
                                     .gap(px(18. * s))
                                     .child(self.shop_button("banner", offer, true, cx))
-                                    .child(price(offer, 22., s)),
+                                    .child(price(offer, self.server_wallet.discount, 22., s)),
                             ),
                     )
                     .child(
@@ -778,7 +861,7 @@ impl Launcher {
                             .flex()
                             .items_center()
                             .justify_between()
-                            .child(price(offer, 16., s))
+                            .child(price(offer, self.server_wallet.discount, 16., s))
                             .child(self.shop_button("buy", offer, false, cx)),
                     ),
             )
@@ -867,6 +950,22 @@ impl Launcher {
             .gap(px(18. * s))
             .pb(px(20. * s))
             .child(self.shop_title(cx))
+            .when_some(self.shop_state.clone(), |d, why| {
+                d.child(
+                    field(s)
+                        .px(px(14. * s))
+                        .py(px(10. * s))
+                        .border_color(rgb(0x9a536a))
+                        .flex()
+                        .items_center()
+                        .gap(px(10. * s))
+                        .child(icon("info", 0xf08a96).size(px(18. * s)))
+                        .child(div().flex_1().text_size(px(14. * s)).child(why)),
+                )
+            })
+            .when(self.shop_state.is_none(), |d| {
+                d.child(self.shop_creator(cx))
+            })
             .child(self.shop_banner(cx))
             .child(
                 div()

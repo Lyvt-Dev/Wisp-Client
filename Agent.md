@@ -157,7 +157,7 @@ Do not rewrite main or force a changed remote branch. Preserve local changes and
   other players don't see them; the Founders "first 50" limit is not enforced.
 - Item files and card art come from crates/wisp-cosmetics/examples/shop_items.rs
   (checked by Item::parse, drawn with preview::render). The Founders Cape uses the
-  owner's texture (launcher/assets/shop/founders_cape_texture.png). Trails have card
+  owner's texture (crates/wisp-shop/assets/founders_cape_texture.png). Trails have card
   art and can be equipped, but the game has no trail renderer yet.
 - Layout follows the owner's Shop mock-up (title row, banner slides, tab boxes, search
   with filter/sort, three-column cards beside a highlight card); the page scrolls.
@@ -229,7 +229,7 @@ Do not rewrite main or force a changed remote branch. Preserve local changes and
 - The owl's geometry was wrong since 0.10.5: its children's cubes repeated their pivot (cubes
   are placed from the part's pivot), so the head and wings floated off the body. Rebuilt in
   `examples/shop_items.rs` with a 64×64 texture. New `cosmic_fox` (10 boxes, scale 0.5). Both
-  glow. Regenerate with `cargo run -p wisp-cosmetics --example shop_items -- launcher/assets/shop`.
+  glow. Regenerate with `cargo run -p wisp-cosmetics --example shop_items -- crates/wisp-shop/assets`.
 - Launcher: trails carry item files now and are written to `shop/worn`; the banner's second
   slide and the Featured highlight are the fox (`banner_cosmic_fox.png`, `highlight.png`).
 - Diagnostics: a warning when the default font has no providers (`font.rs`) and for the first
@@ -431,7 +431,7 @@ Do not rewrite main or force a changed remote branch. Preserve local changes and
 ## 0.11.1 Zedix Cape (0.11.0 was a local build; 0.11.1 is the first published 0.11 installer)
 
 - The owner asked for an animated cape from `capeideas/Zedix2.png` for 400 coins: offer
-  `zedix_cape` (Kind::Cape). The logo is kept as `launcher/assets/shop/zedix_cape_logo.png`;
+  `zedix_cape` (Kind::Cape). The logo is kept as `crates/wisp-shop/assets/zedix_cape_logo.png`;
   `shop_items` `zedix_frames` scales the Z onto the HD cape's outer face (24 frames, 2 ticks) on a
   dark violet cape with drifting smoke and stars, a breathing halo, a pulsing neon edge with sparks
   and a light sweep across the letter. No banner slide.
@@ -494,7 +494,7 @@ Do not rewrite main or force a changed remote branch. Preserve local changes and
   on tabs or headings; the owned count sits beside the star. New kinds `Weapon` and `Wings`;
   `Offer::creator` shows "by @name" on the card. Capes and wings share the back slot
   (`Kind::shares_slot`): wearing one takes the other off.
-- Daylight (800, by @gold3nz): the creator's Blockbench model (`launcher/assets/shop/daylight.bbmodel`)
+- Daylight (800, by @gold3nz): the creator's Blockbench model (`crates/wisp-shop/assets/daylight.bbmodel`)
   converted by `shop_items` (`bbmodel_quads`) into the new `quads` part field; new slot `weapon`
   (beside a cape, hidden under an elytra). `MAX_VERTICES` is now 1024 (the sword has 812).
 - Nebula Wings (1,500): generated in `shop_items` (procedural animated nebula texture, 8 frames,

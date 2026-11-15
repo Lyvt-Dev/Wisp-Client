@@ -42,6 +42,8 @@ wisp-shader-api = { path = "../wisp-shader-api" }
 wisp-friends = { path = "../wisp-friends" }
 # The Wisp Menu's Friends tab draws the friends list the cosmetics thread reads.
 wisp-cosmetics = { path = "../wisp-cosmetics" }
+# The Shop's items and prices for the Wisp Menu's Store.
+wisp-shop = { path = "../wisp-shop" }
 # The narrator (GameNarrator): text-to-speech of chat, system messages and screens.
 wisp-narrator = { path = "../wisp-narrator" }
 # Wisp mods: sandboxed WebAssembly components, off unless installed and turned on (docs/mods.md).

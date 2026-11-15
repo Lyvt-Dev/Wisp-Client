@@ -360,6 +360,16 @@ impl<'a> Ui<'a> {
     pub fn gui_per_dp(&self) -> f32 {
         self.density / self.scale
     }
+    /// A sprite of the GUI atlas stretched over the rectangle (dp); nothing when it isn't there.
+    pub fn sprite(&mut self, name: &str, x: f32, y: f32, w: f32, h: f32) {
+        let [gx, gy, gw, gh] = self.gui_rect(x, y, w, h);
+        self.batch
+            .sprite_scaled(self.atlas, name, gx, gy, gw, gh, u32::MAX);
+    }
+    /// Whether the GUI atlas has the sprite.
+    pub fn has_sprite(&self, name: &str) -> bool {
+        self.atlas.sprites.contains_key(name)
+    }
     /// Where the next quad goes, to clip what follows with [`Ui::clip_since`].
     pub fn mark(&self) -> usize {
         self.batch.vertices.len()

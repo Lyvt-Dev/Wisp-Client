@@ -1,6 +1,8 @@
 # The Wisp server on any Linux machine with Docker, with HTTPS set up automatically:
 #
-#   DOMAIN=wisp.example.com docker compose -f crates/wisp-cosmetics-server/docker-compose.yml up -d
+#   DOMAIN=wisp.example.com WISP_ADMINS=<your UUID> docker compose -f crates/wisp-cosmetics-server/docker-compose.yml up -d
+#
+# WISP_ADMINS: the Minecraft UUIDs (comma separated) that may choose creators.
 #
 # Point the domain's DNS (an A record) at the machine first; Caddy gets the certificate itself.
 services:
@@ -9,6 +11,8 @@ services:
       context: ../..
       dockerfile: crates/wisp-cosmetics-server/Dockerfile
     restart: unless-stopped
+    environment:
+      WISP_ADMINS: ${WISP_ADMINS:-}
     volumes:
       - wisp-data:/data
   caddy:

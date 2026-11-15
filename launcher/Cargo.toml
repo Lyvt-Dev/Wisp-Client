@@ -1,6 +1,6 @@
 [package]
 name = "wisp-launcher"
-version = "0.14.9"
+version = "0.15.0"
 edition = "2021"
 license = "MIT"
 description = "Wisp launcher for the Rust Minecraft engine"
@@ -14,6 +14,7 @@ gui = ["dep:gpui", "dep:gpui_platform", "dep:wisp-theme", "dep:image", "dep:objc
 [dependencies]
 wisp-compat = { path = "../crates/wisp-compat" }
 wisp-cosmetics = { path = "../crates/wisp-cosmetics" }
+wisp-shop = { path = "../crates/wisp-shop" }
 glam = "0.30"
 wisp-mods = { path = "../crates/wisp-mods" }
 wisp-shader-api = { path = "../crates/wisp-shader-api" }

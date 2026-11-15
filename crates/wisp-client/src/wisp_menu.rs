@@ -3,11 +3,14 @@
 //! cards with their switches, and each module's settings page. This file lays it out and draws
 //! it; the game (`game/wisp_menu.rs`) feeds it the settings, draws the cards' item icons and runs
 //! the actions. One pass draws and records where everything is, and clicks read that record.
-//! The Friends tab (`friends.rs`) lists the player's Wisp friends.
+//! The Friends tab (`friends.rs`) lists the player's Wisp friends; the Store, Creator and Admin
+//! tabs (`store.rs`) are the Shop on the Wisp server.
 mod friends;
+mod store;
 pub use friends::{
     FriendClick, FriendsView, tint as friend_tint, whereabouts as friend_whereabouts,
 };
+pub use store::{StoreClick, StoreField, StorePage, coins as store_coins};
 
 use crate::{
     extras::{
@@ -78,6 +81,8 @@ pub enum Action {
     FriendAdd,
     /// A friend's or a request's button (`friends_shown`).
     Friend(FriendClick, usize),
+    /// Something on the Store, Creator or Admin page.
+    Store(StoreClick),
     /// A click outside the panel.
     Close,
     /// Inside the panel, on nothing.
@@ -131,6 +136,17 @@ pub struct Menu {
     pub confirm_remove: Option<usize>,
     /// The friends list as last drawn.
     friends_shown: Option<wisp_cosmetics::share::Friends>,
+    /// The Store, Creator or Admin page is shown instead of the modules.
+    pub store_page: Option<StorePage>,
+    /// The Store's kind (`None`: everything).
+    pub store_kind: Option<wisp_shop::Kind>,
+    /// What is typed in the page's field, and which field has the keyboard.
+    pub store_input: String,
+    pub store_focus: Option<StoreField>,
+    /// The creator whose Remove was clicked once: the next click removes.
+    pub store_confirm: Option<usize>,
+    /// The creators' UUIDs as the Admin page last drew them.
+    store_creators: Vec<String>,
     /// When the menu opened, for its slide in.
     pub opened: Option<std::time::Instant>,
     hits: Vec<([f32; 4], Action)>,
@@ -176,6 +192,10 @@ impl Menu {
             (cursor.0 >= *x && cursor.0 < x + w && cursor.1 >= *y && cursor.1 < y + h).then_some(*a)
         })
     }
+    /// The UUID of the creator in row `i` of the Admin page as last drawn.
+    pub fn store_creator(&self, i: usize) -> Option<&str> {
+        self.store_creators.get(i).map(String::as_str)
+    }
     /// The wheel scrolls the grid or the settings page.
     pub fn wheel(&mut self, delta: f32) {
         self.scroll = (self.scroll - delta * 40.0).clamp(0.0, self.scroll_room.max(0.0));
@@ -187,6 +207,7 @@ impl Menu {
         e: &Extras,
         key_name: &dyn Fn(&str) -> String,
         friends: FriendsView,
+        store: Option<&wisp_cosmetics::share::ShopState>,
     ) -> Vec<Icon> {
         self.hits.clear();
         let mut icons = Vec::new();
@@ -213,10 +234,14 @@ impl Menu {
         ui.rounded(px, py, pw, ph, RADIUS, PANEL);
         ui.border(px, py, pw, ph, RADIUS, STROKE);
         self.hit(ui, px, py, pw, ph, Action::Nothing);
-        self.draw_header(ui, e, (px, py, pw), friends);
+        self.draw_header(ui, e, (px, py, pw), friends, store);
         let top = HEADER_H + TABS_H + 16.0;
         let (mx, my) = (px + 24.0, py + top);
         let (mw, mh) = (pw - 48.0, ph - top - 18.0);
+        if let Some(page) = self.store_page {
+            self.draw_store(ui, store, page, (mx, my, mw, mh));
+            return icons;
+        }
         if self.friends_page {
             self.draw_friends(ui, friends, (mx, my, mw, mh));
             return icons;
@@ -235,7 +260,9 @@ impl Menu {
         e: &Extras,
         (px, py, pw): (f32, f32, f32),
         friends: FriendsView,
+        store: Option<&wisp_cosmetics::share::ShopState>,
     ) {
+        let other_page = self.friends_page || self.store_page.is_some();
         // The header's plate keeps the panel's rounded top corners.
         ui.rounded(px, py, pw, HEADER_H + TABS_H, RADIUS, HEADER);
         ui.rounded(px, py + HEADER_H + TABS_H - RADIUS, pw, RADIUS, 0.0, HEADER);
@@ -262,7 +289,7 @@ impl Menu {
         ui.text_line(Face::Medium, 13.0, eh, ex + 15.0, ey, ON_ACCENT, &label);
         self.hit(ui, ex, ey, ew, eh, Action::EditHud);
         // The search, for the modules.
-        if !self.friends_page {
+        if !other_page {
             let sw = 240.0_f32.min(pw * 0.32);
             let (sx, sy, sh) = (ex - 10.0 - sw, ey, eh);
             ui.rounded(sx, sy, sw, sh, 10.0, FIELD);
@@ -303,7 +330,7 @@ impl Menu {
                 .filter(|f| tab.is_none_or(|c| c == f.category))
                 .filter(|f| e.feature_on(f.key))
                 .count();
-            let selected = self.category == tab && !self.friends_page;
+            let selected = self.category == tab && !other_page;
             let badge = (count > 0).then(|| {
                 (
                     count.to_string(),
@@ -327,9 +354,41 @@ impl Menu {
             (online > 0).then(|| (online.to_string(), hex(0x22C55E, 150)))
         };
         let name = lang::get_or("wisp.menu.friends", "Friends");
-        self.draw_tab(ui, x, ty, &name, self.friends_page, badge, Action::Friends);
+        x = self.draw_tab(ui, x, ty, &name, self.friends_page, badge, Action::Friends);
+        // The Shop: Store for everyone, Creator for creators, Admin for the owner.
+        ui.rounded(x + 4.0, ty + 14.0, 1.0, TABS_H - 28.0, 0.0, STROKE);
+        x += 10.0;
+        let me = store.map(|s| s.me.clone()).unwrap_or_default();
+        let pages = [
+            (StorePage::Shop, "wisp.menu.store", "Store", true),
+            (
+                StorePage::Creator,
+                "wisp.menu.creator",
+                "Creator",
+                me.creator,
+            ),
+            (StorePage::Admin, "wisp.menu.admin", "Admin", me.admin),
+        ];
+        for (page, key, fallback, shown) in pages {
+            if !shown {
+                continue;
+            }
+            let name = lang::get_or(key, fallback);
+            let badge = (page == StorePage::Creator && me.supporters > 0)
+                .then(|| (me.supporters.to_string(), hex(0xF2C14E, 150)));
+            let selected = self.store_page == Some(page);
+            x = self.draw_tab(
+                ui,
+                x,
+                ty,
+                &name,
+                selected,
+                badge,
+                Action::Store(StoreClick::Page(page)),
+            );
+        }
         // How many are on, at the right of the tabs.
-        if !self.friends_page && self.open.is_none() {
+        if !other_page && self.open.is_none() {
             let cards = self.cards(e);
             let on = cards.iter().filter(|c| c.on).count();
             let summary = format!(

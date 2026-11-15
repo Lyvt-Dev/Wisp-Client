@@ -100,6 +100,23 @@ paste anything; an address set in Settings still wins.
 | `PORT` | `8080` | the port it listens on |
 | `WISP_COSMETICS_DB` | `/data/cosmetics.sqlite3` with a `/data` volume, else `cosmetics.sqlite3` | the one data file |
 | `WISP_COSMETICS_ITEMS` | any valid item | comma-separated item ids players may wear, e.g. the Shop's |
+| `WISP_ADMINS` | nobody | comma-separated Minecraft UUIDs (yours) that may choose creators in the game |
+
+## Creators
+
+Creators are players you choose. Each picks a creator code in the game (and may change it). A
+player who enters a creator's code gets 10 % off in the Shop and wears that creator's badge
+before their name; the creator earns 10 % of every item's price in Wisp Coins, which their game
+collects. Only `WISP_ADMINS` accounts choose creators, in the game or with these commands run on
+the server (with the same `WISP_COSMETICS_DB`):
+
+```
+wisp-cosmetics-server creator <name>                   # make a player a creator (they used Wisp once)
+wisp-cosmetics-server badge <name> badge.png [#rrggbb] # their badge: a PNG of at most 16x16, and the line under the name
+wisp-cosmetics-server uncreator <name>                 # no longer a creator
+```
+
+The API is described at the top of `crates/wisp-cosmetics-server/src/creators.rs`.
 
 ## If something doesn't work
 

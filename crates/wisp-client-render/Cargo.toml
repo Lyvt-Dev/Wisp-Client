@@ -9,6 +9,8 @@ description = "The client's world data, rendering and screens: chunks, meshing, 
 [dependencies]
 wisp-compat = { path = "../wisp-compat" }
 wisp-cosmetics = { path = "../wisp-cosmetics" }
+# The Shop's item cards, packed into the GUI atlas for the Wisp Menu's Store.
+wisp-shop = { path = "../wisp-shop" }
 # The GUI atlas's pixels, kept compressed once uploaded (hud.rs `pack_pixels`).
 lz4_flex = { version = "0.14", default-features = false, features = ["std", "safe-encode", "safe-decode", "checked-decode"] }
 wisp-assets = { path = "../wisp-assets" }

@@ -8117,7 +8117,7 @@ dependencies = [
 
 [[package]]
 name = "wisp-launcher"
-version = "0.14.9"
+version = "0.15.0"
 dependencies = [
  "base64",
  "chacha20poly1305",
@@ -8143,6 +8143,7 @@ dependencies = [
  "wisp-cosmetics",
  "wisp-mods",
  "wisp-shader-api",
+ "wisp-shop",
  "wisp-theme",
  "wry",
  "zip",
@@ -8172,6 +8173,14 @@ dependencies = [
  "toml 1.1.8+spec-1.1.0",
  "wisp-compat",
  "zip",
+]
+
+[[package]]
+name = "wisp-shop"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

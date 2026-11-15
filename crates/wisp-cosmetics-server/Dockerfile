@@ -4,6 +4,7 @@ WORKDIR /src
 COPY Cargo.toml Cargo.toml
 COPY crates/wisp-compat crates/wisp-compat
 COPY crates/wisp-cosmetics crates/wisp-cosmetics
+COPY crates/wisp-shop crates/wisp-shop
 COPY crates/wisp-cosmetics-server crates/wisp-cosmetics-server
 RUN cargo build --release --manifest-path crates/wisp-cosmetics-server/Cargo.toml
 

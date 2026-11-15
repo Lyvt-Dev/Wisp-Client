@@ -1,10 +1,10 @@
 //! The game's own client code (`wisp_cosmetics`: the sharing thread and the worn-items cache)
 //! against this server over real HTTP, as two Wisp players would use it.
+use serde_json::{Value, json};
+use std::time::{Duration, Instant};
 use wisp_cosmetics::share::Sharing;
 use wisp_cosmetics::{Cosmetics, Http};
 use wisp_cosmetics_server::{App, Mojang, Store, router};
-use serde_json::{Value, json};
-use std::time::{Duration, Instant};
 
 const STEVE: u128 = 0x0123456789abcdef0123456789abcdef;
 
@@ -20,7 +20,10 @@ impl Mojang for FakeMojang {
 fn serve() -> String {
     let (tx, rx) = std::sync::mpsc::channel();
     std::thread::spawn(move || {
-        let runtime = tokio::runtime::Builder::new_multi_thread().enable_all().build().unwrap();
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap();
         runtime.block_on(async move {
             let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
             tx.send(listener.local_addr().unwrap()).unwrap();
@@ -44,15 +47,19 @@ fn wait_for<T>(mut found: impl FnMut() -> Option<T>) -> T {
 
 /// The Shop's real Nebula Wings, as the launcher writes them for the game.
 fn wings() -> Value {
-    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../launcher/assets/shop/nebula_wings.json");
-    serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap()
+    let wings = wisp_shop::offer("nebula_wings").and_then(|o| o.item).unwrap();
+    serde_json::from_slice(wings).unwrap()
 }
 
 #[test]
 fn one_player_wears_and_emotes_and_another_sees_it() {
     let base = serve();
     // Steve's game: signed in, publishing what he wears and the emote he plays.
-    let steve = Sharing::start(Http::new(&base, "Wisp/test"), "Steve".into(), Some(Box::new(|_| Ok(()))));
+    let steve = Sharing::start(
+        Http::new(&base, "Wisp/test"),
+        "Steve".into(),
+        Some(Box::new(|_| Ok(()))),
+    );
     steve.wear(vec![wings()]);
     // Published once the service lists it (the game keeps an answer a minute, so Alex asks
     // after that).
@@ -70,7 +77,10 @@ fn one_player_wears_and_emotes_and_another_sees_it() {
     let alex = Cosmetics::new(Http::new(&base, "Wisp/test"), None);
     let worn = wait_for(|| alex.frame().worn(STEVE).filter(|w| !w.is_empty()));
     assert_eq!(worn[0].id, "nebula_wings");
-    assert!(worn[0].frames.len() > 1, "the animated texture made the trip");
+    assert!(
+        worn[0].frames.len() > 1,
+        "the animated texture made the trip"
+    );
 
     let alex_sharing = Sharing::start(Http::new(&base, "Wisp/test"), String::new(), None);
     alex_sharing.asking([STEVE]);

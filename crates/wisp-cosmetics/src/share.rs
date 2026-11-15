@@ -3,8 +3,10 @@
 //! emotes the players in view are playing (`POST /v1/emotes`, asked every second while any
 //! player is in view), and friends: where this player is (`POST /v1/presence`, every 20 seconds,
 //! answered with the friends list) and requests, accepts and removals (`/v1/friends/...`, see
-//! the server's `friends.rs`). All of it runs on a thread of its own; the game only hands it work
-//! and reads the last answer.
+//! the server's `friends.rs`), and the Shop: the wallet the server keeps (coins are only there),
+//! buying and wearing, the creator supported, a creator's dashboard and the admins' creator list
+//! (the server's `shop.rs` and `creators.rs`). All of it runs on a thread of its own; the game only
+//! hands it work and reads the last answer.
 use crate::account::{self, Call};
 use serde_json::{Value, json};
 use std::collections::HashMap;
@@ -107,6 +109,127 @@ pub struct FriendsState {
     pub busy: bool,
 }
 
+/// The player's Shop wallet, as the server keeps it.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct ShopWallet {
+    pub coins: u32,
+    pub owned: Vec<String>,
+    pub equipped: Vec<String>,
+    /// Percent off with the supported creator's code (0 without one).
+    pub discount: u32,
+    /// The creator supported: their name and code.
+    pub supporting: Option<(String, Option<String>)>,
+}
+
+/// What the server says this player is: an admin, a creator with their code and numbers.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct CreatorInfo {
+    pub admin: bool,
+    pub creator: bool,
+    pub code: Option<String>,
+    pub badge: bool,
+    /// Players with this creator's code entered.
+    pub supporters: u32,
+    /// Purchases they made with it.
+    pub purchases: u32,
+    /// Coins earned from them, all time.
+    pub earned: u32,
+}
+
+/// A creator in the admins' list.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct AdminCreator {
+    pub uuid: String,
+    pub name: String,
+    pub code: Option<String>,
+    pub badge: bool,
+    pub supporters: u32,
+    pub earned: u32,
+}
+
+/// Something to do in the Shop.
+#[derive(Clone, Debug, PartialEq)]
+pub enum ShopAsk {
+    /// Reads the wallet (and the creator's or admin's numbers) now.
+    Refresh,
+    /// Buys an item (the server prices it and checks the coins) and wears it.
+    Buy(String),
+    Equip(String),
+    Unequip(String),
+    /// Supports the creator with this code, or nobody.
+    Support(Option<String>),
+    /// A creator's new code.
+    SetCode(String),
+    /// An admin makes the player of this name a creator.
+    AdminAdd(String),
+    /// An admin takes a creator's status away (uuid).
+    AdminRemove(String),
+}
+
+/// What the game shows of the Shop.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct ShopState {
+    /// The wallet as last read (None: none yet).
+    pub wallet: Option<ShopWallet>,
+    pub me: CreatorInfo,
+    /// Every creator, for an admin.
+    pub creators: Vec<AdminCreator>,
+    /// Why there is no wallet: no account, a failed sign-in, an unreachable server.
+    pub problem: Option<String>,
+    /// What the last action did, whether it failed, and when.
+    pub notice: Option<(String, bool, Instant)>,
+    /// An action is on its way.
+    pub busy: bool,
+}
+
+fn number(v: &Value) -> u32 {
+    v.as_u64().map_or(0, |n| n.min(u64::from(u32::MAX)) as u32)
+}
+
+impl ShopWallet {
+    /// Reads the server's wallet (`GET /v1/wallet`).
+    pub fn parse(v: &Value) -> Self {
+        let list = |key: &str| -> Vec<String> {
+            v[key]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(|i| i.as_str().map(str::to_owned))
+                .collect()
+        };
+        Self {
+            coins: number(&v["coins"]),
+            owned: list("owned"),
+            equipped: list("equipped"),
+            discount: number(&v["discount"]),
+            supporting: v["supporting"].is_object().then(|| {
+                (
+                    v["supporting"]["name"]
+                        .as_str()
+                        .unwrap_or_default()
+                        .to_owned(),
+                    v["supporting"]["code"].as_str().map(str::to_owned),
+                )
+            }),
+        }
+    }
+}
+
+impl CreatorInfo {
+    /// Reads `GET /v1/creator/me`.
+    pub fn parse(v: &Value) -> Self {
+        Self {
+            admin: v["admin"].as_bool().unwrap_or(false),
+            creator: v["creator"].as_bool().unwrap_or(false),
+            code: v["code"].as_str().map(str::to_owned),
+            badge: v["badge"].as_bool().unwrap_or(false),
+            supporters: number(&v["supporters"]),
+            purchases: number(&v["purchases"]),
+            earned: number(&v["earned"]),
+        }
+    }
+}
+
 /// An emote another player is playing.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Playing {
@@ -119,6 +242,7 @@ enum Work {
     Wear(Vec<Value>),
     Emote(Option<String>),
     Friend(FriendAsk),
+    Shop(ShopAsk),
 }
 
 /// Signs in to Mojang for the service: the game's `auth::join_server` with its session.
@@ -133,6 +257,7 @@ struct Shared {
     /// The server this player is on (None: singleplayer or the title screen).
     server: Option<String>,
     friends: FriendsState,
+    shop: ShopState,
 }
 
 pub struct Sharing {
@@ -209,6 +334,27 @@ impl Sharing {
             .clone()
     }
 
+    /// Asks the server something about the Shop; the answer shows in [`Self::shop`].
+    pub fn shop(&self, ask: ShopAsk) {
+        if !matches!(ask, ShopAsk::Refresh) {
+            self.shared
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .shop
+                .busy = true;
+        }
+        let _ = self.work.send(Work::Shop(ask));
+    }
+
+    /// The Shop's wallet and state, as last answered.
+    pub fn shop_state(&self) -> ShopState {
+        self.shared
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .shop
+            .clone()
+    }
+
     /// The emotes the players in view are playing, as last answered.
     pub fn playing(&self) -> HashMap<u128, Playing> {
         self.shared
@@ -233,12 +379,12 @@ fn run(
     let mut retry: Option<(Instant, Duration)> = None;
     let mut next_poll = Instant::now();
     let mut next_friends = Instant::now();
+    // The welcome gift and the daily bonus, collected once the server is reached.
+    let mut collected = false;
     if join.is_none() {
-        shared
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .friends
-            .problem = Some("Sign in with Microsoft to use friends.".into());
+        let mut s = shared.lock().unwrap_or_else(PoisonError::into_inner);
+        s.friends.problem = Some("Sign in with Microsoft to use friends.".into());
+        s.shop.problem = Some("Sign in with Microsoft to use the Shop.".into());
     }
     loop {
         let wait = next_poll
@@ -249,6 +395,19 @@ fn run(
             Ok(Work::Wear(items)) => wear = Some(items),
             Ok(Work::Emote(id)) => emote = Some(id),
             Ok(Work::Friend(a)) => ask = Some(a),
+            Ok(Work::Shop(a)) => {
+                if let Some(join) = &join {
+                    shop_work(
+                        service,
+                        name,
+                        join,
+                        &mut session,
+                        &mut collected,
+                        &a,
+                        shared,
+                    );
+                }
+            }
             Err(RecvTimeoutError::Timeout) => {}
             Err(RecvTimeoutError::Disconnected) => return,
         }
@@ -382,6 +541,137 @@ fn reason(e: &str) -> String {
     }
 }
 
+/// One Shop action (or a refresh), then the wallet, the creator's numbers and, for an admin, the
+/// creators, read again.
+fn shop_work(
+    service: &dyn Call,
+    name: &str,
+    join: &Join,
+    session: &mut Option<String>,
+    collected: &mut bool,
+    ask: &ShopAsk,
+    shared: &Mutex<Shared>,
+) {
+    let mut notice: Option<(String, bool)> = None;
+    if !*collected
+        && let Ok(v) = signed(service, name, join, session, &|s| {
+            service.call("POST", "/v1/wallet/collect", s, &json!({}))
+        })
+    {
+        *collected = true;
+        let given = number(&v["given"]);
+        if given > 0 {
+            notice = Some((format!("+{given} Wisp Coins collected."), false));
+        }
+    }
+    let acted = signed(service, name, join, session, &|s| match ask {
+        ShopAsk::Refresh => Ok(Value::Null),
+        ShopAsk::Buy(id) => {
+            service.call("POST", "/v1/shop/buy", s, &json!({ "item": id }))?;
+            service.call("POST", "/v1/shop/equip", s, &json!({ "item": id }))
+        }
+        ShopAsk::Equip(id) => service.call("POST", "/v1/shop/equip", s, &json!({ "item": id })),
+        ShopAsk::Unequip(id) => service.call("POST", "/v1/shop/unequip", s, &json!({ "item": id })),
+        ShopAsk::Support(code) => {
+            service.call("PUT", "/v1/supporting", s, &json!({ "code": code }))
+        }
+        ShopAsk::SetCode(code) => {
+            service.call("PUT", "/v1/creator/code", s, &json!({ "code": code }))
+        }
+        ShopAsk::AdminAdd(who) => service.call(
+            "POST",
+            "/v1/admin/creators",
+            s,
+            &json!({ "name": who.trim() }),
+        ),
+        ShopAsk::AdminRemove(uuid) => service.call(
+            "DELETE",
+            &format!("/v1/admin/creators/{uuid}"),
+            s,
+            &json!({}),
+        ),
+    });
+    match (&acted, ask) {
+        (Err(e), _) => notice = Some((reason(e), true)),
+        (Ok(_), ShopAsk::Buy(_)) => notice = Some(("Bought and equipped.".into(), false)),
+        (Ok(_), ShopAsk::Equip(_)) => notice = Some(("Equipped.".into(), false)),
+        (Ok(_), ShopAsk::Unequip(_)) => notice = Some(("Taken off.".into(), false)),
+        (Ok(v), ShopAsk::Support(_)) => {
+            notice = Some((
+                match v["supporting"]["name"].as_str() {
+                    Some(who) => format!("You support {who}: 10 % off everything."),
+                    None => "You don't support a creator now.".into(),
+                },
+                false,
+            ));
+        }
+        (Ok(v), ShopAsk::SetCode(_)) => {
+            notice = Some((
+                format!("Your creator code is {}.", v["code"].as_str().unwrap_or("")),
+                false,
+            ));
+        }
+        (Ok(v), ShopAsk::AdminAdd(_)) => {
+            notice = Some((
+                format!("{} is a creator now.", v["name"].as_str().unwrap_or("")),
+                false,
+            ));
+        }
+        (Ok(_), ShopAsk::AdminRemove(_)) => {
+            notice = Some(("No longer a creator.".into(), false));
+        }
+        (Ok(_), ShopAsk::Refresh) => {}
+    }
+    let wallet = signed(service, name, join, session, &|s| {
+        service.call("GET", "/v1/wallet", s, &json!({}))
+    });
+    let me = signed(service, name, join, session, &|s| {
+        service.call("GET", "/v1/creator/me", s, &json!({}))
+    })
+    .map(|v| CreatorInfo::parse(&v))
+    .unwrap_or_default();
+    let creators = if me.admin {
+        signed(service, name, join, session, &|s| {
+            service.call("GET", "/v1/admin/creators", s, &json!({}))
+        })
+        .ok()
+        .and_then(|v| {
+            v["creators"].as_array().map(|list| {
+                list.iter()
+                    .map(|c| AdminCreator {
+                        uuid: c["uuid"].as_str().unwrap_or_default().to_owned(),
+                        name: c["name"].as_str().unwrap_or_default().to_owned(),
+                        code: c["code"].as_str().map(str::to_owned),
+                        badge: c["badge"].as_bool().unwrap_or(false),
+                        supporters: number(&c["supporters"]),
+                        earned: number(&c["earned"]),
+                    })
+                    .collect()
+            })
+        })
+        .unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+    let mut s = shared.lock().unwrap_or_else(PoisonError::into_inner);
+    let shop = &mut s.shop;
+    if !matches!(ask, ShopAsk::Refresh) {
+        shop.busy = false;
+    }
+    match wallet {
+        Ok(v) => {
+            shop.wallet = Some(ShopWallet::parse(&v));
+            shop.problem = None;
+        }
+        Err(e) => shop.problem = Some(reason(&e)),
+    }
+    shop.me = me;
+    shop.creators = creators;
+    if let Some((text, bad)) = notice {
+        shop.notice = Some((text, bad, Instant::now()));
+    }
+}
+
 fn friends_work(
     service: &dyn Call,
     name: &str,
@@ -479,6 +769,19 @@ mod tests {
                 })),
                 _ if session != Some("t1") => Err("HTTP 401".into()),
                 _ if self.expired.replace(false) => Err("HTTP 401".into()),
+                "/v1/wallet/collect" => Ok(json!({ "given": 1100, "wallet": {} })),
+                "/v1/wallet" => Ok(json!({
+                    "coins": 1100, "owned": ["founders_cape"], "equipped": ["founders_cape"],
+                    "discount": 10, "supporting": { "name": "Jeb", "code": "JEB_" }
+                })),
+                "/v1/creator/me" => Ok(json!({ "admin": true, "creator": true, "code": "STEVE",
+                    "badge": false, "supporters": 3, "purchases": 2, "earned": 240 })),
+                "/v1/admin/creators" if method == "GET" => Ok(json!({ "creators": [
+                    { "uuid": "j", "name": "Jeb", "code": "JEB_", "badge": true, "supporters": 1, "earned": 120 }
+                ] })),
+                "/v1/shop/buy" if body["item"] == "free_money" => {
+                    Err("HTTP 404: This item isn't in the shop.".into())
+                }
                 _ => Ok(json!({ "ok": true, "echo": body })),
             }
         }
@@ -536,6 +839,52 @@ mod tests {
             "Request sent to Notch."
         );
         assert!(!sharing.friends().busy);
+    }
+
+    #[test]
+    fn the_shop_collects_once_buys_and_reads_the_creator_and_admin_numbers() {
+        let calls = Arc::new(Mutex::new(Vec::new()));
+        let fake = Fake {
+            calls: calls.clone(),
+            expired: RefCell::new(false),
+        };
+        let sharing = Sharing::start(fake, "Steve".into(), Some(Box::new(|_| Ok(()))));
+        sharing.shop(ShopAsk::Refresh);
+        wait_for(|| sharing.shop_state().wallet.is_some());
+        let state = sharing.shop_state();
+        let wallet = state.wallet.unwrap();
+        assert_eq!((wallet.coins, wallet.discount), (1100, 10));
+        assert_eq!(wallet.supporting, Some(("Jeb".into(), Some("JEB_".into()))));
+        assert_eq!(state.notice.unwrap().0, "+1100 Wisp Coins collected.");
+        assert!(state.me.admin && state.me.creator);
+        assert_eq!((state.me.supporters, state.me.earned), (3, 240));
+        assert_eq!(state.creators[0].name, "Jeb");
+        // A purchase the server refuses says why; the coins are collected only once.
+        sharing.shop(ShopAsk::Buy("free_money".into()));
+        wait_for(|| {
+            let s = sharing.shop_state();
+            !s.busy && s.notice.is_some_and(|n| n.1)
+        });
+        assert_eq!(
+            sharing.shop_state().notice.unwrap().0,
+            "This item isn't in the shop."
+        );
+        sharing.shop(ShopAsk::Buy("nebula_cape".into()));
+        wait_for(|| {
+            sharing
+                .shop_state()
+                .notice
+                .is_some_and(|n| n.0 == "Bought and equipped.")
+        });
+        let calls = calls.lock().unwrap().clone();
+        assert_eq!(
+            calls
+                .iter()
+                .filter(|c| *c == "POST /v1/wallet/collect")
+                .count(),
+            1
+        );
+        assert!(calls.contains(&"POST /v1/shop/equip".to_string()));
     }
 
     #[test]

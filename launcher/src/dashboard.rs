@@ -72,7 +72,9 @@ impl gpui::AssetSource for Assets {
             "icons/rocket" => Some(include_bytes!("../assets/icons/rocket.svg")),
             "icons/gear" => Some(include_bytes!("../assets/icons/gear.svg")),
             "icons/clock" => Some(include_bytes!("../assets/icons/clock.svg")),
-            "artwork/zedix.png" => Some(include_bytes!("../assets/shop/zedix_cape_logo.png")),
+            "artwork/zedix.png" => Some(include_bytes!(
+                "../../crates/wisp-shop/assets/zedix_cape_logo.png"
+            )),
             "icons/shield-check" => Some(include_bytes!("../assets/icons/shield-check.svg")),
             "icons/user-circle" => Some(include_bytes!("../assets/icons/user-circle.svg")),
             "icons/refresh" => Some(include_bytes!("../assets/icons/refresh.svg")),
@@ -230,6 +232,8 @@ struct Launcher {
     friends_notice: Option<(String, bool)>,
     friend_heads: std::collections::HashMap<String, Option<Arc<gpui::RenderImage>>>,
     friend_input: gpui::Entity<SearchInput>,
+    /// The Shop's creator code field.
+    creator_input: gpui::Entity<SearchInput>,
     service_input: gpui::Entity<SearchInput>,
     /// The server the game was started on, for the friends list.
     last_server: Option<String>,
@@ -247,7 +251,13 @@ struct Launcher {
     shader_search: gpui::Entity<SearchInput>,
     shop_search: gpui::Entity<SearchInput>,
     shop: shop_view::ShopUi,
+    /// The Shop wallet as the Wisp server last answered it, in the Shop's own type for the
+    /// views; empty until it answers. Coins are kept only on the server.
     wallet: wisp_launcher::shop::Wallet,
+    /// The same answer with the creator discount and who is supported.
+    server_wallet: wisp_launcher::friends::Wallet,
+    /// Why the Shop can't work now (no server, not signed in, server down).
+    shop_state: Option<String>,
     home: PathBuf,
     settings: Settings,
     prefs: wisp_launcher::prefs::Prefs,
@@ -324,6 +334,8 @@ impl Launcher {
             std::thread::spawn(move || friends_view::worker(home, events, friends_rx));
         }
         let friend_input = cx.new(|cx| SearchInput::new("Minecraft name…", focus.clone(), cx));
+        let creator_input =
+            cx.new(|cx| SearchInput::new("Enter a creator code…", focus.clone(), cx));
         cx.subscribe(&friend_input, |_, _, _: &search_input::Changed, cx| {
             cx.notify()
         })
@@ -461,11 +473,8 @@ impl Launcher {
                 if changed { cx.notify(); }
             }).is_err() { break; }
         }).detach();
-        let mut wallet = wisp_launcher::shop::Wallet::load(&home);
-        let earned = wallet.collect(wisp_launcher::shop::today());
-        if earned > 0 {
-            let _ = wallet.save(&home);
-        }
+        // The wallet comes from the Wisp server (the friends worker collects the daily coins).
+        let wallet = wisp_launcher::shop::Wallet::default();
         let accounts = auth::accounts(&home).map(|(a, _)| a).unwrap_or_default();
         let start = match prefs.start_page {
             wisp_launcher::prefs::StartPage::Home => Page::Home,
@@ -482,6 +491,7 @@ impl Launcher {
             friends_notice: None,
             friend_heads: Default::default(),
             friend_input,
+            creator_input,
             service_input,
             last_server: None,
             skin: None,
@@ -493,6 +503,8 @@ impl Launcher {
             shop_search,
             shop: Default::default(),
             wallet,
+            server_wallet: Default::default(),
+            shop_state: Some(tr("Connecting to the Wisp server…")),
             home,
             settings,
             prefs,
@@ -761,6 +773,19 @@ impl Launcher {
                 friends_view::FriendsUpdate::Unavailable(why) => self.friends_state = Some(why),
                 friends_view::FriendsUpdate::Notice(text, bad) => {
                     self.friends_notice = Some((text, bad))
+                }
+                friends_view::FriendsUpdate::Wallet(wallet) => {
+                    self.wallet = wallet.as_shop();
+                    self.server_wallet = wallet;
+                    self.shop_state = None;
+                }
+                friends_view::FriendsUpdate::ShopNotice(text, bad) => {
+                    self.shop.busy = false;
+                    self.shop.notice = Some((text, bad));
+                }
+                friends_view::FriendsUpdate::ShopUnavailable(why) => {
+                    self.shop.busy = false;
+                    self.shop_state = Some(why);
                 }
             },
             Event::FriendHead(uuid, face) => {

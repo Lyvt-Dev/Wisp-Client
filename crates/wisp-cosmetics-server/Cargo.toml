@@ -20,6 +20,8 @@ large_enum_variant = "allow"
 wisp-compat = { path = "../wisp-compat" }
 # Every uploaded item is checked exactly as the game checks it.
 wisp-cosmetics = { path = "../wisp-cosmetics" }
+# The Shop's items, prices and rules: wallets are kept here so nobody makes coins up.
+wisp-shop = { path = "../wisp-shop" }
 axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "json", "query"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal", "time", "sync"] }
 rusqlite = { version = "0.37", features = ["bundled"] }
@@ -29,12 +31,13 @@ sha2 = "0.10"
 getrandom = "0.3"
 # Mojang's session server (blocking, run off the async workers; rustls).
 ureq = { version = "2.12", features = ["json"] }
+# The `badge` command reads a PNG file into a badge item.
+base64 = "0.22"
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }
 http-body-util = "0.1"
 png = "0.18"
-base64 = "0.22"
 
 [profile.release]
 strip = true

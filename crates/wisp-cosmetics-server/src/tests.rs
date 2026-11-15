@@ -431,3 +431,365 @@ async fn asking_someone_who_asked_you_makes_friends_and_decline_forgets() {
     .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
+
+/// A 16×16 PNG of one colour, base64: a badge's mark.
+fn mark_png() -> String {
+    let mut out = Vec::new();
+    let mut encoder = png::Encoder::new(&mut out, 16, 16);
+    encoder.set_color(png::ColorType::Rgba);
+    encoder.set_depth(png::BitDepth::Eight);
+    encoder
+        .write_header()
+        .unwrap()
+        .write_image_data(&[255; 16 * 16 * 4])
+        .unwrap();
+    use base64::Engine;
+    base64::engine::general_purpose::STANDARD.encode(out)
+}
+
+/// Wisp's badge as the launcher writes it into every worn folder: a name tag.
+fn wisp_badge() -> Value {
+    json!({ "format": 1, "id": "wisp_badge", "parts": [], "slot": "name_tag",
+            "tag": { "line": "#ffffff" }, "texture": { "png": mark_png() } })
+}
+
+#[tokio::test]
+async fn creators_codes_supporters_shares_and_badges() {
+    // Notch is the admin; Jeb becomes a creator; Steve supports him.
+    let app = app().with_admins(&["11111111-1111-1111-1111-111111111111".to_owned()]);
+    let steve = session(&app, "Steve").await;
+    let notch = session(&app, "Notch").await;
+    let jeb = session(&app, "Jeb").await;
+
+    // Only an admin chooses creators, and only players who have used Wisp.
+    let (status, _) = call(
+        &app,
+        "POST",
+        "/v1/admin/creators",
+        Some(&steve),
+        json!({ "name": "Jeb" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    let (status, _) = call(
+        &app,
+        "POST",
+        "/v1/admin/creators",
+        Some(&notch),
+        json!({ "name": "Herobrine" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    let (status, body) = call(
+        &app,
+        "POST",
+        "/v1/admin/creators",
+        Some(&notch),
+        json!({ "name": "jeb" }),
+    )
+    .await;
+    assert_eq!((status, body["uuid"].as_str()), (StatusCode::OK, Some(JEB)));
+    let (_, me) = call(&app, "GET", "/v1/creator/me", Some(&notch), json!({})).await;
+    assert_eq!(
+        (me["admin"].as_bool(), me["creator"].as_bool()),
+        (Some(true), Some(false))
+    );
+
+    // A creator sets a code; nobody else can, and a code is checked and unique.
+    let (status, _) = call(
+        &app,
+        "PUT",
+        "/v1/creator/code",
+        Some(&steve),
+        json!({ "code": "STEVE" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    let (status, _) = call(
+        &app,
+        "PUT",
+        "/v1/creator/code",
+        Some(&jeb),
+        json!({ "code": "no spaces" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    let (status, body) = call(
+        &app,
+        "PUT",
+        "/v1/creator/code",
+        Some(&jeb),
+        json!({ "code": "jeb_" }),
+    )
+    .await;
+    assert_eq!(
+        (status, body["code"].as_str()),
+        (StatusCode::OK, Some("JEB_"))
+    );
+    let (_, list) = call(&app, "GET", "/v1/creators", None, json!({})).await;
+    assert_eq!(list["discount"], 10);
+    assert_eq!(list["creators"], json!([{ "code": "JEB_", "name": "Jeb" }]));
+
+    // Supporting: by any case, never yourself, never a code nobody has.
+    let (status, _) = call(
+        &app,
+        "PUT",
+        "/v1/supporting",
+        Some(&jeb),
+        json!({ "code": "JEB_" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    let (status, _) = call(
+        &app,
+        "PUT",
+        "/v1/supporting",
+        Some(&steve),
+        json!({ "code": "NOPE" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    let (status, body) = call(
+        &app,
+        "PUT",
+        "/v1/supporting",
+        Some(&steve),
+        json!({ "code": "Jeb_" }),
+    )
+    .await;
+    assert_eq!(
+        (status, &body["supporting"]["name"]),
+        (StatusCode::OK, &json!("Jeb"))
+    );
+
+    // Coins live here: the welcome gift and the daily bonus, once.
+    let (_, body) = call(&app, "POST", "/v1/wallet/collect", Some(&steve), json!({})).await;
+    let start = wisp_shop::WELCOME + wisp_shop::DAILY;
+    assert_eq!(
+        (body["given"].as_u64(), body["wallet"]["coins"].as_u64()),
+        (Some(start.into()), Some(start.into()))
+    );
+    let (_, body) = call(&app, "POST", "/v1/wallet/collect", Some(&steve), json!({})).await;
+    assert_eq!(body["given"], 0);
+    assert_eq!(body["wallet"]["discount"], 10);
+
+    // Steve buys with the 10 percent off; Jeb earns 10 percent of the full price in his wallet.
+    let cape = wisp_shop::OFFERS
+        .iter()
+        .find(|o| o.price > start && wisp_shop::discounted(o.price, 10) <= start)
+        .expect("an item Steve can afford only with the code");
+    let (status, body) = call(
+        &app,
+        "PUT",
+        "/v1/supporting",
+        Some(&steve),
+        json!({ "code": null }),
+    )
+    .await;
+    assert_eq!(
+        (status, &body["supporting"]),
+        (StatusCode::OK, &Value::Null)
+    );
+    let (status, body) = call(
+        &app,
+        "POST",
+        "/v1/shop/buy",
+        Some(&steve),
+        json!({ "item": cape.id }),
+    )
+    .await;
+    assert_eq!(
+        (status, body["short"].as_u64()),
+        (
+            StatusCode::PAYMENT_REQUIRED,
+            Some((cape.price - start).into())
+        )
+    );
+    call(
+        &app,
+        "PUT",
+        "/v1/supporting",
+        Some(&steve),
+        json!({ "code": "JEB_" }),
+    )
+    .await;
+    let (status, body) = call(
+        &app,
+        "POST",
+        "/v1/shop/buy",
+        Some(&steve),
+        json!({ "item": cape.id }),
+    )
+    .await;
+    let paid = wisp_shop::discounted(cape.price, 10);
+    assert_eq!(
+        (status, body["paid"].as_u64()),
+        (StatusCode::OK, Some(paid.into()))
+    );
+    assert_eq!(
+        body["wallet"]["coins"].as_u64(),
+        Some((start - paid).into())
+    );
+    let (status, _) = call(
+        &app,
+        "POST",
+        "/v1/shop/buy",
+        Some(&steve),
+        json!({ "item": cape.id }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    let (_, wallet) = call(&app, "GET", "/v1/wallet", Some(&jeb), json!({})).await;
+    assert_eq!(
+        wallet["coins"].as_u64(),
+        Some(wisp_shop::share(cape.price, 10).into())
+    );
+    let (_, me) = call(&app, "GET", "/v1/creator/me", Some(&jeb), json!({})).await;
+    assert_eq!(
+        (me["supporters"].as_i64(), me["purchases"].as_i64()),
+        (Some(1), Some(1))
+    );
+    assert_eq!(
+        me["earned"].as_u64(),
+        Some(wisp_shop::share(cape.price, 10).into())
+    );
+
+    // Wearing: only what is owned, and nothing that isn't in the Shop.
+    let (status, body) = call(
+        &app,
+        "POST",
+        "/v1/shop/equip",
+        Some(&steve),
+        json!({ "item": cape.id }),
+    )
+    .await;
+    assert_eq!(
+        (status, &body["wallet"]["equipped"]),
+        (StatusCode::OK, &json!([cape.id]))
+    );
+    let (status, _) = call(
+        &app,
+        "POST",
+        "/v1/shop/equip",
+        Some(&jeb),
+        json!({ "item": cape.id }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    let (status, _) = call(
+        &app,
+        "POST",
+        "/v1/shop/equip",
+        Some(&steve),
+        json!({ "item": "free_coins" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    let (_, body) = call(
+        &app,
+        "POST",
+        "/v1/shop/unequip",
+        Some(&steve),
+        json!({ "item": cape.id }),
+    )
+    .await;
+    assert_eq!(body["wallet"]["equipped"], json!([]));
+
+    // The admin gives Jeb a badge: Steve wears it in place of Wisp's, and so does Jeb.
+    let (status, _) = call(
+        &app,
+        "PUT",
+        "/v1/wear",
+        Some(&steve),
+        json!({ "items": [hat("hat"), wisp_badge()] }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let (status, _) = call(
+        &app,
+        "PUT",
+        &format!("/v1/admin/creators/{JEB}/badge"),
+        Some(&notch),
+        json!({ "png": "not a png" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    let (status, badge) = call(
+        &app,
+        "PUT",
+        &format!("/v1/admin/creators/{JEB}/badge"),
+        Some(&notch),
+        json!({ "png": mark_png(), "line": "#ff4d8d" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let hash = badge["badge"].as_str().unwrap().to_owned();
+    let (_, worn) = call(
+        &app,
+        "POST",
+        "/v1/worn",
+        None,
+        json!({ "players": [PLAYER] }),
+    )
+    .await;
+    let ids: Vec<&str> = worn["players"][PLAYER]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|w| w["id"].as_str().unwrap())
+        .collect();
+    assert_eq!(ids, ["hat", "creator_badge"]);
+    let (_, file) = call(
+        &app,
+        "GET",
+        &format!("/v1/items/creator_badge?hash={hash}"),
+        None,
+        json!({}),
+    )
+    .await;
+    assert_eq!(file["tag"]["line"], "#ff4d8d");
+    let (_, worn) = call(&app, "PUT", "/v1/wear", Some(&jeb), json!({ "items": [] })).await;
+    assert_eq!(worn["worn"], json!([]));
+    let (_, worn) = call(&app, "POST", "/v1/worn", None, json!({ "players": [JEB] })).await;
+    assert_eq!(worn["players"][JEB][0]["id"], "creator_badge");
+
+    // A new code keeps Jeb's supporters.
+    call(
+        &app,
+        "PUT",
+        "/v1/creator/code",
+        Some(&jeb),
+        json!({ "code": "JEBBY" }),
+    )
+    .await;
+    let (_, me) = call(&app, "GET", "/v1/creator/me", Some(&steve), json!({})).await;
+    assert_eq!(me["supporting"]["code"], "JEBBY");
+
+    // No longer a creator: Steve supports nobody and wears Wisp's badge again.
+    let (_, body) = call(
+        &app,
+        "DELETE",
+        &format!("/v1/admin/creators/{JEB}"),
+        Some(&notch),
+        json!({}),
+    )
+    .await;
+    assert_eq!(body["removed"], true);
+    let (_, me) = call(&app, "GET", "/v1/creator/me", Some(&steve), json!({})).await;
+    assert!(me["supporting"].is_null());
+    let (_, worn) = call(
+        &app,
+        "POST",
+        "/v1/worn",
+        None,
+        json!({ "players": [PLAYER] }),
+    )
+    .await;
+    let ids: Vec<&str> = worn["players"][PLAYER]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|w| w["id"].as_str().unwrap())
+        .collect();
+    assert_eq!(ids, ["hat", "wisp_badge"]);
+}

@@ -6,7 +6,8 @@
     "watchPatterns": [
       "/crates/wisp-cosmetics/**",
       "/crates/wisp-cosmetics-server/**",
-      "/crates/wisp-compat/**"
+      "/crates/wisp-compat/**",
+      "/crates/wisp-shop/**"
     ]
   },
   "deploy": {

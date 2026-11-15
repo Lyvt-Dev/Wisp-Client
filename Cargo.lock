@@ -4731,6 +4731,7 @@ dependencies = [
  "wisp-server-files",
  "wisp-shader-api",
  "wisp-shaders",
+ "wisp-shop",
  "wisp-telemetry",
  "wisp-theme",
  "wisp-threads",
@@ -4813,6 +4814,7 @@ dependencies = [
  "wisp-server-files",
  "wisp-shader-api",
  "wisp-shaders",
+ "wisp-shop",
  "wisp-telemetry",
  "wisp-theme",
  "wisp-threads",
@@ -4867,6 +4869,7 @@ dependencies = [
  "wisp-protocol",
  "wisp-shader-api",
  "wisp-shaders",
+ "wisp-shop",
  "wisp-telemetry",
  "wisp-theme",
  "wisp-threads",
@@ -5157,6 +5160,14 @@ dependencies = [
  "wisp-compat",
  "wisp-core",
  "zip",
+]
+
+[[package]]
+name = "wisp-shop"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

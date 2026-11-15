@@ -225,6 +225,102 @@ impl Client {
         self.call("DELETE", &format!("/v1/friends/{uuid}"), None)
             .map(|v| parse(&v))
     }
+
+    /// The player's wallet, as the server keeps it.
+    pub fn wallet(&self) -> Result<Wallet, Failure> {
+        self.call("GET", "/v1/wallet", None)
+            .map(|v| Wallet::parse(&v))
+    }
+
+    /// The welcome gift and today's bonus, once each: the coins given and the wallet.
+    pub fn collect(&self) -> Result<(u32, Wallet), Failure> {
+        self.call("POST", "/v1/wallet/collect", Some(json!({})))
+            .map(|v| (count(&v["given"]), Wallet::parse(&v["wallet"])))
+    }
+
+    /// Buys an item: the server prices it (less the supported creator's discount) and checks
+    /// the coins. Answers the coins paid and the wallet.
+    pub fn buy(&self, item: &str) -> Result<(u32, Wallet), Failure> {
+        self.call("POST", "/v1/shop/buy", Some(json!({ "item": item })))
+            .map(|v| (count(&v["paid"]), Wallet::parse(&v["wallet"])))
+    }
+
+    pub fn equip(&self, item: &str) -> Result<Wallet, Failure> {
+        self.call("POST", "/v1/shop/equip", Some(json!({ "item": item })))
+            .map(|v| Wallet::parse(&v["wallet"]))
+    }
+
+    pub fn unequip(&self, item: &str) -> Result<Wallet, Failure> {
+        self.call("POST", "/v1/shop/unequip", Some(json!({ "item": item })))
+            .map(|v| Wallet::parse(&v["wallet"]))
+    }
+
+    /// Supports the creator with `code`, or nobody with None.
+    pub fn support(&self, code: Option<&str>) -> Result<(), Failure> {
+        self.call("PUT", "/v1/supporting", Some(json!({ "code": code })))
+            .map(|_| ())
+    }
+}
+
+fn count(value: &Value) -> u32 {
+    value
+        .as_u64()
+        .map_or(0, |n| n.min(u64::from(u32::MAX)) as u32)
+}
+
+/// The player's Shop wallet on the Wisp server: the only place coins are kept.
+#[derive(Clone, Debug, PartialEq, Default)]
+pub struct Wallet {
+    pub coins: u32,
+    pub owned: Vec<String>,
+    pub equipped: Vec<String>,
+    /// Today's daily bonus is given.
+    pub collected: bool,
+    /// Percent off with the supported creator's code (0 without one).
+    pub discount: u32,
+    /// The creator supported: their name and code.
+    pub supporting: Option<(String, Option<String>)>,
+}
+
+impl Wallet {
+    pub fn parse(value: &Value) -> Self {
+        let list = |key: &str| {
+            value
+                .get(key)
+                .and_then(Value::as_array)
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|v| v.as_str().map(str::to_owned))
+                        .collect()
+                })
+                .unwrap_or_default()
+        };
+        let supporting = value.get("supporting").filter(|s| s.is_object()).map(|s| {
+            (
+                s["name"].as_str().unwrap_or_default().to_owned(),
+                s["code"].as_str().map(str::to_owned),
+            )
+        });
+        Self {
+            coins: count(&value["coins"]),
+            owned: list("owned"),
+            equipped: list("equipped"),
+            collected: value["collected"].as_bool().unwrap_or(false),
+            discount: count(&value["discount"]),
+            supporting,
+        }
+    }
+
+    /// The Shop's own wallet type, for the views that read it.
+    pub fn as_shop(&self) -> crate::shop::Wallet {
+        crate::shop::Wallet {
+            coins: self.coins,
+            owned: self.owned.clone(),
+            equipped: self.equipped.clone(),
+            bonus_day: self.collected.then(crate::shop::today),
+            welcomed: true,
+        }
+    }
 }
 
 /// A friend's skin texture URL and whether it has slim arms, from Mojang's public profile.
@@ -262,6 +358,28 @@ pub fn skin_of(uuid: &str) -> Option<(String, bool)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The wallet as the Wisp server answers it (`/v1/wallet`), into what the views read.
+    #[test]
+    fn the_servers_wallet_is_read_with_the_creator_supported() {
+        let wallet = Wallet::parse(&json!({
+            "coins": 1100, "owned": ["founders_cape"], "equipped": ["founders_cape"],
+            "collected": true, "discount": 10,
+            "supporting": { "name": "Jeb", "code": "JEB_" },
+        }));
+        assert_eq!(wallet.coins, 1100);
+        assert_eq!(wallet.discount, 10);
+        assert_eq!(wallet.supporting, Some(("Jeb".into(), Some("JEB_".into()))));
+        let shop = wallet.as_shop();
+        assert!(shop.owns("founders_cape") && shop.wears("founders_cape"));
+        assert_eq!(shop.bonus_day, Some(crate::shop::today()));
+        // Nobody supported, nothing collected yet: no discount, no bonus day.
+        let plain = Wallet::parse(&json!({ "coins": 5, "supporting": null }));
+        assert_eq!(
+            (plain.discount, plain.supporting.clone(), plain.as_shop().bonus_day),
+            (0, None, None)
+        );
+    }
 
     #[test]
     fn the_list_is_read_online_first_then_by_name() {

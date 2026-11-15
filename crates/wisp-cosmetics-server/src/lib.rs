@@ -20,6 +20,9 @@
 //! - `GET /v1/items/<id>?hash=<hash>`: an item file, which never changes for its hash.
 //! - `POST /v1/emotes` `{"players": [...]}` answers `{"players": {uuid: {"id", "elapsed"}}}`
 //!   for the ones playing an emote now.
+//!
+//! Creators, their codes and badges, and the admins who choose them: `creators.rs`. Every
+//! player's Wisp Coins and Shop items: `shop.rs`.
 use axum::{
     Json, Router,
     extract::{DefaultBodyLimit, Path, Query, State},
@@ -91,6 +94,8 @@ impl Store {
                  visible INTEGER NOT NULL DEFAULT 1, updated INTEGER NOT NULL);",
         )?;
         friends::tables(&db)?;
+        creators::tables(&db)?;
+        shop::tables(&db)?;
         Ok(Self(Mutex::new(db)))
     }
 
@@ -98,7 +103,7 @@ impl Store {
         Self::open(":memory:").expect("an in-memory database")
     }
 
-    fn db(&self) -> std::sync::MutexGuard<'_, Connection> {
+    pub fn db(&self) -> std::sync::MutexGuard<'_, Connection> {
         self.0.lock().unwrap_or_else(PoisonError::into_inner)
     }
 }
@@ -129,6 +134,8 @@ pub struct App {
     live: Arc<Mutex<Live>>,
     /// Item ids accepted (`WISP_COSMETICS_ITEMS`, comma separated); empty: any valid item.
     allowed: Arc<Vec<String>>,
+    /// The accounts that choose the creators (`WISP_ADMINS`), as UUIDs without dashes.
+    admins: Arc<Vec<String>>,
 }
 
 impl App {
@@ -138,7 +145,14 @@ impl App {
             mojang: Arc::new(mojang),
             live: Arc::default(),
             allowed: Arc::new(allowed),
+            admins: Arc::default(),
         }
+    }
+
+    /// The admins (`WISP_ADMINS`): UUIDs, with or without dashes; anything else is left out.
+    pub fn with_admins(mut self, admins: &[String]) -> Self {
+        self.admins = Arc::new(admins.iter().filter_map(|a| uuid(a)).collect());
+        self
     }
 
     fn live(&self) -> std::sync::MutexGuard<'_, Live> {
@@ -213,6 +227,27 @@ pub fn router(app: App) -> Router {
         .route("/v1/friends/accept", post(friends::accept))
         .route("/v1/friends/decline", post(friends::decline))
         .route("/v1/friends/{uuid}", axum::routing::delete(friends::remove))
+        .route("/v1/creators", get(creators::list))
+        .route("/v1/creator/me", get(creators::me))
+        .route("/v1/creator/code", put(creators::set_code))
+        .route("/v1/supporting", put(creators::set_supporting))
+        .route("/v1/wallet", get(shop::wallet))
+        .route("/v1/wallet/collect", post(shop::collect))
+        .route("/v1/shop/buy", post(shop::buy))
+        .route("/v1/shop/equip", post(shop::equip))
+        .route("/v1/shop/unequip", post(shop::unequip))
+        .route(
+            "/v1/admin/creators",
+            get(creators::admin_list).post(creators::admin_add),
+        )
+        .route(
+            "/v1/admin/creators/{uuid}",
+            axum::routing::delete(creators::admin_remove),
+        )
+        .route(
+            "/v1/admin/creators/{uuid}/badge",
+            put(creators::admin_badge).delete(creators::admin_unbadge),
+        )
         .layer(DefaultBodyLimit::max(MAX_WORN * MAX_ITEM / 2))
         .with_state(app)
 }
@@ -376,22 +411,29 @@ async fn worn(State(app): State<App>, Json(body): Json<Players>) -> Response {
         return refuse(StatusCode::BAD_REQUEST, "too many players");
     }
     let mut out = serde_json::Map::new();
+    let players: Vec<String> = body.players.iter().filter_map(|p| uuid(p)).collect();
     let db = app.store.db();
+    // A creator's badge takes the place of Wisp's.
+    let badges: HashMap<String, String> = creators::badges(&db, &players).into_iter().collect();
     let mut query =
         match db.prepare_cached("SELECT worn FROM players WHERE uuid = ?1 AND visible = 1") {
             Ok(q) => q,
             Err(e) => return refuse(StatusCode::INTERNAL_SERVER_ERROR, &e.to_string()),
         };
-    for player in body.players.iter().filter_map(|p| uuid(p)) {
+    for player in players {
         let worn: Option<String> = query
             .query_row([&player], |r| r.get(0))
             .optional()
             .ok()
             .flatten();
-        if let Some(list) = worn.and_then(|w| serde_json::from_str::<Value>(&w).ok())
-            && list.as_array().is_some_and(|a| !a.is_empty())
-        {
-            out.insert(player, list);
+        let Some(mut list) = worn.and_then(|w| serde_json::from_str::<Vec<Value>>(&w).ok()) else {
+            continue;
+        };
+        if let Some(hash) = badges.get(&player) {
+            creators::wear_badge(&mut list, hash);
+        }
+        if !list.is_empty() {
+            out.insert(player, Value::from(list));
         }
     }
     Json(json!({ "ttl": WORN_TTL, "players": out })).into_response()
@@ -484,7 +526,9 @@ async fn emotes(State(app): State<App>, Json(body): Json<Players>) -> Response {
     Json(json!({ "players": out })).into_response()
 }
 
+pub mod creators;
 mod friends;
+pub mod shop;
 
 #[cfg(test)]
 mod tests;

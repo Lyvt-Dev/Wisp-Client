@@ -9,8 +9,9 @@ use wisp_client::{
     hud::HudBatch,
     items::ItemStack,
     ui_theme::Ui,
-    wisp_menu::{Action, Control, FriendsView},
+    wisp_menu::{Action, Control, FriendsView, StoreClick, StoreField, StorePage},
 };
+use wisp_cosmetics::share::ShopAsk;
 
 impl Game<'_> {
     /// Right Shift in a world (or the Extras page's button): the menu opens on the page it was
@@ -31,8 +32,14 @@ impl Game<'_> {
         m.search_focused = false;
         m.friend_focused = false;
         m.confirm_remove = None;
+        m.store_focus = None;
+        m.store_confirm = None;
         m.waiting_key = None;
         m.dragging = None;
+        if m.store_page.is_some() {
+            self.shop_ask(ShopAsk::Refresh);
+        }
+        let m = &mut self.extras.menu;
         // Back from the HUD editor it is already open: no slide in again.
         if self.screen != Screen::HudEditor {
             m.opened = Some(std::time::Instant::now());
@@ -46,11 +53,28 @@ impl Game<'_> {
         }
         self.capture(false);
     }
+    /// The Store key: the Wisp Menu, opened on the Store.
+    pub(super) fn open_store(&mut self) {
+        let m = &mut self.extras.menu;
+        m.store_page = Some(StorePage::Shop);
+        m.friends_page = false;
+        m.open = None;
+        m.scroll = 0.0;
+        self.open_wisp_menu();
+    }
+    /// Hands the Shop's work to the Wisp server's thread (nothing without a server).
+    fn shop_ask(&self, ask: ShopAsk) {
+        if let Some(sharing) = &self.cosmetics.sharing {
+            sharing.shop(ask);
+        }
+    }
     pub(super) fn close_wisp_menu(&mut self) {
         self.save_menu_settings();
         let m = &mut self.extras.menu;
         m.search_focused = false;
         m.friend_focused = false;
+        m.store_focus = None;
+        m.store_confirm = None;
         m.confirm_remove = None;
         m.waiting_key = None;
         m.dragging = None;
@@ -65,6 +89,7 @@ impl Game<'_> {
         let cursor = self.cursor;
         let state = self.friends_state();
         let server = self.friends_server();
+        let shop = self.cosmetics.sharing.as_ref().map(|s| s.shop_state());
         let icons = {
             let atlas = &self.gui.atlas;
             let mut ui = Ui::new(atlas, batch, cursor);
@@ -73,10 +98,13 @@ impl Game<'_> {
                 state: state.as_ref(),
                 server: server.as_deref(),
             };
-            let icons = self
-                .extras
-                .menu
-                .draw(&mut ui, &self.settings.extras, &key_name, friends);
+            let icons = self.extras.menu.draw(
+                &mut ui,
+                &self.settings.extras,
+                &key_name,
+                friends,
+                shop.as_ref(),
+            );
             ui.finish();
             icons
         };
@@ -108,6 +136,15 @@ impl Game<'_> {
         }
         if !matches!(
             action,
+            Action::Store(StoreClick::Field(_) | StoreClick::Submit(_))
+        ) {
+            m.store_focus = None;
+        }
+        if !matches!(action, Action::Store(StoreClick::Remove(_))) {
+            m.store_confirm = None;
+        }
+        if !matches!(
+            action,
             Action::Friend(wisp_client::wisp_menu::FriendClick::Remove, _)
         ) {
             m.confirm_remove = None;
@@ -127,10 +164,13 @@ impl Game<'_> {
                 m.open = None;
                 m.scroll = 0.0;
                 m.friends_page = false;
+                m.store_page = None;
             }
+            Action::Store(click) => self.store_click(click),
             Action::Friends => {
                 let m = &mut self.extras.menu;
                 m.friends_page = true;
+                m.store_page = None;
                 m.scroll = 0.0;
                 if let Some(sharing) = &self.cosmetics.sharing {
                     sharing.friend(wisp_cosmetics::share::FriendAsk::Refresh);
@@ -194,6 +234,71 @@ impl Game<'_> {
             Action::Nothing => {}
         }
     }
+    /// A click on the Store, Creator or Admin page. Every purchase is priced and checked by the
+    /// Wisp server; the page shows its answer.
+    fn store_click(&mut self, click: StoreClick) {
+        let shop = self.cosmetics.sharing.as_ref().map(|s| s.shop_state());
+        let m = &mut self.extras.menu;
+        match click {
+            StoreClick::Page(page) => {
+                m.store_page = Some(page);
+                m.friends_page = false;
+                m.open = None;
+                m.scroll = 0.0;
+                m.store_input.clear();
+                self.shop_ask(ShopAsk::Refresh);
+            }
+            StoreClick::Kind(kind) => {
+                m.store_kind = kind;
+                m.scroll = 0.0;
+            }
+            StoreClick::Item(id) => {
+                let wallet = shop.and_then(|s| s.wallet).unwrap_or_default();
+                let ask = if wallet.equipped.iter().any(|e| e == id) {
+                    ShopAsk::Unequip(id.to_owned())
+                } else if wallet.owned.iter().any(|o| o == id) {
+                    ShopAsk::Equip(id.to_owned())
+                } else {
+                    ShopAsk::Buy(id.to_owned())
+                };
+                self.shop_ask(ask);
+            }
+            StoreClick::Field(field) => {
+                if m.store_focus != Some(field) {
+                    m.store_input.clear();
+                }
+                m.store_focus = Some(field);
+            }
+            StoreClick::Submit(field) => self.store_submit(field),
+            StoreClick::ClearSupport => self.shop_ask(ShopAsk::Support(None)),
+            StoreClick::Remove(i) => {
+                if m.store_confirm == Some(i) {
+                    m.store_confirm = None;
+                    if let Some(uuid) = m.store_creator(i).map(str::to_owned) {
+                        self.shop_ask(ShopAsk::AdminRemove(uuid));
+                    }
+                } else {
+                    m.store_confirm = Some(i);
+                }
+            }
+        }
+    }
+    /// The field's button (or Enter): what is typed goes to the server.
+    fn store_submit(&mut self, field: StoreField) {
+        let m = &mut self.extras.menu;
+        let text = m.store_input.trim().to_owned();
+        if m.store_focus != Some(field) || text.is_empty() {
+            m.store_focus = Some(field);
+            return;
+        }
+        m.store_input.clear();
+        m.store_focus = None;
+        self.shop_ask(match field {
+            StoreField::Support => ShopAsk::Support(Some(text)),
+            StoreField::Code => ShopAsk::SetCode(text),
+            StoreField::AdminName => ShopAsk::AdminAdd(text),
+        });
+    }
     /// The cursor moved: a held slider follows it.
     pub(super) fn wisp_menu_drag(&mut self) {
         let Some((f, s, x0, x1)) = self.extras.menu.dragging else {
@@ -229,6 +334,21 @@ impl Game<'_> {
             return;
         }
         let m = &mut self.extras.menu;
+        if let Some(field) = m.store_focus {
+            match code {
+                KeyCode::Escape => m.store_focus = None,
+                KeyCode::Enter | KeyCode::NumpadEnter => self.store_submit(field),
+                KeyCode::Backspace => {
+                    m.store_input.pop();
+                }
+                _ => {
+                    if let Some(text) = &event.text {
+                        self.wisp_menu_text(text);
+                    }
+                }
+            }
+            return;
+        }
         if m.friend_focused {
             match code {
                 KeyCode::Escape => m.friend_focused = false,
@@ -280,7 +400,7 @@ impl Game<'_> {
                         // On Friends, typing goes to the add field.
                         m.friend_focused = true;
                         self.wisp_menu_text(text);
-                    } else if m.open.is_none() {
+                    } else if m.open.is_none() && m.store_page.is_none() {
                         m.search_focused = true;
                         self.wisp_menu_text(text);
                     }
@@ -291,6 +411,18 @@ impl Game<'_> {
     /// Text typed into the search (keys, the input method or an agent's `type`).
     pub(super) fn wisp_menu_text(&mut self, text: &str) {
         let m = &mut self.extras.menu;
+        if m.store_focus.is_some() {
+            // Creator codes and Minecraft names alike: letters, digits and _, at most 16.
+            for c in text
+                .chars()
+                .filter(|c| c.is_ascii_alphanumeric() || *c == '_')
+            {
+                if m.store_input.len() < 16 {
+                    m.store_input.push(c);
+                }
+            }
+            return;
+        }
         if m.friend_focused {
             // Minecraft names: letters, digits and _, at most 16.
             for c in text

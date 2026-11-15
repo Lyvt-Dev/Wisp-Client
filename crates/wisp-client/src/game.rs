@@ -16517,6 +16517,21 @@ impl Game<'_> {
             self.open_wisp_menu();
             return Ok(());
         }
+        // Y: the Wisp Menu's Store, unless the player bound Y to something else.
+        if key == KeyCode::KeyY
+            && self.screen == Screen::Playing
+            && self.title.is_none()
+            && self
+                .settings
+                .keys
+                .translate_all(key)
+                .into_iter()
+                .next()
+                .is_none()
+        {
+            self.open_store();
+            return Ok(());
+        }
         if self.sort_key_press(key) || self.hdr_key_press(key) {
             return Ok(());
         }
