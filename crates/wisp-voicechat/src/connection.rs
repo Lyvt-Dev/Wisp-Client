@@ -21,8 +21,10 @@ struct Shared {
     id: u128,
     socket: OnceLock<UdpSocket>,
     stop: AtomicBool,
-    /// The authenticate ack's nonce, once it came.
-    nonce: Mutex<Option<[u8; 16]>>,
+    /// Version 20's authenticate body: the player and the secret.
+    legacy: Option<(u128, [u8; 16])>,
+    /// Set once the authenticate ack came, with version 21's nonce.
+    acked: Mutex<Option<Option<[u8; 16]>>>,
     connected: AtomicBool,
     failed: AtomicBool,
     last_keep_alive: Mutex<Instant>,
@@ -66,7 +68,9 @@ impl Connection {
             id: secret.connection_id,
             socket: OnceLock::new(),
             stop: AtomicBool::new(false),
-            nonce: Mutex::new(None),
+            legacy: (secret.version < protocol::VERSION_PRERELEASE)
+                .then_some((secret.player, secret.secret)),
+            acked: Mutex::new(None),
             connected: AtomicBool::new(false),
             failed: AtomicBool::new(false),
             last_keep_alive: Mutex::new(Instant::now()),
@@ -177,13 +181,14 @@ impl MicSender {
     }
 }
 
-/// Authenticate, then check the connection with the ack's nonce, once a second until it's up.
+/// Authenticate, then check the connection (with the ack's nonce in version 21), once a second
+/// until it's up.
 fn handshake(s: &Shared) {
     while !s.stop.load(Ordering::Relaxed) && !s.connected.load(Ordering::Relaxed) {
-        let nonce = *s.nonce.lock().expect("nonce lock");
-        match nonce {
-            None => s.send(&Packet::Authenticate),
-            Some(n) => s.send(&Packet::ConnectionCheck(n)),
+        let acked = *s.acked.lock().expect("ack lock");
+        match acked {
+            None => s.send(&Packet::Authenticate(s.legacy)),
+            Some(nonce) => s.send(&Packet::ConnectionCheck(nonce)),
         }
         // A second, in steps, so a closed connection stops at once.
         for _ in 0..10 {
@@ -229,7 +234,7 @@ fn receive(s: &Shared, sounds: &Sender<Sound>) {
         };
         match packet {
             Packet::AuthenticateAck(nonce) => {
-                let mut held = s.nonce.lock().expect("nonce lock");
+                let mut held = s.acked.lock().expect("ack lock");
                 if held.is_none() {
                     *held = Some(nonce);
                 }
@@ -250,7 +255,7 @@ fn receive(s: &Shared, sounds: &Sender<Sound>) {
                     return;
                 }
             }
-            Packet::Mic { .. } | Packet::Authenticate | Packet::ConnectionCheck(_) => {}
+            Packet::Mic { .. } | Packet::Authenticate(_) | Packet::ConnectionCheck(_) => {}
         }
     }
 }
@@ -270,6 +275,7 @@ mod tests {
             .unwrap();
         let key = [9u8; 16];
         let secret = Secret {
+            version: 21,
             secret: key,
             connection_id: 1234,
             port: i32::from(server.local_addr().unwrap().port()),
@@ -293,20 +299,20 @@ mod tests {
             (p, from)
         };
         let (p, client) = recv();
-        assert_eq!(p, Packet::Authenticate);
+        assert_eq!(p, Packet::Authenticate(None));
         let send = |p: &Packet| {
             server
                 .send_to(&protocol::to_client(&key, p).unwrap(), client)
                 .unwrap();
         };
-        send(&Packet::AuthenticateAck([5; 16]));
+        send(&Packet::AuthenticateAck(Some([5; 16])));
         loop {
             match recv().0 {
                 Packet::ConnectionCheck(n) => {
-                    assert_eq!(n, [5; 16]);
+                    assert_eq!(n, Some([5; 16]));
                     break;
                 }
-                Packet::Authenticate => {}
+                Packet::Authenticate(_) => {}
                 other => panic!("{other:?}"),
             }
         }
@@ -333,5 +339,59 @@ mod tests {
         };
         send(&Packet::Sound(sound.clone()));
         assert_eq!(rx.recv_timeout(Duration::from_secs(5)).unwrap(), sound);
+    }
+
+    /// A released (version 20) server: the player's uuid on every packet, the secret in the
+    /// authenticate packet, an empty ack and an empty connection check.
+    #[test]
+    fn the_released_handshake_against_a_local_server() {
+        let server = UdpSocket::bind("127.0.0.1:0").unwrap();
+        server
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .unwrap();
+        let key = [8u8; 16];
+        let secret = Secret {
+            version: 20,
+            secret: key,
+            connection_id: 55,
+            port: i32::from(server.local_addr().unwrap().port()),
+            player: 55,
+            codec: Codec::Voip,
+            mtu: 1024,
+            distance: 48.0,
+            keep_alive_ms: 1000,
+            groups: true,
+            voice_host: String::new(),
+            recording: true,
+        };
+        let (tx, _rx) = std::sync::mpsc::channel();
+        let local: Resolve = Arc::new(|_: &str| "127.0.0.1".into());
+        let conn = Connection::open(&secret, "localhost", local, tx).unwrap();
+        let mut buf = [0u8; 4096];
+        let mut recv = || {
+            let (n, from) = server.recv_from(&mut buf).unwrap();
+            let (id, p) = protocol::from_client(&key, &buf[..n]).unwrap();
+            assert_eq!(id, 55);
+            (p, from)
+        };
+        let (p, client) = recv();
+        assert_eq!(p, Packet::Authenticate(Some((55, key))));
+        let send = |p: &Packet| {
+            server
+                .send_to(&protocol::to_client(&key, p).unwrap(), client)
+                .unwrap();
+        };
+        send(&Packet::AuthenticateAck(None));
+        loop {
+            match recv().0 {
+                Packet::ConnectionCheck(None) => break,
+                Packet::Authenticate(_) => {}
+                other => panic!("{other:?}"),
+            }
+        }
+        send(&Packet::ConnectionCheckAck);
+        send(&Packet::KeepAlive);
+        assert_eq!(recv().0, Packet::KeepAlive);
+        assert_eq!(conn.status(), Status::Connected);
     }
 }

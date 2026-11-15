@@ -1242,6 +1242,31 @@ impl Streaming {
         }
         chunks
     }
+    /// Columns a server's chunk storage still holds but no longer shows: they stay loaded
+    /// and lit, their pending sections go and the caller takes their meshes out of the
+    /// renderer. Their sections wait (`waiting`) to mesh again once they are back in view.
+    pub fn park_columns(&mut self, world: &mut World, parked: &FxHashSet<(i32, i32)>) {
+        if parked.is_empty() {
+            return;
+        }
+        let sections = world.layout().sections() as i32;
+        forget_pending_sections(
+            &mut self.meshing,
+            &mut self.compile_started,
+            &mut self.waiting,
+            parked,
+            sections,
+        );
+        for &(x, z) in parked {
+            self.meshed.remove(&(x, z));
+            world.dirty_sections.take_column(x, z);
+            if world.chunks.contains_key(&(x, z)) {
+                self.waiting.extend((0..sections).map(|sy| (x, sy, z)));
+            }
+        }
+        // Checked again next update: the ones still in view mesh again at once.
+        self.waiting_area = ((i32::MIN, i32::MIN), -1, usize::MAX);
+    }
     /// Queue a job for the column `at`, nearest first: its distance (`distance`)
     /// times four plus `bias`, which orders a column's jobs. A job without a
     /// column (a save, meshes to free) goes ahead of every other.

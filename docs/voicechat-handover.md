@@ -26,7 +26,7 @@ generally allowed but a legal grey area; the owner was told and chose to go ahea
 ### 1. Crate `crates/wisp-voicechat` (complete, 12 tests pass, clippy clean)
 - `protocol.rs`: Minecraft buffer encodings, plugin channel payloads (`request_secret`,
   `secret`, `client_state`, `state`/`states`), all 10 UDP packet types, and AES-128-GCM with the
-  IV first. Compatibility version 21 (Simple Voice Chat 2.6/2.7 for 26.3).
+  IV first. Compatibility versions 20 (released 2.6.x) and 21 (2.7 prereleases), told apart by the secret's layout.
 - `connection.rs`: a UDP thread. It resolves the address, following SRV redirects through a
   resolver passed in, then sends Authenticate every second until the ack arrives, then the
   connection check, echoes keep-alives and pings, and detects a lost connection after 10 times

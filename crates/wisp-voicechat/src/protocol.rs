@@ -3,22 +3,29 @@
 use aes_gcm::aead::{Aead, KeyInit};
 use aes_gcm::{Aes128Gcm, Nonce};
 
-/// The protocol version this client speaks (Simple Voice Chat 2.6.x / 2.7.x, Minecraft 26.3).
-pub const COMPATIBILITY_VERSION: i32 = 21;
+/// The protocol versions this client speaks: 20 is every released Simple Voice Chat 2.6.x, 21 the
+/// 2.7 prereleases. A server only answers a request for its own version, so the client asks for
+/// 20 first and falls back to 21.
+pub const VERSION_RELEASE: i32 = 20;
+pub const VERSION_PRERELEASE: i32 = 21;
 /// The plugin channels.
 pub const REQUEST_SECRET: &str = "voicechat:request_secret";
 pub const SECRET: &str = "voicechat:secret";
+/// Version 21's mute and disable state.
 pub const CLIENT_STATE: &str = "voicechat:client_state";
+/// Version 20's: only disabled.
+pub const UPDATE_STATE: &str = "voicechat:update_state";
 pub const STATE: &str = "voicechat:state";
 pub const STATES: &str = "voicechat:states";
 pub const JOINED_GROUP: &str = "voicechat:joined_group";
 /// A player left: their uuid.
 pub const REMOVE_STATE: &str = "voicechat:remove_state";
 /// Every channel, for `minecraft:register`.
-pub const CHANNELS: [&str; 7] = [
+pub const CHANNELS: [&str; 8] = [
     REQUEST_SECRET,
     SECRET,
     CLIENT_STATE,
+    UPDATE_STATE,
     STATE,
     STATES,
     REMOVE_STATE,
@@ -192,7 +199,10 @@ pub enum Codec {
 /// `voicechat:secret`: what the client needs to open the UDP connection.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Secret {
+    /// The protocol version the layout showed (20 or 21).
+    pub version: i32,
     pub secret: [u8; 16],
+    /// What UDP packets to the server carry: version 20 uses the player's uuid.
     pub connection_id: u128,
     pub port: i32,
     pub player: u128,
@@ -206,13 +216,35 @@ pub struct Secret {
 }
 
 impl Secret {
+    /// Either version's layout (21 adds the connection id after the secret): whichever reads
+    /// the payload exactly.
     pub fn read(data: &[u8]) -> Result<Self, Error> {
-        let mut r = Reader::new(data);
+        let exact = |version| {
+            let mut r = Reader::new(data);
+            let s = Self::read_version(&mut r, version)?;
+            if r.remaining() != 0 {
+                return err("trailing bytes");
+            }
+            Ok(s)
+        };
+        exact(VERSION_RELEASE).or_else(|e| exact(VERSION_PRERELEASE).map_err(|_| e))
+    }
+
+    fn read_version(r: &mut Reader, version: i32) -> Result<Self, Error> {
+        let secret = r.raw16()?;
+        let connection_id = if version >= VERSION_PRERELEASE {
+            Some(r.uuid()?)
+        } else {
+            None
+        };
+        let port = r.i32()?;
+        let player = r.uuid()?;
         Ok(Self {
-            secret: r.raw16()?,
-            connection_id: r.uuid()?,
-            port: r.i32()?,
-            player: r.uuid()?,
+            version,
+            secret,
+            connection_id: connection_id.unwrap_or(player),
+            port,
+            player,
             codec: match r.u8()? {
                 1 => Codec::Audio,
                 2 => Codec::LowDelay,
@@ -256,17 +288,23 @@ impl Secret {
 }
 
 /// `voicechat:request_secret`.
-pub fn request_secret() -> Vec<u8> {
+pub fn request_secret(version: i32) -> Vec<u8> {
     let mut w = Writer::default();
-    w.i32(COMPATIBILITY_VERSION);
+    w.i32(version);
     w.data
 }
 
-/// `voicechat:client_state`.
-pub fn client_state(muted: bool, disabled: bool) -> Vec<u8> {
+/// The mute and disable state for the server: version 21's `voicechat:client_state`, or version
+/// 20's `voicechat:update_state` (which has no mute; muted just sends nothing).
+pub fn client_state(version: i32, muted: bool, disabled: bool) -> (&'static str, Vec<u8>) {
     let mut w = Writer::default();
-    w.bool(muted).bool(disabled);
-    w.data
+    if version >= VERSION_PRERELEASE {
+        w.bool(muted).bool(disabled);
+        (CLIENT_STATE, w.data)
+    } else {
+        w.bool(disabled);
+        (UPDATE_STATE, w.data)
+    }
 }
 
 /// `minecraft:register`: the channel ids, NUL-separated.
@@ -286,7 +324,23 @@ pub struct PlayerState {
 }
 
 impl PlayerState {
-    fn read(r: &mut Reader) -> Result<Self, Error> {
+    fn read(r: &mut Reader, version: i32) -> Result<Self, Error> {
+        if version < VERSION_PRERELEASE {
+            // Version 20: bool disabled, bool disconnected, uuid, name, optional group.
+            let disabled = r.bool()?;
+            let disconnected = r.bool()?;
+            let player = r.uuid()?;
+            let name = r.utf(32767)?;
+            let group = if r.bool()? { Some(r.uuid()?) } else { None };
+            return Ok(Self {
+                player,
+                name,
+                muted: false,
+                disabled,
+                disconnected,
+                group,
+            });
+        }
         let flags = r.u8()?;
         let player = r.uuid()?;
         let name = r.utf(256)?;
@@ -306,18 +360,18 @@ impl PlayerState {
     }
 
     /// `voicechat:state`.
-    pub fn read_one(data: &[u8]) -> Result<Self, Error> {
-        Self::read(&mut Reader::new(data))
+    pub fn read_one(data: &[u8], version: i32) -> Result<Self, Error> {
+        Self::read(&mut Reader::new(data), version)
     }
 
     /// `voicechat:states`.
-    pub fn read_all(data: &[u8]) -> Result<Vec<Self>, Error> {
+    pub fn read_all(data: &[u8], version: i32) -> Result<Vec<Self>, Error> {
         let mut r = Reader::new(data);
         let n = r.i32()?;
         if !(0..=100_000).contains(&n) {
             return err("bad state count");
         }
-        (0..n).map(|_| Self::read(&mut r)).collect()
+        (0..n).map(|_| Self::read(&mut r, version)).collect()
     }
 }
 
@@ -330,14 +384,16 @@ pub enum Packet {
         whispering: bool,
     },
     Sound(Sound),
-    Authenticate,
-    AuthenticateAck([u8; 16]),
+    /// Version 20 carries the player and the secret; 21 is empty.
+    Authenticate(Option<(u128, [u8; 16])>),
+    /// Version 21's ack carries a nonce for the connection check; 20's is empty.
+    AuthenticateAck(Option<[u8; 16]>),
     Ping {
         id: u128,
         timestamp: i64,
     },
     KeepAlive,
-    ConnectionCheck([u8; 16]),
+    ConnectionCheck(Option<[u8; 16]>),
     ConnectionCheckAck,
 }
 
@@ -410,11 +466,17 @@ impl Packet {
                     w.utf(c);
                 }
             }
-            Packet::Authenticate => {
+            Packet::Authenticate(legacy) => {
                 w.u8(5);
+                if let Some((player, secret)) = legacy {
+                    w.uuid(*player).raw(secret);
+                }
             }
             Packet::AuthenticateAck(n) => {
-                w.u8(6).raw(n);
+                w.u8(6);
+                if let Some(n) = n {
+                    w.raw(n);
+                }
             }
             Packet::Ping { id, timestamp } => {
                 w.u8(7).uuid(*id).i64(*timestamp);
@@ -423,7 +485,10 @@ impl Packet {
                 w.u8(8);
             }
             Packet::ConnectionCheck(n) => {
-                w.u8(9).raw(n);
+                w.u8(9);
+                if let Some(n) = n {
+                    w.raw(n);
+                }
             }
             Packet::ConnectionCheckAck => {
                 w.u8(10);
@@ -495,14 +560,17 @@ impl Packet {
                     category: category(&mut r, flags)?,
                 })
             }
-            5 => Packet::Authenticate,
-            6 => Packet::AuthenticateAck(r.raw16()?),
+            5 if r.remaining() == 0 => Packet::Authenticate(None),
+            5 => Packet::Authenticate(Some((r.uuid()?, r.raw16()?))),
+            6 if r.remaining() == 0 => Packet::AuthenticateAck(None),
+            6 => Packet::AuthenticateAck(Some(r.raw16()?)),
             7 => Packet::Ping {
                 id: r.uuid()?,
                 timestamp: r.i64()?,
             },
             8 => Packet::KeepAlive,
-            9 => Packet::ConnectionCheck(r.raw16()?),
+            9 if r.remaining() == 0 => Packet::ConnectionCheck(None),
+            9 => Packet::ConnectionCheck(Some(r.raw16()?)),
             10 => Packet::ConnectionCheckAck,
             other => return err(&format!("unknown packet type {other}")),
         })
@@ -607,6 +675,7 @@ mod tests {
             .i32(1000);
         w.bool(true).utf("").bool(true);
         let s = Secret::read(&w.data).unwrap();
+        assert_eq!(s.version, 21);
         assert_eq!(s.secret, [7; 16]);
         assert_eq!((s.connection_id, s.port, s.player), (1, 24454, 2));
         assert_eq!(
@@ -617,6 +686,40 @@ mod tests {
             s.address("play.example.net"),
             ("play.example.net".into(), 24454)
         );
+    }
+
+    #[test]
+    fn a_released_servers_secret_has_no_connection_id() {
+        let mut w = Writer::default();
+        w.raw(&[7; 16])
+            .i32(24454)
+            .uuid(2)
+            .u8(0)
+            .i32(1024)
+            .f64(48.0)
+            .i32(1000);
+        w.bool(true).utf("").bool(true);
+        let s = Secret::read(&w.data).unwrap();
+        assert_eq!(s.version, 20);
+        // Version 20's UDP packets carry the player's uuid.
+        assert_eq!((s.connection_id, s.port, s.player), (2, 24454, 2));
+        assert_eq!((s.mtu, s.distance, s.keep_alive_ms), (1024, 48.0, 1000));
+    }
+
+    #[test]
+    fn released_states_read_their_booleans() {
+        let mut w = Writer::default();
+        w.i32(2);
+        w.bool(false).bool(false).uuid(10).utf("Alex").bool(false);
+        w.bool(true)
+            .bool(true)
+            .uuid(11)
+            .utf("Steve")
+            .bool(true)
+            .uuid(99);
+        let states = PlayerState::read_all(&w.data, 20).unwrap();
+        assert!(!states[0].disabled && states[0].group.is_none() && states[0].name == "Alex");
+        assert!(states[1].disabled && states[1].disconnected && states[1].group == Some(99));
     }
 
     #[test]
@@ -680,7 +783,10 @@ mod tests {
                 },
                 category: Some("music".into()),
             }),
-            Packet::AuthenticateAck([4; 16]),
+            Packet::AuthenticateAck(Some([4; 16])),
+            Packet::AuthenticateAck(None),
+            Packet::Authenticate(Some((12, [6; 16]))),
+            Packet::ConnectionCheck(None),
             Packet::Ping {
                 id: 77,
                 timestamp: 123,
@@ -719,7 +825,7 @@ mod tests {
         assert!(Packet::decode(&[1, 0x80, 0x80, 0x80, 0x80, 0x80, 0x01]).is_err());
         assert!(Packet::decode(&[0]).is_err() && Packet::decode(&[11]).is_err());
         assert!(Secret::read(&[0; 20]).is_err());
-        assert!(PlayerState::read_all(&(-1i32).to_be_bytes()).is_err());
+        assert!(PlayerState::read_all(&(-1i32).to_be_bytes(), 21).is_err());
         // Garbage datagrams: a pseudo-random sweep of lengths and bytes.
         let mut x = 0x2545_F491_4F6C_DD1Du64;
         for len in 0..300 {
@@ -734,7 +840,8 @@ mod tests {
             let _ = Packet::decode(&bytes);
             let _ = from_server(&key, &bytes);
             let _ = Secret::read(&bytes);
-            let _ = PlayerState::read_all(&bytes);
+            let _ = PlayerState::read_all(&bytes, 20);
+            let _ = PlayerState::read_all(&bytes, 21);
         }
     }
 
@@ -744,7 +851,7 @@ mod tests {
         w.i32(2);
         w.u8(0x01).uuid(10).utf("Alex");
         w.u8(0x24).uuid(11).utf("Steve").uuid(99);
-        let states = PlayerState::read_all(&w.data).unwrap();
+        let states = PlayerState::read_all(&w.data, 21).unwrap();
         assert!(states[0].muted && !states[0].disabled && states[0].group.is_none());
         assert!(states[1].disabled && states[1].group == Some(99) && states[1].name == "Steve");
     }

@@ -246,6 +246,51 @@ impl ChunkDecoder {
     }
 }
 
+/// `ClientChunkCache.Storage`'s slots: the column last stored in each, by `getIndex`
+/// (`floorMod` of the coordinates by the storage's width). Two columns inside the storage
+/// never share a slot, so a column stored in a taken slot replaces one outside it.
+#[derive(Default)]
+pub(super) struct ChunkRing {
+    width: i32,
+    slots: wisp_client::fast_hash::FxHashMap<(i32, i32), (i32, i32)>,
+}
+
+impl ChunkRing {
+    /// The width of the storage for a server view distance: `calculateStorageRange` (the
+    /// distance, at least two, plus three) each way of the centre, and the centre.
+    pub(super) fn width_for(view_distance: i32) -> i32 {
+        (view_distance.max(2) + 3) * 2 + 1
+    }
+
+    pub(super) fn width(&self) -> i32 {
+        self.width
+    }
+
+    /// A new storage of `width` holding `columns`.
+    pub(super) fn reset(&mut self, width: i32, columns: impl IntoIterator<Item = (i32, i32)>) {
+        self.width = width.max(1);
+        self.slots.clear();
+        for (x, z) in columns {
+            self.slots.insert(self.slot(x, z), (x, z));
+        }
+    }
+
+    pub(super) fn clear(&mut self) {
+        self.slots.clear();
+    }
+
+    fn slot(&self, x: i32, z: i32) -> (i32, i32) {
+        let w = self.width.max(1);
+        (x.rem_euclid(w), z.rem_euclid(w))
+    }
+
+    /// Stores the column: the other column its slot held, if any.
+    pub(super) fn store(&mut self, x: i32, z: i32) -> Option<(i32, i32)> {
+        let old = self.slots.insert(self.slot(x, z), (x, z))?;
+        (old != (x, z)).then_some(old)
+    }
+}
+
 pub(super) enum Next {
     Ready(Decoded),
     Decoding,
@@ -286,6 +331,8 @@ impl Game<'_> {
             }
         };
         let (x, z) = (p.x, p.z);
+        // Storage.replace: the column this one's slot held goes.
+        self.evict_remote_chunk_slot(x, z);
         // A column sent again while it is resident (a bulk edit): only what changed is lit and meshed again.
         if self.world.chunks.contains_key(&(x, z)) {
             wisp_client::spans::time("replace_remote", || {
@@ -381,6 +428,27 @@ impl Game<'_> {
 mod tests {
     use super::*;
     use wisp_protocol::chunk::{ChunkData, Paletted, Section as Wire, Strategy as Wiring};
+
+    /// A view distance of 2 makes a storage 5 + 2 * 3 = 11 wide. A column stored where an
+    /// out-of-range one sits (11 columns away, negatives too) replaces it; a column sent again
+    /// replaces nothing; a resized storage files its columns by the new width.
+    #[test]
+    fn a_stored_column_replaces_only_the_one_in_its_slot() {
+        let mut ring = ChunkRing::default();
+        ring.reset(ChunkRing::width_for(2), [(0, 0), (3, -4)]);
+        assert_eq!(ring.width(), 11);
+        assert_eq!(ring.store(0, 0), None);
+        assert_eq!(ring.store(1, 0), None);
+        assert_eq!(ring.store(12, 0), Some((1, 0)));
+        assert_eq!(ring.store(-10, 0), Some((12, 0)));
+        assert_eq!(ring.store(3, 7), Some((3, -4)));
+        assert_eq!(ring.store(0, -11), Some((0, 0)));
+        // Below a view distance of 2 the storage keeps its smallest size.
+        assert_eq!(ChunkRing::width_for(0), 11);
+        ring.reset(ChunkRing::width_for(10), [(0, 0), (11, 0)]);
+        assert_eq!(ring.store(11, 0), None);
+        assert_eq!(ring.store(27, 0), Some((0, 0)));
+    }
 
     /// A column of `state` with biome 1 everywhere, unlit.
     fn packet(x: i32, state: i32) -> Box<C> {

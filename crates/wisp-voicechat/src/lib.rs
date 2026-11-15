@@ -81,6 +81,10 @@ pub struct VoiceChat {
     states: HashMap<u128, PlayerState>,
     /// Whether the server answered the request: it runs voice chat.
     available: bool,
+    /// The protocol version asked for last, then the one the server's secret showed.
+    version: i32,
+    /// When to ask again with the prerelease version if the server hasn't answered.
+    fallback_at: Option<Instant>,
 }
 
 impl VoiceChat {
@@ -100,6 +104,8 @@ impl VoiceChat {
             retry_at: None,
             states: HashMap::new(),
             available: false,
+            version: protocol::VERSION_RELEASE,
+            fallback_at: None,
         };
         v.apply(settings);
         v
@@ -148,8 +154,11 @@ impl VoiceChat {
     }
 
     fn send_state(&mut self) {
-        let payload = protocol::client_state(self.settings.muted, self.settings.disabled);
-        self.outgoing.push((protocol::CLIENT_STATE, payload));
+        self.outgoing.push(protocol::client_state(
+            self.version,
+            self.settings.muted,
+            self.settings.disabled,
+        ));
     }
 
     /// The player joined a server (`host` as they typed it, without the port; `resolve` follows
@@ -160,8 +169,14 @@ impl VoiceChat {
         self.resolve = resolve;
         self.outgoing
             .push(("minecraft:register", protocol::register()));
+        self.request(protocol::VERSION_RELEASE);
+        self.fallback_at = Some(Instant::now() + Duration::from_secs(5));
+    }
+
+    fn request(&mut self, version: i32) {
+        self.version = version;
         self.outgoing
-            .push((protocol::REQUEST_SECRET, protocol::request_secret()));
+            .push((protocol::REQUEST_SECRET, protocol::request_secret(version)));
     }
 
     /// The player left the server.
@@ -169,6 +184,8 @@ impl VoiceChat {
         self.session = None;
         self.available = false;
         self.retry_at = None;
+        self.fallback_at = None;
+        self.version = protocol::VERSION_RELEASE;
         self.states.clear();
         self.controls.transmitting.store(false, Ordering::Relaxed);
     }
@@ -183,19 +200,22 @@ impl VoiceChat {
         match channel {
             protocol::SECRET => match Secret::read(data) {
                 Ok(secret) => {
+                    log::info!("Wisp voice chat: server speaks version {}", secret.version);
                     self.available = true;
+                    self.fallback_at = None;
+                    self.version = secret.version;
                     self.send_state();
                     self.start(secret);
                 }
-                Err(e) => log::warn!("Wisp voice chat: bad secret: {e}"),
+                Err(e) => log::warn!("Wisp voice chat: bad secret ({} bytes): {e}", data.len()),
             },
             protocol::STATE => {
-                if let Ok(s) = PlayerState::read_one(data) {
+                if let Ok(s) = PlayerState::read_one(data, self.version) {
                     self.states.insert(s.player, s);
                 }
             }
             protocol::STATES => {
-                if let Ok(all) = PlayerState::read_all(data) {
+                if let Ok(all) = PlayerState::read_all(data, self.version) {
                     self.states = all.into_iter().map(|s| (s.player, s)).collect();
                 }
             }
@@ -266,8 +286,16 @@ impl VoiceChat {
             && Instant::now() >= at
         {
             self.retry_at = None;
-            self.outgoing
-                .push((protocol::REQUEST_SECRET, protocol::request_secret()));
+            self.request(self.version);
+        }
+        if let Some(at) = self.fallback_at
+            && Instant::now() >= at
+        {
+            // No answer to the release version: maybe a 2.7 prerelease server.
+            self.fallback_at = None;
+            if !self.available {
+                self.request(protocol::VERSION_PRERELEASE);
+            }
         }
         let Some(s) = &self.session else {
             return;
@@ -354,7 +382,7 @@ mod tests {
         );
         assert_eq!(
             out[1],
-            (protocol::REQUEST_SECRET, 21i32.to_be_bytes().to_vec())
+            (protocol::REQUEST_SECRET, 20i32.to_be_bytes().to_vec())
         );
         assert_eq!(v.state(), State::Unavailable);
         assert!(!v.payload("other:thing", &[]));
@@ -370,12 +398,19 @@ mod tests {
         assert!(v.take_outgoing().is_empty());
         v.available = true;
         v.apply(Settings::default());
-        assert_eq!(v.take_outgoing(), [(protocol::CLIENT_STATE, vec![0, 0])]);
+        assert_eq!(v.take_outgoing(), [(protocol::UPDATE_STATE, vec![0])]);
+        v.version = protocol::VERSION_PRERELEASE;
+        v.apply(Settings {
+            muted: true,
+            ..Settings::default()
+        });
+        assert_eq!(v.take_outgoing(), [(protocol::CLIENT_STATE, vec![1, 0])]);
     }
 
     #[test]
     fn a_removed_state_forgets_the_player() {
         let mut v = VoiceChat::new(Settings::default());
+        v.version = protocol::VERSION_PRERELEASE;
         let mut w = protocol::Writer::default();
         w.u8(0).uuid(42).utf("Alex");
         assert!(v.payload(protocol::STATE, &w.data));

@@ -6,7 +6,7 @@
 //! clicks). The player still moves with the local physics, as the vanilla
 //! client predicts its own movement; the server stays authoritative for
 //! everything else.
-use super::remote_chunks::{ChunkDecoder, ChunkFormat, Next};
+use super::remote_chunks::{ChunkDecoder, ChunkFormat, ChunkRing, Next};
 use super::{Dim, Game, Mining, Screen};
 use std::{
     collections::{HashMap, VecDeque},
@@ -689,6 +689,8 @@ pub(super) struct Remote {
     clock_game_time: i64,
     /// `ClientChunkCache.Storage`'s view centre (ClientboundSetChunkCacheCenterPacket).
     chunk_center: (i32, i32),
+    /// `ClientChunkCache.Storage`'s slots.
+    chunk_ring: ChunkRing,
     /// Received events a frame left for the next one, in order, and when
     /// the oldest of them first waited (`poll_remote`).
     backlog: VecDeque<Received>,
@@ -1107,6 +1109,7 @@ impl Game<'_> {
             clock_partial: 0.0,
             clock_game_time: 0,
             chunk_center: (0, 0),
+            chunk_ring: Default::default(),
             backlog: VecDeque::new(),
             backlog_since: None,
             server_links: Vec::new(),
@@ -1809,7 +1812,10 @@ impl Game<'_> {
                 && let C::ForgetLevelChunk(p) = &**packet
             {
                 self.native_client_packet(packet);
-                forgotten.insert((p.pos[0], p.pos[1]));
+                // ClientChunkCache.drop: only a column inside the storage.
+                if self.remote_chunk_in_range(p.pos[0], p.pos[1]) {
+                    forgotten.insert((p.pos[0], p.pos[1]));
+                }
                 continue;
             }
             self.forget_remote_columns(&mut forgotten);
@@ -2216,6 +2222,7 @@ impl Game<'_> {
                 r.level_player_textures.clear();
                 // A new ClientLevel: a new chunk storage, centred on 0, 0.
                 r.chunk_center = (0, 0);
+                r.chunk_ring.clear();
             }
             self.clear_lod();
             self.pending_uploads.clear();
@@ -2256,16 +2263,62 @@ impl Game<'_> {
             (x - r.chunk_center.0).abs() <= range && (z - r.chunk_center.1).abs() <= range
         })
     }
-    /// The columns a moved or resized storage no longer holds.
-    fn drop_remote_chunks_out_of_range(&mut self) {
-        let mut gone: wisp_client::fast_hash::FxHashSet<(i32, i32)> = self
-            .world
+    /// The columns outside the storage around the view centre.
+    fn remote_chunks_out_of_range(&self) -> wisp_client::fast_hash::FxHashSet<(i32, i32)> {
+        self.world
             .chunks
             .keys()
             .copied()
             .filter(|&(x, z)| !self.remote_chunk_in_range(x, z))
-            .collect();
+            .collect()
+    }
+    /// `updateViewRadius`: a new storage of the new size keeps only the columns inside it.
+    fn drop_remote_chunks_out_of_range(&mut self) {
+        let mut gone = self.remote_chunks_out_of_range();
         self.forget_remote_columns(&mut gone);
+        self.rebuild_remote_chunk_ring();
+    }
+    /// `updateViewCenter`: the columns outside the moved storage stay, unseen. Their
+    /// sections leave the renderer and mesh again once back in view.
+    fn park_remote_chunks_out_of_range(&mut self) {
+        let parked = self.remote_chunks_out_of_range();
+        if parked.is_empty() {
+            return;
+        }
+        self.streaming.park_columns(&mut self.world, &parked);
+        if let Some(renderer) = self.renderer.as_mut() {
+            renderer.remove_columns(parked.iter().copied());
+        }
+    }
+    /// The storage's width: `calculateStorageRange` each way of the centre, and it.
+    fn remote_chunk_ring_width(&self) -> i32 {
+        self.remote
+            .as_ref()
+            .map_or(1, |r| ChunkRing::width_for(r.view_distance))
+    }
+    fn rebuild_remote_chunk_ring(&mut self) {
+        let width = self.remote_chunk_ring_width();
+        let keys: Vec<(i32, i32)> = self.world.chunks.keys().copied().collect();
+        if let Some(r) = self.remote.as_mut() {
+            r.chunk_ring.reset(width, keys);
+        }
+    }
+    /// `Storage.replace` for a column about to be stored: the one stored in its slot before,
+    /// a column outside the storage now, goes.
+    pub(super) fn evict_remote_chunk_slot(&mut self, x: i32, z: i32) {
+        if self
+            .remote
+            .as_ref()
+            .is_some_and(|r| r.chunk_ring.width() != self.remote_chunk_ring_width())
+        {
+            self.rebuild_remote_chunk_ring();
+        }
+        let Some(old) = self.remote.as_mut().and_then(|r| r.chunk_ring.store(x, z)) else {
+            return;
+        };
+        if self.world.chunks.contains_key(&old) {
+            self.forget_remote_columns(&mut [old].into_iter().collect());
+        }
     }
     /// Forgets the `gone` columns (and empties the set): their chunks (freed on a thread
     /// of their own when there are many), their sections in the renderer and their block
@@ -3214,7 +3267,9 @@ impl Game<'_> {
             C::ChunksBiomes(p) => self.remote_chunks_biomes(&p),
             // `poll_remote` forgets a run of them at once.
             C::ForgetLevelChunk(p) => {
-                self.forget_remote_columns(&mut [(p.pos[0], p.pos[1])].into_iter().collect());
+                if self.remote_chunk_in_range(p.pos[0], p.pos[1]) {
+                    self.forget_remote_columns(&mut [(p.pos[0], p.pos[1])].into_iter().collect());
+                }
             }
             C::ChunkBatchFinished(_) => {
                 // ChunkBatchSizeCalculator's ceiling; meshing runs on workers.
@@ -4894,17 +4949,25 @@ impl Game<'_> {
             }
             C::SetChunkCacheRadius(p) => {
                 self.streaming.radius = self.render_distance_in_use().min(p.distance + 1).max(2);
+                let width = self.remote_chunk_ring_width();
                 if let Some(r) = self.remote.as_mut() {
                     r.view_distance = p.distance;
                 }
-                // ClientChunkCache.updateViewRadius: a new storage of that size.
-                self.drop_remote_chunks_out_of_range();
+                // ClientChunkCache.updateViewRadius: a new storage of that size, when
+                // the size changed (the hidden columns stay otherwise).
+                if self.remote_chunk_ring_width() != width {
+                    self.drop_remote_chunks_out_of_range();
+                }
             }
+            // ClientChunkCache.updateViewCenter only moves the storage's centre: the
+            // columns now outside it stay stored, hidden, until the centre comes back or
+            // a column for the same slot replaces them. A server that moves the centre
+            // away and back (a teleport) doesn't send them again.
             C::SetChunkCacheCenter(p) => {
                 if let Some(r) = self.remote.as_mut() {
                     r.chunk_center = (p.x, p.z);
                 }
-                self.drop_remote_chunks_out_of_range();
+                self.park_remote_chunks_out_of_range();
             }
             C::BlockEntityData(p) => self.remote_block_entity_data(p.pos, p.kind, &p.tag),
             C::OpenSignEditor(p) => self.remote_open_sign_editor(p),

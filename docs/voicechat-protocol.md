@@ -4,7 +4,10 @@ Wisp's voice chat (`crates/wisp-voicechat`) talks to servers that run the Simple
 mod or plugin, so Wisp players can talk with Java players who have it. It is a clean-room
 implementation for interoperability: it was written from this description of the wire protocol,
 and contains no code, assets or translations of the original mod (which is "All Rights
-Reserved"). Compatibility version: **21** (Simple Voice Chat 2.6.x / 2.7.x for Minecraft 26.3).
+Reserved"). Compatibility versions: **20** (every released Simple Voice Chat 2.6.x,
+on Paper, Fabric and the rest) and **21** (the 2.7 prereleases). The tables below are version 21;
+see "Version 20" for what differs. The client asks for 20 first and, with no answer after 5 s,
+for 21; it tells the two apart by the secret's layout.
 
 Last checked on 2026-11-14 against the official 2.7.0-pre1+26.3 sources (branch `26.3`, commit
 `137d62f`, `voicechat_compatibility_version=21`, `mod_compatible_version=2.6.x`). Every layout
@@ -89,3 +92,18 @@ empty opus data ends a stretch of speech (decoder reset). Sequence numbers count
 from 0; gaps up to a few frames are concealed by the decoder. Received sound is keyed by the
 channel uuid. Player sound is placed at the sender's position, dropped past `distance + 1` and
 faded linearly to 0 at `distance`; group sound is not placed.
+
+## Version 20 (released 2.6.x)
+
+Checked on 2026-11-14 against branch `2.6.x/26.3` (`mod_version=2.6.28+26.3`,
+`voicechat_compatibility_version=20`). Everything not listed matches version 21.
+
+- `voicechat:secret` has no connection id: 16 raw bytes secret, i32 UDP port, uuid player, then
+  the rest as above. UDP packets to the server carry the **player** uuid where 21 has the
+  connection id.
+- Mute and disable go on `voicechat:update_state` with only bool disabled (no
+  `voicechat:client_state`). Muted simply sends nothing.
+- Player state: bool disabled, bool disconnected, uuid player, utf(32767) name, bool has group,
+  [uuid group].
+- Authenticate (5) carries uuid player then the 16 raw bytes secret; Authenticate ack (6) and
+  Connection check (9) are empty.
