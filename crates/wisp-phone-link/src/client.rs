@@ -13,6 +13,8 @@ pub struct Hello {
     pub name: String,
     /// `wisp-resources.json`'s schema (0 when the PC has no prepared files).
     pub schema: i64,
+    /// The Wisp server the launcher uses (Store, cosmetics, friends), if it has one.
+    pub wisp_server: Option<String>,
 }
 
 /// A download's progress: bytes so far of the whole.
@@ -79,6 +81,10 @@ pub fn hello(addr: SocketAddr) -> io::Result<Hello> {
         version: field("version"),
         name: field("name"),
         schema: value["schema"].as_i64().unwrap_or(0),
+        wisp_server: value["wisp_server"]
+            .as_str()
+            .map(|s| s.trim().to_owned())
+            .filter(|s| !s.is_empty()),
     })
 }
 
@@ -214,6 +220,7 @@ mod tests {
                 version: "26.3".into(),
                 name: "Test PC".into(),
                 code: "123456".into(),
+                wisp_server: Some("https://wisp.example".into()),
             },
         )
         .unwrap();
@@ -235,6 +242,7 @@ mod tests {
                 version: "26.3".into(),
                 name: "Test PC".into(),
                 schema: 7,
+                wisp_server: Some("https://wisp.example".into()),
             }
         );
         let to = scratch("to").join("26.3");

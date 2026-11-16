@@ -55,6 +55,8 @@ const GREEN: u32 = hex(0x22C55E, 235);
 const GREEN_SOFT: u32 = hex(0x22C55E, 40);
 const RED: u32 = hex(0xFF6B6B, 230);
 const CARD_MIN: f32 = 210.0;
+/// Store and Friends without a Wisp server on the phone, which takes it from the PC launcher.
+pub(super) const PHONE_NO_SERVER: &str = "The phone uses your PC launcher's Wisp server: set it there (Settings, General, Wisp server), then restart the app and tap Get them again under the game files.";
 const GAP: f32 = 12.0;
 
 /// Coins with thousands grouped: 12,000.
@@ -112,10 +114,14 @@ impl Menu {
                 ui,
                 (mx, my + 60.0, mw),
                 &lang::get_or("wisp.menu.store.no_server", "No Wisp server"),
-                &lang::get_or(
-                    "wisp.menu.store.no_server_hint",
-                    "The Shop runs on the Wisp server: set its address in the launcher, Settings, General.",
-                ),
+                &if cfg!(target_os = "android") {
+                    lang::get_or("wisp.menu.no_server_hint_phone", PHONE_NO_SERVER)
+                } else {
+                    lang::get_or(
+                        "wisp.menu.store.no_server_hint",
+                        "The Shop runs on the Wisp server: set its address in the launcher, Settings, General.",
+                    )
+                },
             );
             return;
         };

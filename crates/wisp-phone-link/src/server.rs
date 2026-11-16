@@ -18,6 +18,9 @@ pub struct Offer {
     pub name: String,
     /// The code the player types on the phone.
     pub code: String,
+    /// The Wisp server (Store, cosmetics, friends) set in the launcher, if any: the phone uses
+    /// the same one.
+    pub wisp_server: Option<String>,
 }
 
 #[derive(Default)]
@@ -203,8 +206,12 @@ fn serve(mut stream: TcpStream, offer: &Offer, state: &State) -> io::Result<()> 
                 .and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok())
                 .and_then(|v| v.get("schema")?.as_i64())
                 .unwrap_or(0);
+            let wisp_server = offer
+                .wisp_server
+                .as_deref()
+                .map_or_else(|| "null".to_owned(), json_string);
             let body = format!(
-                "{{\"protocol\":{},\"version\":{},\"name\":{},\"schema\":{schema}}}",
+                "{{\"protocol\":{},\"version\":{},\"name\":{},\"schema\":{schema},\"wisp_server\":{wisp_server}}}",
                 json_string(crate::PROTOCOL),
                 json_string(&offer.version),
                 json_string(&offer.name)

@@ -1,16 +1,19 @@
 //! Offers a prepared folder to a phone as the launcher's Settings › Phone does, for testing the
 //! app without the launcher (the Android emulator reaches this PC at 10.0.2.2):
 //!
-//!   cargo run -p wisp-phone-link --example offer -- <resources/26.3> [code]
+//!   cargo run -p wisp-phone-link --example offer -- <resources/26.3> [code] [wisp server]
 fn main() {
     let mut args = std::env::args().skip(1);
-    let root = args.next().expect("usage: offer <prepared folder> [code]");
+    let root = args
+        .next()
+        .expect("usage: offer <prepared folder> [code] [wisp server]");
     let code = args.next().unwrap_or_else(wisp_phone_link::new_code);
     let server = wisp_phone_link::Server::start(wisp_phone_link::Offer {
         root: root.into(),
         version: "26.3".into(),
         name: "Test PC".into(),
         code: code.clone(),
+        wisp_server: std::env::args().nth(3),
     })
     .expect("a free port");
     let _responder = wisp_phone_link::Responder::start(server.port(), "Test PC");

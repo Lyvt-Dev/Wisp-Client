@@ -5,7 +5,7 @@ pub mod msa;
 pub mod setup;
 pub mod text;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
 /// The phone's folders.
@@ -40,6 +40,45 @@ pub fn open_url(url: &str) {
     match PLATFORM.get() {
         Some(platform) => (platform.open_url)(url),
         None => crate::game::open_link(url),
+    }
+}
+
+/// The file in the private folder that keeps the PC launcher's Wisp server.
+const WISP_SERVER_FILE: &str = "wisp-server.txt";
+
+/// Keeps the Wisp server the PC's launcher uses (the files came from it), or forgets it when
+/// that launcher has none.
+pub fn save_wisp_server(private: &Path, server: Option<&str>) {
+    let file = private.join(WISP_SERVER_FILE);
+    let result = match server.map(str::trim).filter(|s| !s.is_empty()) {
+        Some(server) => {
+            std::fs::create_dir_all(private).and_then(|()| std::fs::write(&file, server))
+        }
+        None => match std::fs::remove_file(&file) {
+            Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e),
+            _ => Ok(()),
+        },
+    };
+    if let Err(e) = result {
+        log::warn!("Wisp: couldn't keep the Wisp server address: {e}");
+    }
+}
+
+/// The Wisp server saved by [`save_wisp_server`].
+pub fn wisp_server(private: &Path) -> Option<String> {
+    std::fs::read_to_string(private.join(WISP_SERVER_FILE))
+        .ok()
+        .map(|s| s.trim().to_owned())
+        .filter(|s| !s.is_empty())
+}
+
+/// Turns on the Store, cosmetics and friends for this run with the saved Wisp server, as the
+/// PC launcher does for the game it starts (`WISP_COSMETICS`, `WISP_COSMETICS_API`). Call
+/// before the game starts: some of them are read once.
+pub fn use_wisp_server(paths: &Paths) {
+    if let Some(server) = wisp_server(&paths.private) {
+        wisp_compat::set_override("WISP_COSMETICS", "1");
+        wisp_compat::set_override("WISP_COSMETICS_API", server);
     }
 }
 

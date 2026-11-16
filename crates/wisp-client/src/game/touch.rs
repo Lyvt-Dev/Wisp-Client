@@ -4,7 +4,7 @@
 //! side turns the view, a short tap there uses or places, holding still there breaks or attacks
 //! (as phones play Minecraft), buttons for jump, sneak, inventory, drop, chat, perspective and
 //! pause, and a tap on the hotbar picks its slot. Over a menu a finger is the mouse: a tap clicks,
-//! holding still right-clicks, a drag scrolls.
+//! holding still over item slots right-clicks (splits a stack), a drag scrolls.
 //!
 //! Everything goes through the paths the keyboard, mouse and controller take (`mapped_key`,
 //! `play_mouse`, `look_turn`, the move vector), so key bindings, toggles and servers see the same.
@@ -20,7 +20,7 @@ use wisp_client::held::Source;
 use wisp_client::hud::HudBatch;
 use wisp_client::ui_theme::{Ui, color};
 
-/// Holding still this long breaks (playing) or right-clicks (a menu).
+/// Holding still this long breaks (playing) or right-clicks (over item slots).
 const HOLD: Duration = Duration::from_millis(300);
 /// A finger that moved less than this (in units, see [`Layout::unit`]) still taps or holds.
 const STILL: f64 = 0.12;
@@ -103,6 +103,8 @@ pub(super) struct TouchControls {
     pub(super) taps_since_focus: u32,
     /// A text field had the focus at the last look.
     pub(super) field_focused: bool,
+    /// The touch controls played at the last frame.
+    was_playing: bool,
 }
 
 /// Where the controls are, in physical pixels, from the window's size and the GUI scale.
@@ -372,7 +374,13 @@ impl Game<'_> {
         let playing = self.touch_playing();
         if !playing {
             self.touch_release_world()?;
+            // A screen opened from a button: the pointer left at the window's middle when the
+            // game let go of it, which would light a button or open a tooltip there.
+            if std::mem::take(&mut self.touch.was_playing) {
+                self.touch_pointer_away(event_loop);
+            }
         }
+        self.touch.was_playing = playing;
         for i in 0..self.touch.fingers.len() {
             let finger = self.touch.fingers[i];
             let still = distance(finger.start, finger.at) <= STILL * layout.unit;
@@ -391,7 +399,7 @@ impl Game<'_> {
                 Role::Pointer {
                     scrolled: false,
                     right: false,
-                } if still && held && !playing => {
+                } if still && held && !playing && self.touch_hold_right_clicks() => {
                     self.touch_pointer_to(event_loop, finger.at);
                     self.touch_pointer_button(event_loop, MouseButton::Right, true);
                     self.touch.fingers[i].role = Role::Pointer {
@@ -403,6 +411,14 @@ impl Game<'_> {
             }
         }
         Ok(())
+    }
+
+    /// Where a held finger is a right click: the screens with item slots (inventory,
+    /// containers, stations, creative), where it splits a stack. Elsewhere nothing takes a right
+    /// click, and a tap near the bottom edge reaches the app late (the system's gesture
+    /// navigation holds it back first), so it must stay a left click there.
+    fn touch_hold_right_clicks(&self) -> bool {
+        self.title.is_none() && matches!(self.screen, Screen::Inventory | Screen::Creative)
     }
 
     /// A screen opened over the world: the stick, a held break and held buttons let go, as the

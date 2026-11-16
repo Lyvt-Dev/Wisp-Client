@@ -21868,6 +21868,7 @@ pub fn run_with() -> Result<()> {
         if !phone_setup::show(&paths, &settings)? {
             return Ok(());
         }
+        wisp_client::phone::use_wisp_server(&paths);
         if let Some(name) = wisp_client::phone::start_session(&paths) {
             options.player_name = Some(name);
         }

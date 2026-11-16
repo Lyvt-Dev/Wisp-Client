@@ -30,18 +30,17 @@ wisp-android (android target).
 
 ## Open, in this order
 
-1. **Menu taps on title sub-screens are lost** (world list rows, "Create New World", likely the
-   Wisp Menu too). Main title menu, in-game buttons, hotbar, inventory work. Pattern: a click only
-   lands when the pointer was already there for a drawn frame. `touch.rs` already delays the click
-   until `Game::frames` advanced past the pointer move (`touch_flush_click`), and `touch_frame`
-   runs in `idle`; still lost. Next step: add a `log::info!` in `touch_flush_click` and in the
-   title `MouseInput Pressed` branch (`game.rs`, `t.click(self.cursor…)`), rebuild, tap a world
-   row, read `adb logcat -s wisp`. Suspects: the title sub-screens hit-test against hover state
-   from their last draw (look in `crates/wisp-client-render/src/screen_draw.rs` and the title
-   screen module for a stored hover), or the trailing `touch_pointer_away` CursorMoved(-1e4)
-   resets it before the click is handled. Try sending the press in one loop iteration and the
-   release + pointer-away in the next.
-2. After that works: verify the star opens the Wisp Menu (Store/cosmetics) by touch.
+1. ~~Menu taps on title sub-screens are lost~~ **fixed and verified (2026-11-16, emulator):** the
+   cause was the emulator's slow frames (>300 ms): `touch_frame` saw a tap as a held finger and
+   sent a right click, which the title screens ignore. A held finger now right-clicks only over
+   item slots (`touch_hold_right_clicks`: Inventory, Creative). World row, Play Selected World,
+   the star (Wisp Menu), a module toggle and the menu's tabs all react to a tap now.
+2. ~~Star opens the Wisp Menu~~ **verified.** The phone now also takes the PC launcher's Wisp
+   server with the game files (`Hello::wisp_server` in `wisp-phone-link`, kept in
+   `private/wisp-server.txt`, set for the run through `wisp_compat::set_override`). Store and
+   Friends say "No Wisp server" with a phone hint when the launcher has none (`SERVICE` is empty
+   by default, so the owner must set one in the launcher before pairing). Not yet seen with a
+   real server: the emulator's files were copied before this.
 3. Push `android-port` after the fix. CI: `android` workflow builds the signed release APK
    (secrets are set), `local-launcher` builds the 0.15.1 Windows installer (artifact; it only
    publishes from main). Check that the `android` run of the last push went green (the first one

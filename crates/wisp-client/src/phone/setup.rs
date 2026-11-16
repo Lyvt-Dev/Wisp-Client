@@ -769,6 +769,7 @@ impl Setup {
         let cancel = self.new_job();
         let shared = Arc::clone(&self.shared);
         let target = self.paths.resources.clone();
+        let private = self.paths.private.clone();
         {
             let mut s = shared.lock().unwrap();
             s.busy = true;
@@ -779,7 +780,8 @@ impl Setup {
         let _ = std::thread::Builder::new()
             .name("phone-link-download".into())
             .spawn(move || {
-                let result = fetch(pc.addr, &code, &target, &cancel, &shared);
+                let result = fetch(pc.addr, &code, &target, &cancel, &shared)
+                    .map(|wisp_server| super::save_wisp_server(&private, wisp_server.as_deref()));
                 let mut s = shared.lock().unwrap();
                 s.busy = false;
                 if cancel.load(Ordering::Relaxed) {
@@ -806,7 +808,7 @@ fn fetch(
     target: &std::path::Path,
     cancel: &AtomicBool,
     shared: &Mutex<Shared>,
-) -> Result<(), (Step, String)> {
+) -> Result<Option<String>, (Step, String)> {
     let unreachable = |e: &dyn std::fmt::Display| {
         (
             Step::FindPc,
@@ -850,7 +852,8 @@ fn fetch(
                 tf("copy_failed", &[("error", &e.to_string())]),
             ),
         }
-    })
+    })?;
+    Ok(hello.wisp_server)
 }
 
 #[cfg(test)]
@@ -979,6 +982,7 @@ mod tests {
                 version: wisp_core::VANILLA_VERSION.into(),
                 name: "PC".into(),
                 code: "246810".into(),
+                wisp_server: Some("https://wisp.example".into()),
             },
         )
         .unwrap();
@@ -1002,6 +1006,10 @@ mod tests {
         setup.settle();
         assert_eq!(setup.step, Step::Home);
         assert!(setup.files_ready());
+        assert_eq!(
+            super::super::wisp_server(&paths.private).as_deref(),
+            Some("https://wisp.example")
+        );
         assert_eq!(
             std::fs::read(paths.resources.join("assets/x.png"))
                 .unwrap()

@@ -701,6 +701,7 @@
   "wisp.menu.friends.loading": "Connecting to the Wisp server…",
   "wisp.menu.friends.no_server": "No Wisp server is set",
   "wisp.menu.friends.no_server_hint": "Set its address in the launcher: Settings, General, Wisp server. Then start the game again.",
+  "wisp.menu.no_server_hint_phone": "The phone uses your PC launcher's Wisp server: set it there (Settings, General, Wisp server), then restart the app and tap Get them again under the game files.",
   "wisp.menu.friends.none": "No friends yet",
   "wisp.menu.friends.none_hint": "Type a Minecraft name above and press Add. They need to have opened Wisp once.",
   "wisp.menu.friends.offline": "Offline",

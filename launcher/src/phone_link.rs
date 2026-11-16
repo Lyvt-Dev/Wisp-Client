@@ -65,6 +65,7 @@ impl PhoneLink {
             version: version.to_owned(),
             name: pc_name(),
             code: code.clone(),
+            wisp_server: crate::shop::service(),
         })
         .map_err(|e| format!("Couldn't open a port for the phone: {e}"))?;
         // Another launcher may hold the discovery port: the phone can still type the address.

@@ -139,10 +139,14 @@ impl Menu {
                 ui,
                 (mx, my + 80.0, mw),
                 &lang::get_or("wisp.menu.friends.no_server", "No Wisp server is set"),
-                &lang::get_or(
-                    "wisp.menu.friends.no_server_hint",
-                    "Set its address in the launcher: Settings, General, Wisp server. Then start the game again.",
-                ),
+                &if cfg!(target_os = "android") {
+                    lang::get_or("wisp.menu.no_server_hint_phone", super::store::PHONE_NO_SERVER)
+                } else {
+                    lang::get_or(
+                        "wisp.menu.friends.no_server_hint",
+                        "Set its address in the launcher: Settings, General, Wisp server. Then start the game again.",
+                    )
+                },
             );
             return;
         };
