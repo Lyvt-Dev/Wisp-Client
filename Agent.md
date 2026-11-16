@@ -344,6 +344,35 @@ Do not rewrite main or force a changed remote branch. Preserve local changes and
 - Releases: the `local-launcher` workflow publishes from `main`. On a private repository it needs
   Actions minutes; the public repository has them free.
 
+## 0.15.1 Wisp for Android (branch android-port)
+
+- The owner asked for the Wisp Client on phones with everything (cosmetics etc.), released as an
+  APK on GitHub from a new branch. Owner decisions: the game files come from the player's own PC
+  over the local network (they come out of Mojang's Java code and can't ship in the APK), Android
+  10+, arm64, Vulkan (wgpu falls back to GLES), a release key Claude made.
+- Architecture and build: `docs/android.md`. `crates/wisp-android` (NativeActivity, no Java),
+  `crates/wisp-client/src/phone/` (setup screen = the phone's launcher, Microsoft device-code
+  sign-in, German/English), `game/touch.rs` (touch controls), `crates/wisp-phone-link` +
+  `launcher/src/phone_link.rs` (Settings › Phone › Connect a phone), `packaging/android/`
+  (`build-apk.sh` without Gradle), `.github/workflows/android.yml`.
+- Release key: `%USERPROFILE%\Documents\Wisp-Android-Signatur` (keystore + password file, the
+  owner must back it up) and the secrets `WISP_ANDROID_KEYSTORE_BASE64`, `_PASS`, `_KEY_ALIAS` in
+  Lyvt-Dev/Wisp-Client. Lose it and phones refuse every update over the installed app.
+- Local tooling (ignored): `.local/tooling/android` (JDK 17, SDK, NDK 27, CMake, emulator, AVD
+  `wisp-test`). `packaging/android/env.sh` finds it. `cargo run -p wisp-phone-link --example
+  offer -- <resources/26.3>` offers files like the launcher (emulator reaches the PC at 10.0.2.2).
+- Verified in the Android 14 emulator (x86_64 with arm64 translation, SwiftShader, so slow): the
+  setup screen, copying the owner's prepared 26.3 files (747 MB) from this PC, the Microsoft code
+  and the browser intent, background and back, the game loading on the shared event loop, the
+  title screen, a new world, joystick, look, hotbar, inventory, back button, soft keyboard.
+  Not verified: a real phone, a signed-in session, the Store/cosmetics on the phone, voice chat.
+- Fixed for phones on the way: mimalloc local-dynamic TLS (dlopen), file systems without locks
+  (worlds and the log), one winit event loop per process (`run_app` + replayed `resumed`), the
+  surface dropped/recreated with the background, 16 KB page alignment.
+- Known: a quick tap right at the bottom edge of a menu was missed in the emulator (gesture nav);
+  Bluetooth controllers are off (gilrs/hidapi); no microphone permission prompt; no system
+  clipboard.
+
 ## Unreleased: four emotes, Wisp Original Cape and Stray Head
 
 - The owner asked (2026-11-13) for emotes Dark Ascension (dark energy envelops the player), Bruh

@@ -36,9 +36,11 @@ enum Button {
     Chat,
     Perspective,
     Pause,
+    /// The Wisp Menu (Right Shift on a PC): the Store, cosmetics, emotes, friends, modules.
+    WispMenu,
 }
 
-const BUTTONS: [Button; 7] = [
+const BUTTONS: [Button; 8] = [
     Button::Jump,
     Button::Sneak,
     Button::Inventory,
@@ -46,6 +48,7 @@ const BUTTONS: [Button; 7] = [
     Button::Chat,
     Button::Perspective,
     Button::Pause,
+    Button::WispMenu,
 ];
 
 #[derive(Clone, Copy, Debug)]
@@ -89,6 +92,17 @@ pub(super) struct TouchControls {
     sneak_latched: bool,
     /// Scroll left over below one line.
     scroll: f64,
+    /// The frame (`Game::frames`) the pointer last moved in, and where it went.
+    moved_at: u64,
+    pointer: Option<(f64, f64)>,
+    /// A tap over a menu waiting for a frame drawn with the pointer where it landed: menus click
+    /// what the last frame showed under the pointer, and a quick tap can end before that frame.
+    pending_click: Option<(f64, f64)>,
+    /// Taps since a text field took the focus: the phone's keyboard shows after one, so a field
+    /// a screen focuses by itself (the world list's search) doesn't push it up.
+    pub(super) taps_since_focus: u32,
+    /// A text field had the focus at the last look.
+    pub(super) field_focused: bool,
 }
 
 /// Where the controls are, in physical pixels, from the window's size and the GUI scale.
@@ -123,9 +137,11 @@ impl Layout {
             Button::Sneak => ((w - 3.2 * u, h - 1.1 * u), 0.6 * u),
             Button::Inventory => ((w / 2.0 + bar + 0.6 * u, bar_y), 0.45 * u),
             Button::Drop => ((w / 2.0 - bar - 0.6 * u, bar_y), 0.45 * u),
-            Button::Pause => ((w - 0.7 * u, 0.7 * u), 0.42 * u),
-            Button::Chat => ((w - 1.85 * u, 0.7 * u), 0.42 * u),
-            Button::Perspective => ((w - 3.0 * u, 0.7 * u), 0.42 * u),
+            // Top left: the top right is where toasts (advancements, the tutorial) appear.
+            Button::Pause => ((0.7 * u, 0.7 * u), 0.42 * u),
+            Button::Chat => ((1.85 * u, 0.7 * u), 0.42 * u),
+            Button::Perspective => ((3.0 * u, 0.7 * u), 0.42 * u),
+            Button::WispMenu => ((4.15 * u, 0.7 * u), 0.42 * u),
         }
     }
 
@@ -326,19 +342,15 @@ impl Game<'_> {
                     Role::Hotbar => {}
                     Role::Pointer { scrolled, right } => {
                         self.touch.scroll = 0.0;
-                        if !scrolled && !cancelled {
+                        if right {
+                            self.touch_pointer_button(event_loop, MouseButton::Right, false);
+                            self.touch_pointer_away(event_loop);
+                        } else if !scrolled && !cancelled {
                             self.touch_pointer_to(event_loop, at);
-                            if right {
-                                self.touch_pointer_button(event_loop, MouseButton::Right, false);
-                            } else {
-                                self.touch_pointer_button(event_loop, MouseButton::Left, true);
-                                self.touch_pointer_button(event_loop, MouseButton::Left, false);
-                            }
-                        }
-                        // No finger, no hover: the pointer leaves, so no button stays lit and
-                        // no tooltip stays open where the last tap was.
-                        if self.touch.fingers.is_empty() {
-                            self.touch_pointer_to(event_loop, (-1.0e4, -1.0e4));
+                            self.touch.pending_click = Some(at);
+                            self.touch_flush_click(event_loop);
+                        } else {
+                            self.touch_pointer_away(event_loop);
                         }
                     }
                 }
@@ -356,6 +368,7 @@ impl Game<'_> {
         let Some(layout) = self.touch_layout() else {
             return Ok(());
         };
+        self.touch_flush_click(event_loop);
         let playing = self.touch_playing();
         if !playing {
             self.touch_release_world()?;
@@ -448,6 +461,12 @@ impl Game<'_> {
                 self.touch.sneak_latched = !self.touch.sneak_latched;
                 self.touch_key(KeyCode::ShiftLeft, self.touch.sneak_latched)
             }
+            Button::WispMenu => {
+                if down {
+                    self.open_wisp_menu();
+                }
+                Ok(())
+            }
             Button::Inventory | Button::Chat | Button::Perspective | Button::Pause => {
                 if !down {
                     return Ok(());
@@ -473,7 +492,42 @@ impl Game<'_> {
         }
     }
 
+    /// Clicks a waiting tap once a frame has been drawn with the pointer on it.
+    fn touch_flush_click(&mut self, event_loop: &dyn EventLoopCtl) {
+        let Some(at) = self.touch.pending_click else {
+            return;
+        };
+        if self.frames <= self.touch.moved_at {
+            return;
+        }
+        self.touch.pending_click = None;
+        self.touch.taps_since_focus = self.touch.taps_since_focus.saturating_add(1);
+        self.touch_pointer_to(event_loop, at);
+        self.touch_pointer_button(event_loop, MouseButton::Left, true);
+        self.touch_pointer_button(event_loop, MouseButton::Left, false);
+        self.touch_pointer_away(event_loop);
+    }
+
+    /// No finger, no hover: the pointer leaves, so no button stays lit and no tooltip stays open
+    /// where the last tap was.
+    fn touch_pointer_away(&mut self, event_loop: &dyn EventLoopCtl) {
+        if self.touch.fingers.is_empty() && self.touch.pending_click.is_none() {
+            self.touch.pointer = None;
+            self.touch_window_event(
+                event_loop,
+                WindowEvent::CursorMoved {
+                    device_id: DeviceId::dummy(),
+                    position: PhysicalPosition::new(-1.0e4, -1.0e4),
+                },
+            );
+        }
+    }
+
     fn touch_pointer_to(&mut self, event_loop: &dyn EventLoopCtl, at: (f64, f64)) {
+        if self.touch.pointer != Some(at) {
+            self.touch.pointer = Some(at);
+            self.touch.moved_at = self.frames;
+        }
         self.touch_window_event(
             event_loop,
             WindowEvent::CursorMoved {
@@ -609,6 +663,12 @@ fn draw_glyph(ui: &mut Ui, button: Button, x: f32, y: f32, r: f32, ink: u32) {
                 color::with_alpha(color::hex(0x000000, 255), 0.6),
             );
             ui.circle(x, y, s * 0.3, ink);
+        }
+        Button::WispMenu => {
+            // Wisp's four-pointed star.
+            let (l, n) = (s * 1.1, s * 0.28);
+            ui.quad([[x, y - l], [x + n, y], [x, y + l], [x - n, y]], ink);
+            ui.quad([[x - l, y], [x, y - n], [x + l, y], [x, y + n]], ink);
         }
         Button::Pause => {
             ui.rounded(x - s * 0.6, y - s * 0.75, s * 0.4, s * 1.5, s * 0.1, ink);

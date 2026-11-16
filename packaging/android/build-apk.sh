@@ -74,7 +74,7 @@ else
   fi
   name="Wisp-Client-$version-android-arm64-debug.apk"
 fi
-"$bt/apksigner$bat" sign --ks "$keystore" --ks-pass "pass:$pass" --key-pass "pass:$pass" \
+"$bt/apksigner$bat" sign --v4-signing-enabled false --ks "$keystore" --ks-pass "pass:$pass" --key-pass "pass:$pass" \
   --ks-key-alias "$alias" --out "$out/$name" "$work/aligned.apk"
 "$bt/apksigner$bat" verify "$out/$name"
 (cd "$out" && sha256sum "$name" > "$name.sha256")

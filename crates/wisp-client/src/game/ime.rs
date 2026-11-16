@@ -44,7 +44,16 @@ impl Game<'_> {
 
     /// Allow the input method only while a text box has focus.
     pub(super) fn sync_ime(&mut self) {
-        let want = self.text_field_focused();
+        let focused = self.text_field_focused();
+        if focused != self.touch.field_focused {
+            self.touch.field_focused = focused;
+            self.touch.taps_since_focus = 0;
+        }
+        // With touch, the on-screen keyboard waits for a tap: it would cover half the screen
+        // whenever a screen focuses its field by itself.
+        // Chat and a sign are opened to type: their keyboard comes at once.
+        let to_type = self.screen == Screen::Chat || self.sign_edit.is_some();
+        let want = focused && (!self.touch.active || to_type || self.touch.taps_since_focus > 0);
         if want != self.ime_allowed
             && let Some(window) = &self.window
         {

@@ -1,3 +1,86 @@
+# Handover: Wisp for Android (2026-11-16, branch `android-port`)
+
+The owner asked for the Wisp Client on phones (Android APK, everything incl. cosmetics), released
+on GitHub from a new branch. **Status: the app works in the emulator end to end; not released
+yet.** The general handover from 2026-11-13 follows further down. Details: `docs/android.md`,
+`Agent.md` › "0.15.1 Wisp for Android".
+
+## Where it is
+
+- Branch **`android-port`** (local, tracks `wisp/android-port` on Lyvt-Dev/Wisp-Client), based on
+  `store-and-creators`, all pushed. The last commit adds the Wisp-Menu touch button (star), the
+  top buttons at the top left, the keyboard only after a tap, phone first-start options
+  (`tutorialStep:none`, render distance 8) and the CI fixes; it was built and run in the emulator
+  except the star (blocked by item 1 below).
+- Version **0.15.1** (`launcher/Cargo.toml`): launcher gets Settings › Phone › Connect a phone,
+  the APK has the same version. Notes: `packaging/android/releases/0.15.1.md`,
+  `packaging/windows/releases/0.15.1.md`.
+- Owner decisions: game files come from the player's own PC over Wi-Fi (they are made by Mojang's
+  Java code and can't ship in the APK); Android 10+, arm64; release key made by Claude.
+
+## What is done and verified (Android 14 emulator, x86_64 + arm64 translation, SwiftShader)
+
+Setup screen (de/en), copying the real prepared 26.3 files (747 MB) from this PC through
+`wisp-phone-link`, Microsoft device code + browser intent, background/foreground (surface
+recreated), the game on the shared event loop, title screen, new world (saved and listed again),
+joystick, look, hotbar tap, inventory, back button, soft keyboard. Tests: `cargo test -p
+wisp-phone-link` (12), `cargo test -p wisp-client --lib -- phone:: touch::` (13). Clippy `-D
+warnings` clean on wisp-client, wisp-phone-link, wisp-client-input, wisp-voicechat, launcher,
+wisp-android (android target).
+
+## Open, in this order
+
+1. **Menu taps on title sub-screens are lost** (world list rows, "Create New World", likely the
+   Wisp Menu too). Main title menu, in-game buttons, hotbar, inventory work. Pattern: a click only
+   lands when the pointer was already there for a drawn frame. `touch.rs` already delays the click
+   until `Game::frames` advanced past the pointer move (`touch_flush_click`), and `touch_frame`
+   runs in `idle`; still lost. Next step: add a `log::info!` in `touch_flush_click` and in the
+   title `MouseInput Pressed` branch (`game.rs`, `t.click(self.cursor…)`), rebuild, tap a world
+   row, read `adb logcat -s wisp`. Suspects: the title sub-screens hit-test against hover state
+   from their last draw (look in `crates/wisp-client-render/src/screen_draw.rs` and the title
+   screen module for a stored hover), or the trailing `touch_pointer_away` CursorMoved(-1e4)
+   resets it before the click is handled. Try sending the press in one loop iteration and the
+   release + pointer-away in the next.
+2. After that works: verify the star opens the Wisp Menu (Store/cosmetics) by touch.
+3. Push `android-port` after the fix. CI: `android` workflow builds the signed release APK
+   (secrets are set), `local-launcher` builds the 0.15.1 Windows installer (artifact; it only
+   publishes from main). Check that the `android` run of the last push went green (the first one
+   failed only on the missing exec bit, fixed since).
+4. Test the CI release APK: `adb shell pm uninstall -k dev.wisp.client` (keeps the copied files),
+   `adb install` it, start, Play.
+5. Release: `gh release create android-v0.15.1` on `android-port` with the APK (+ .sha256) and the
+   Windows `Wisp-Client-0.15.1-Setup-x64.exe` from the CI artifact (the phone needs the new
+   launcher to pair), notes from `packaging/android/releases/0.15.1.md`. Don't merge to main
+   without the owner (that publishes launcher-v0.15.1).
+
+Known limits (in the release notes): no Bluetooth controllers, no mic permission prompt, no system
+clipboard, a quick tap at the very bottom edge in menus was missed (gesture nav).
+
+## Tools for this work (all under ignored `.local/tooling`)
+
+- `. packaging/android/env.sh` sets Rust, JDK 17, SDK, NDK 27, CMake/Ninja for the Android target.
+- APK: `bash packaging/android/build-apk.sh --profile fast` (~8-12 min incremental, debug key in
+  `.local/android-debug.jks`) → `dist/android/`. Release profile = LTO, much longer.
+- Emulator: `ANDROID_AVD_HOME=.local/tooling/android/avd .local/tooling/android/sdk/emulator/emulator.exe
+  -avd wisp-test -no-window -no-audio -gpu swiftshader_indirect`; adb in `sdk/platform-tools`.
+  Screenshots: `adb exec-out screencap -p > shot.png`; taps: `adb shell input tap X Y` (2400x1080).
+  The emulator already has the game files and a world, so Play works right away.
+- Offer files like the launcher: `target/release/examples/offer.exe <resources/26.3> 135790`, phone
+  address `10.0.2.2` in the emulator (broadcast discovery doesn't cross the emulator NAT).
+- Release key: `%USERPROFILE%\Documents\Wisp-Android-Signatur` (keystore + PASSWORT-LESEN.txt);
+  the owner must back it up. Secrets `WISP_ANDROID_KEYSTORE_BASE64`, `WISP_ANDROID_KEYSTORE_PASS`,
+  `WISP_ANDROID_KEY_ALIAS` on Lyvt-Dev/Wisp-Client.
+
+## Side question the owner asked (answered in chat)
+
+Running a Wisp server on Arch Linux: build `wisp-server` and `wisp-client` there (`cargo build
+--release -p wisp-server`, `cargo build --release --no-default-features -p wisp-client --bin
+wisp-client`, same folder), copy the PC's `%LOCALAPPDATA%\wisp-local-launcher
+esources.3`
+and `wisp-server import-resources` it, then `wisp-server init` / `start` (docs/hosting.md).
+
+---
+
 # Handover: where things stand (2026-11-13)
 
 Read [Agent.md](Agent.md) for the project rules and history; this page is the current state and

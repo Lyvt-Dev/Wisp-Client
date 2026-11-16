@@ -54,7 +54,7 @@ jobs:
         env:
           WISP_ANDROID_KEYSTORE_PASS: ${{ secrets.WISP_ANDROID_KEYSTORE_PASS }}
           WISP_ANDROID_KEY_ALIAS: ${{ secrets.WISP_ANDROID_KEY_ALIAS }}
-        run: packaging/android/build-apk.sh --profile release --out dist/android
+        run: bash packaging/android/build-apk.sh --profile release --out dist/android
       - uses: actions/upload-artifact@v4
         with:
           name: wisp-android
