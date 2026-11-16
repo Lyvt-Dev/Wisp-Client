@@ -1,8 +1,8 @@
 # Handover: Wisp for Android (2026-11-16, branch `android-port`)
 
 The owner asked for the Wisp Client on phones (Android APK, everything incl. cosmetics), released
-on GitHub from a new branch. **Status: the app works in the emulator end to end; not released
-yet.** The general handover from 2026-11-13 follows further down. Details: `docs/android.md`,
+on GitHub from a new branch. **Status: released as `android-v0.15.1` (2026-11-16), tested in the
+emulator.** The general handover from 2026-11-13 follows further down. Details: `docs/android.md`,
 `Agent.md` › "0.15.1 Wisp for Android".
 
 ## Where it is
@@ -47,10 +47,15 @@ wisp-android (android target).
    copied files go too). Then: setup, address 10.0.2.2 + code, 747 MB copied with a test Wisp
    server, Play, Create New World by tap, star, Store tab shows the offers ("Sign in with
    Microsoft to use the Shop"), no tutorial toast on the fresh options.
-5. Release: `gh release create android-v0.15.1` on `android-port` with the APK (+ .sha256) and the
-   Windows `Wisp-Client-0.15.1-Setup-x64.exe` from the CI artifact (the phone needs the new
-   launcher to pair), notes from `packaging/android/releases/0.15.1.md`. Don't merge to main
-   without the owner (that publishes launcher-v0.15.1).
+5. ~~Release~~ **published 2026-11-16:** https://github.com/Lyvt-Dev/Wisp-Client/releases/tag/android-v0.15.1
+   (APK + .sha256, `Wisp-Client-0.15.1-Setup-x64.exe` + .sha256 from CI run 43954363180), made
+   with `--latest=false`: the website and `install.sh`/`install.ps1` use `releases/latest` and
+   need a `launcher-v*` release there (0.14.9 stays Latest). The launcher's updater only reads
+   `launcher-v*`, so PCs reach 0.15.1 only by installing it from this page or once `android-port`
+   is merged to main (the owner decides; that publishes launcher-v0.15.1).
+
+Still open: try it on a real phone; the owner must set a Wisp server in the launcher (Settings ›
+General) before pairing, otherwise Store and Friends stay off on the phone (`SERVICE` is empty).
 
 Known limits (in the release notes): no Bluetooth controllers, no mic permission prompt, no system
 clipboard, a quick tap at the very bottom edge in menus was missed (gesture nav).
