@@ -41,12 +41,12 @@ wisp-android (android target).
    Friends say "No Wisp server" with a phone hint when the launcher has none (`SERVICE` is empty
    by default, so the owner must set one in the launcher before pairing). Not yet seen with a
    real server: the emulator's files were copied before this.
-3. Push `android-port` after the fix. CI: `android` workflow builds the signed release APK
-   (secrets are set), `local-launcher` builds the 0.15.1 Windows installer (artifact; it only
-   publishes from main). Check that the `android` run of the last push went green (the first one
-   failed only on the missing exec bit, fixed since).
-4. Test the CI release APK: `adb shell pm uninstall -k dev.wisp.client` (keeps the copied files),
-   `adb install` it, start, Play.
+3. ~~Push, CI~~ **done:** `d9ed5405` pushed; `android` run 43954363330 green (signed APK).
+4. ~~Test the CI release APK~~ **done (2026-11-16):** the release key differs from the debug key,
+   so `pm uninstall -k` is not enough: a full `adb uninstall dev.wisp.client` is needed (the
+   copied files go too). Then: setup, address 10.0.2.2 + code, 747 MB copied with a test Wisp
+   server, Play, Create New World by tap, star, Store tab shows the offers ("Sign in with
+   Microsoft to use the Shop"), no tutorial toast on the fresh options.
 5. Release: `gh release create android-v0.15.1` on `android-port` with the APK (+ .sha256) and the
    Windows `Wisp-Client-0.15.1-Setup-x64.exe` from the CI artifact (the phone needs the new
    launcher to pair), notes from `packaging/android/releases/0.15.1.md`. Don't merge to main
