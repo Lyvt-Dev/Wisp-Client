@@ -85,5 +85,6 @@ jobs:
             exit 0
           fi
           ls dist/android/*-debug.apk >/dev/null 2>&1 && { echo "No release key: not publishing a debug-signed APK."; exit 1; }
+          # Not "Latest": the website and install scripts take releases/latest as the launcher.
           gh release create "$tag" dist/android/* --target "$GITHUB_SHA" \
-            --title "Wisp for Android $version" --notes-file "$notes"
+            --title "Wisp for Android $version" --notes-file "$notes" --latest=false
