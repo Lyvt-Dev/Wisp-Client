@@ -54,6 +54,16 @@ wisp-android (android target).
    `launcher-v*`, so PCs reach 0.15.1 only by installing it from this page or once `android-port`
    is merged to main (the owner decides; that publishes launcher-v0.15.1).
 
+**Merged to main 2026-11-16** (fast-forward, plus `34ed5e66`: Android releases from main use
+`--latest=false`). `launcher-v0.15.1` is published and Latest, but **by hand**: the workflow's
+`publish-release` job got `HTTP 403: Resource not accessible by integration` on
+`POST /releases` (also after creating the tag with the owner's token and a rerun; repository
+default workflow permissions are "read", the job asks for `contents: write`). Done instead with
+the owner's `gh`: tag on `0e694d41`, `gh release create --verify-tag --draft` with the run's
+artifacts, `gh release edit --draft=false --latest`. Before the next launcher release, check
+Settings › Actions › General › Workflow permissions ("Read and write") or publish by hand again.
+(Windows PowerShell 5.1 can't run `publish-release.ps1`: gh's stderr stops it; it needs pwsh.)
+
 Still open: try it on a real phone; the owner must set a Wisp server in the launcher (Settings ›
 General) before pairing, otherwise Store and Friends stay off on the phone (`SERVICE` is empty).
 
