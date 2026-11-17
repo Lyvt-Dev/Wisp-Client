@@ -68,8 +68,8 @@ impl Launcher {
             })
     }
 
-    /// The friends column on the right. The launcher has no friends service: it shows the
-    /// player and how to play together through invite codes.
+    /// Social: the friends panel over the right of the page, opened from the top bar. The
+    /// player, then adding friends, requests, friends, daily coins and servers.
     pub(super) fn friends_panel(&self, cx: &mut Context<Self>) -> Stateful<Div> {
         let s = self.ui_scale;
         let presence = if self.child.is_some() {
@@ -79,98 +79,111 @@ impl Launcher {
         } else {
             tr("Not signed in")
         };
+        let online = self.friends.as_ref().map_or(0, |f| f.online());
         div()
             .id("friends-panel")
-            .w(px(340. * s))
+            .w(px(360. * s))
             .h_full()
             .flex_none()
             .flex()
             .flex_col()
             .overflow_hidden()
-            .rounded(px(18. * s))
+            .rounded(px(20. * s))
             .border_1()
             .border_color(rgba(0xffffff1a))
-            .bg(rgba(0x111215f2))
+            .bg(rgba(0x111215f5))
             .shadow(vec![gpui::BoxShadow {
-                color: rgba(0x00000080).into(),
-                offset: gpui::point(px(0.), px(12. * s)),
-                blur_radius: px(40. * s),
+                color: rgba(0x00000099).into(),
+                offset: gpui::point(px(0.), px(16. * s)),
+                blur_radius: px(48. * s),
                 spread_radius: px(0.),
                 inset: false,
             }])
             .occlude()
             .child(
                 div()
-                    .h(px(52. * s))
                     .flex_none()
-                    .px(px(18. * s))
+                    .px(px(20. * s))
+                    .pt(px(18. * s))
+                    .pb(px(12. * s))
                     .flex()
                     .items_center()
-                    .justify_between()
+                    .gap(px(10. * s))
                     .child(
                         div()
-                            .flex()
-                            .items_baseline()
-                            .gap(px(6. * s))
-                            .child(
-                                div()
-                                    .text_size(px(17. * s))
-                                    .font_weight(FontWeight::SEMIBOLD)
-                                    .child(tr("Friends")),
-                            )
-                            .child(
-                                div()
-                                    .text_size(px(14. * s))
-                                    .text_color(rgb(MUTED))
-                                    .child(trf(
-                                        "({count} online)",
-                                        &[(
-                                            "count",
-                                            &self
-                                                .friends
-                                                .as_ref()
-                                                .map_or(0, |f| f.online())
-                                                .to_string(),
-                                        )],
-                                    )),
-                            ),
+                            .text_size(px(24. * s))
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .child(tr("Social")),
                     )
                     .child(
                         div()
-                            .id("friends-servers")
-                            .text_size(px(13. * s))
-                            .text_color(rgb(MUTED))
+                            .px(px(10. * s))
+                            .py(px(3. * s))
+                            .rounded_full()
+                            .bg(rgba(0xffffff12))
+                            .flex()
+                            .items_center()
+                            .gap(px(6. * s))
+                            .text_size(px(12. * s))
+                            .text_color(rgb(0xd9dadd))
+                            .child(
+                                div()
+                                    .size(px(7. * s))
+                                    .rounded_full()
+                                    .bg(rgb(if online > 0 { 0x4ade80 } else { 0x5b5d65 })),
+                            )
+                            .child(trf("{count} online", &[("count", &online.to_string())])),
+                    )
+                    .child(div().flex_1())
+                    .child(
+                        div()
+                            .id("friends-close")
+                            .size(px(32. * s))
+                            .rounded(px(9. * s))
+                            .flex()
+                            .items_center()
+                            .justify_center()
                             .cursor_pointer()
-                            .hover(|d| d.text_color(rgb(INK)))
-                            .child(tr("Servers"))
+                            .hover(|d| d.bg(rgba(0xffffff14)))
+                            .child(icon("close", INK).size(px(17. * s)))
                             .on_click(cx.listener(|this, _, _, cx| {
-                                this.page = Page::Servers;
-                                cx.notify();
+                                this.set_prefs(|p| p.side_panel = false, cx)
                             })),
                     ),
             )
             .child(
                 div()
                     .id("friends-self")
-                    .mx(px(10. * s))
-                    .px(px(8. * s))
-                    .py(px(7. * s))
-                    .rounded(px(8. * s))
+                    .mx(px(14. * s))
+                    .px(px(12. * s))
+                    .py(px(12. * s))
+                    .rounded(px(14. * s))
+                    .bg(rgba(0xffffff0a))
+                    .border_1()
+                    .border_color(rgba(0xffffff12))
                     .flex()
                     .items_center()
-                    .gap(px(10. * s))
+                    .gap(px(12. * s))
                     .cursor_pointer()
-                    .hover(|d| d.bg(rgb(tone(0x1c1d21))))
+                    .hover(|d| d.bg(rgba(0xffffff14)))
                     .child(
-                        div().relative().child(self.avatar(34.)).child(
+                        div().relative().child(self.avatar(44.)).child(
                             div()
                                 .absolute()
                                 .right(px(-3. * s))
                                 .bottom(px(-3. * s))
-                                .p(px(2. * s))
+                                .p(px(2.5 * s))
                                 .rounded_full()
-                                .bg(rgb(tone(0x141518)))
-                                .child(dot(self.account.is_some(), s)),
+                                .bg(rgb(0x121316))
+                                .child(
+                                    div().size(px(10. * s)).rounded_full().bg(rgb(
+                                        if self.account.is_some() {
+                                            0x4ade80
+                                        } else {
+                                            0x5b5d65
+                                        },
+                                    )),
+                                ),
                         ),
                     )
                     .child(
@@ -180,7 +193,7 @@ impl Launcher {
                             .child(
                                 div()
                                     .truncate()
-                                    .text_size(px(15. * s))
+                                    .text_size(px(16. * s))
                                     .font_weight(FontWeight::SEMIBOLD)
                                     .child(self.account_name()),
                             )
@@ -188,13 +201,14 @@ impl Launcher {
                                 div()
                                     .text_size(px(13. * s))
                                     .text_color(rgb(if self.account.is_some() {
-                                        accent_tone(0x3ccf6a)
+                                        0x4ade80
                                     } else {
-                                        MUTED
+                                        0xa9abb3
                                     }))
                                     .child(presence),
                             ),
                     )
+                    .child(icon("arrow", 0x8e9099).size(px(15. * s)))
                     .on_click(cx.listener(|this, _, _, cx| {
                         this.page = Page::Account;
                         cx.notify();
@@ -202,7 +216,6 @@ impl Launcher {
             )
             .child(self.side_sections(cx))
     }
-
 
     /// The instance list that opens under the Launch button.
     pub(super) fn instance_menu(&self, cx: &mut Context<Self>) -> Div {

@@ -241,14 +241,14 @@ impl Launcher {
                     .id("wordmark")
                     .flex()
                     .items_center()
-                    .gap(px(12. * s))
+                    .gap(px(10. * s))
                     .cursor_pointer()
-                    .child(img("artwork/logo.png").size(px(30. * s)))
+                    .child(img("artwork/logo.png").size(px(32. * s)))
                     .child(
                         div()
-                            .text_size(px(30. * s))
+                            .text_size(px(28. * s))
                             .font_weight(FontWeight::SEMIBOLD)
-                            .child("WISP"),
+                            .child(wisp_theme::brand::NAME),
                     )
                     .on_click(cx.listener(|this, _, _, cx| {
                         this.page = Page::Home;
@@ -257,35 +257,38 @@ impl Launcher {
             )
             .child(drag("drag-left"))
             .child(
+                // The pages in a glass capsule; the one shown is a white pill.
                 div()
                     .flex()
                     .items_center()
-                    .gap(px(40. * s))
+                    .gap(px(2. * s))
+                    .p(px(5. * s))
+                    .rounded_full()
+                    .bg(rgba(0x0b0b0d8c))
+                    .border_1()
+                    .border_color(rgba(0xffffff1a))
                     .children(NAV.iter().enumerate().map(|(i, (label, page, lit))| {
                         let page = *page;
                         let active = lit.contains(&self.page);
                         div()
                             .id(("nav", i))
-                            .relative()
-                            .py(px(10. * s))
-                            .text_size(px(19. * s))
-                            .text_color(rgb(if active { INK } else { 0x8e9099 }))
-                            .when(active, |d| d.font_weight(FontWeight::SEMIBOLD))
+                            .h(px(38. * s))
+                            .px(px(18. * s))
+                            .rounded_full()
+                            .flex()
+                            .items_center()
+                            .text_size(px(16. * s))
                             .cursor_pointer()
-                            .hover(|d| d.text_color(rgb(INK)))
-                            .child(tr(label))
                             .when(active, |d| {
-                                d.child(
-                                    div()
-                                        .absolute()
-                                        .bottom_0()
-                                        .left(relative(0.2))
-                                        .right(relative(0.2))
-                                        .h(px(3. * s))
-                                        .rounded_full()
-                                        .bg(rgb(INK)),
-                                )
+                                d.bg(rgb(0xffffff))
+                                    .text_color(rgb(0x0b0b0d))
+                                    .font_weight(FontWeight::SEMIBOLD)
                             })
+                            .when(!active, |d| {
+                                d.text_color(rgb(0xb4b6bd))
+                                    .hover(|d| d.bg(rgba(0xffffff14)).text_color(rgb(INK)))
+                            })
+                            .child(tr(label))
                             .on_click(cx.listener(move |this, _, _, cx| {
                                 this.page = page;
                                 this.instance_menu = false;
@@ -422,7 +425,8 @@ impl Launcher {
             )
     }
 
-    /// Home: the selected instance large over the artwork, Launch, and the instances as cards.
+    /// Home: the selected instance large over the artwork and Launch on
+    /// the left, the featured server and friends under them, the instances stacked on the right.
     pub(super) fn home(&self, cx: &mut Context<Self>) -> Div {
         let s = self.ui_scale;
         let profile = self.settings.current();
@@ -445,27 +449,35 @@ impl Launcher {
             .iter()
             .max_by_key(|(_, t)| **t)
             .map(|(_, t)| content::ago(*t));
-        let mut subtitle = trf(
-            "Minecraft {version} · Wisp",
-            &[("version", engine::version())],
-        );
-        if let Some(when) = last_played {
-            subtitle = format!("{subtitle} · {}", trf("Played {when}", &[("when", &when)]));
-        }
+        let subtitle = match last_played {
+            Some(when) => trf("Played {when}", &[("when", &when)]),
+            None => tr("Your worlds stay on this computer."),
+        };
 
+        // Launch: a white pill whose play sign sits in a dark circle.
         let launch = div()
             .id("home-launch")
-            .h(px(58. * s))
-            .px(px(40. * s))
-            .rounded(px(12. * s))
+            .h(px(62. * s))
+            .pl(px(8. * s))
+            .pr(px(34. * s))
+            .rounded_full()
             .bg(rgb(0xffffff))
             .flex()
             .items_center()
-            .gap(px(10. * s))
+            .gap(px(14. * s))
             .text_size(px(20. * s))
             .font_weight(FontWeight::SEMIBOLD)
             .text_color(rgb(0x0b0b0d))
-            .child(icon("play", 0x0b0b0d).size(px(18. * s)))
+            .child(
+                div()
+                    .size(px(46. * s))
+                    .rounded_full()
+                    .bg(rgb(0x0b0b0d))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .child(icon("play", 0xffffff).size(px(18. * s))),
+            )
             .child(tr(label))
             .when(busy, |d| d.opacity(0.6))
             .when(!busy, |d| {
@@ -473,12 +485,12 @@ impl Launcher {
                     .hover(|d| d.bg(rgb(0xe4e5e8)))
                     .on_click(cx.listener(|this, _, _, cx| this.play(cx)))
             });
-        let side_button = |id: &'static str, glyph: &'static str| {
+        let round = |id: &'static str, glyph: &'static str| {
             div()
                 .id(id)
-                .size(px(58. * s))
-                .rounded(px(12. * s))
-                .bg(rgba(0x0b0b0d8c))
+                .size(px(52. * s))
+                .rounded_full()
+                .bg(rgba(0x0b0b0d99))
                 .border_1()
                 .border_color(rgba(0xffffff26))
                 .flex()
@@ -486,48 +498,48 @@ impl Launcher {
                 .justify_center()
                 .cursor_pointer()
                 .hover(|d| d.bg(rgba(0xffffff1f)))
-                .child(icon(glyph, INK).size(px(22. * s)))
+                .child(icon(glyph, INK).size(px(20. * s)))
         };
 
         let title = div()
             .flex()
             .flex_col()
-            .gap(px(6. * s))
+            .gap(px(10. * s))
             .child(
                 div()
-                    .max_w(px(900. * s))
+                    .max_w(px(820. * s))
                     .truncate()
-                    .text_size(px(76. * s))
-                    .line_height(px(86. * s))
+                    .text_size(px(72. * s))
+                    .line_height(px(80. * s))
                     .font_weight(FontWeight::SEMIBOLD)
                     .child(name),
             )
             .child(
                 div()
-                    .text_size(px(19. * s))
+                    .text_size(px(18. * s))
                     .text_color(rgb(0xc9cbd1))
                     .child(subtitle),
             )
             .child(
                 div()
-                    .mt(px(18. * s))
+                    .mt(px(14. * s))
                     .relative()
                     .flex()
                     .items_center()
-                    .gap(px(12. * s))
+                    .gap(px(10. * s))
                     .child(launch)
-                    .child(side_button("home-instances", "down").on_click(cx.listener(
+                    .child(round("home-instances", "down").on_click(cx.listener(
                         |this, _, _, cx| {
                             this.instance_menu = !this.instance_menu;
                             cx.notify();
                         },
                     )))
-                    .child(side_button("home-instance-settings", "settings").on_click(
-                        cx.listener(|this, _, _, cx| {
+                    .child(round("home-instance-settings", "settings").on_click(cx.listener(
+                        |this, _, _, cx| {
                             this.page = Page::Instances;
                             cx.notify();
-                        }),
-                    ))
+                        },
+                    )))
                     .when(self.instance_menu, |d| {
                         d.child(
                             gpui::deferred(self.instance_menu(cx).w(px(360. * s)))
@@ -538,7 +550,7 @@ impl Launcher {
             .when_some(self.setup_fraction, |d, fraction| {
                 d.child(
                     div()
-                        .mt(px(12. * s))
+                        .mt(px(6. * s))
                         .w(px(360. * s))
                         .h(px(5. * s))
                         .rounded_full()
@@ -555,7 +567,6 @@ impl Launcher {
             .when(!self.status.is_empty(), |d| {
                 d.child(
                     div()
-                        .mt(px(8. * s))
                         .max_w(px(620. * s))
                         .truncate()
                         .text_size(px(14. * s))
@@ -567,81 +578,227 @@ impl Launcher {
         div()
             .size_full()
             .flex()
-            .flex_col()
+            .gap(px(40. * s))
             .px(px(64. * s))
             .pb(px(40. * s))
-            .child(div().flex_1().min_h(px(20. * s)))
             .child(
                 div()
+                    .flex_1()
+                    .min_w_0()
                     .flex()
-                    .items_end()
-                    .justify_between()
-                    .gap(px(24. * s))
+                    .flex_col()
+                    .child(div().flex_1().min_h(px(20. * s)))
                     .child(title)
+                    .child(div().h(px(36. * s)).flex_none())
                     .child(
-                        self.featured_compact(cx),
+                        div()
+                            .flex()
+                            .gap(px(14. * s))
+                            .child(self.featured_compact(cx))
+                            .child(self.friends_strip(cx)),
                     ),
             )
-            .child(div().h(px(40. * s)).flex_none())
-            .child(self.instance_cards(cx))
+            .child(self.instance_shelf(cx))
     }
 
-    /// The instances as picture cards, the selected one outlined, then a tile for all of them.
-    fn instance_cards(&self, cx: &mut Context<Self>) -> Div {
+    /// Friends online as overlapping heads, opening Social.
+    fn friends_strip(&self, cx: &mut Context<Self>) -> Stateful<Div> {
+        let s = self.ui_scale;
+        let online: Vec<_> = self
+            .friends
+            .as_ref()
+            .map(|l| l.friends.iter().filter(|f| f.online).take(4).collect())
+            .unwrap_or_default();
+        let (title, line) = if online.is_empty() {
+            (tr("Social"), tr("Add friends and join them"))
+        } else {
+            (
+                trf("{count} online", &[("count", &online.len().to_string())]),
+                tr("Join your friends"),
+            )
+        };
+        let mut heads = div().flex().items_center();
+        for (i, friend) in online.iter().enumerate() {
+            heads = heads.child(
+                div()
+                    .when(i > 0, |d| d.ml(px(-10. * s)))
+                    .rounded(px(10. * s))
+                    .border_2()
+                    .border_color(rgb(0x111215))
+                    .child(self.head(&friend.uuid, &friend.name, 36., None)),
+            );
+        }
+        if online.is_empty() {
+            heads = heads.child(
+                div()
+                    .size(px(40. * s))
+                    .rounded_full()
+                    .bg(rgba(0xffffff14))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .child(icon("user-multiple-02", INK).size(px(20. * s))),
+            );
+        }
+        div()
+            .id("home-friends")
+            .w(px(300. * s))
+            .flex_none()
+            .p(px(14. * s))
+            .rounded(px(16. * s))
+            .bg(rgba(0x0b0b0dc4))
+            .border_1()
+            .border_color(rgba(0xffffff1f))
+            .flex()
+            .items_center()
+            .gap(px(14. * s))
+            .cursor_pointer()
+            .hover(|d| d.border_color(rgba(0xffffff40)))
+            .child(heads)
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .child(
+                        div()
+                            .text_size(px(17. * s))
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .child(title),
+                    )
+                    .child(
+                        div()
+                            .truncate()
+                            .text_size(px(13. * s))
+                            .text_color(rgb(0xb4b6bd))
+                            .child(line),
+                    ),
+            )
+            .child(icon("arrow", 0x8e9099).size(px(15. * s)))
+            .on_click(cx.listener(|this, _, _, cx| {
+                this.set_prefs(|p| p.side_panel = true, cx)
+            }))
+    }
+
+    /// The instances stacked on the right of Home: a picture, the name and when it was played;
+    /// the chosen one is outlined. Then the way to all of them.
+    fn instance_shelf(&self, cx: &mut Context<Self>) -> Div {
         let s = self.ui_scale;
         let current = self.settings.current().map(|p| p.name.clone());
-        let height = px(210. * s);
-        let card = |id: ElementId, picture: gpui::ImageSource, label: String, chosen: bool| {
-            div()
-                .id(id)
-                .relative()
-                .flex_1()
-                .min_w_0()
-                .max_w(px(540. * s))
-                .h(height)
-                .rounded(px(16. * s))
-                .overflow_hidden()
-                .border_2()
-                .border_color(rgba(if chosen { 0xffffffe6 } else { 0xffffff14 }))
-                .bg(rgb(tone(SURFACE)))
-                .cursor_pointer()
-                .hover(move |d| {
-                    d.border_color(rgba(if chosen { 0xffffffe6 } else { 0xffffff59 }))
-                })
-                .child(
-                    img(picture)
-                        .absolute()
-                        .inset_0()
-                        .size_full()
-                        .object_fit(ObjectFit::Cover),
-                )
-                .child(div().absolute().inset_0().bg(gpui::linear_gradient(
-                    180.,
-                    gpui::linear_color_stop(rgba(0x0b0b0d00), 0.35),
-                    gpui::linear_color_stop(rgba(0x0b0b0de0), 1.),
-                )))
-                .child(
-                    div()
-                        .absolute()
-                        .left(px(22. * s))
-                        .right(px(22. * s))
-                        .bottom(px(18. * s))
-                        .truncate()
-                        .text_size(px(30. * s))
-                        .font_weight(FontWeight::SEMIBOLD)
-                        .child(label),
-                )
-        };
         let art = |i: usize| -> gpui::ImageSource {
             self.art
                 .card(i)
                 .unwrap_or_else(|| CARD_ART[i % CARD_ART.len()].into())
         };
-        let mut row = div().flex().gap(px(20. * s));
-        for (i, p) in self.settings.profiles.iter().take(3).enumerate() {
+        let row = |id: ElementId, picture: gpui::ImageSource, label: String, line: String, chosen: bool| {
+            div()
+                .id(id)
+                .h(px(96. * s))
+                .flex_none()
+                .p(px(8. * s))
+                .pr(px(16. * s))
+                .rounded(px(18. * s))
+                .bg(rgba(if chosen { 0x1b1c20f0 } else { 0x0b0b0dc4 }))
+                .border_1()
+                .border_color(rgba(if chosen { 0xffffffd9 } else { 0xffffff1a }))
+                .flex()
+                .items_center()
+                .gap(px(14. * s))
+                .cursor_pointer()
+                .hover(move |d| {
+                    d.border_color(rgba(if chosen { 0xffffffd9 } else { 0xffffff4d }))
+                })
+                .child(
+                    img(picture)
+                        .w(px(132. * s))
+                        .h_full()
+                        .flex_none()
+                        .rounded(px(12. * s))
+                        .object_fit(ObjectFit::Cover),
+                )
+                .child(
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .child(
+                            div()
+                                .truncate()
+                                .text_size(px(20. * s))
+                                .font_weight(FontWeight::SEMIBOLD)
+                                .child(label),
+                        )
+                        .child(
+                            div()
+                                .truncate()
+                                .text_size(px(13. * s))
+                                .text_color(rgb(0xa9abb3))
+                                .child(line),
+                        ),
+                )
+                .when(chosen, |d| {
+                    d.child(
+                        div()
+                            .size(px(26. * s))
+                            .flex_none()
+                            .rounded_full()
+                            .bg(rgb(0xffffff))
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .child(icon("tick-02", 0x0b0b0d).size(px(15. * s))),
+                    )
+                })
+        };
+        let mut shelf = div()
+            .w(px(400. * s))
+            .flex_none()
+            .flex()
+            .flex_col()
+            .justify_end()
+            .gap(px(10. * s))
+            .child(
+                div()
+                    .px(px(4. * s))
+                    .flex()
+                    .items_center()
+                    .justify_between()
+                    .child(
+                        div()
+                            .text_size(px(13. * s))
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .text_color(rgb(0xb4b6bd))
+                            .child(tr("YOUR INSTANCES")),
+                    )
+                    .child(
+                        div()
+                            .id("home-all-instances")
+                            .flex()
+                            .items_center()
+                            .gap(px(6. * s))
+                            .text_size(px(14. * s))
+                            .text_color(rgb(0xd9dadd))
+                            .cursor_pointer()
+                            .hover(|d| d.text_color(rgb(INK)))
+                            .child(trf(
+                                "All {count}",
+                                &[("count", &self.settings.profiles.len().to_string())],
+                            ))
+                            .child(icon("arrow", 0xd9dadd).size(px(14. * s)))
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.page = Page::Instances;
+                                cx.notify();
+                            })),
+                    ),
+            );
+        for (i, p) in self.settings.profiles.iter().take(4).enumerate() {
             let chosen = current.as_ref() == Some(&p.name);
-            row = row.child(
-                card(("home-card", i).into(), art(i), p.name.clone(), chosen).on_click(
+            let line = self
+                .content
+                .launched
+                .get(&p.name)
+                .map(|t| trf("Played {when}", &[("when", &content::ago(*t))]))
+                .unwrap_or_else(|| trf("Minecraft {version}", &[("version", engine::version())]));
+            shelf = shelf.child(
+                row(("home-card", i).into(), art(i), p.name.clone(), line, chosen).on_click(
                     cx.listener(move |this, _, _, cx| {
                         this.instance_menu = false;
                         this.select(i, cx);
@@ -649,41 +806,26 @@ impl Launcher {
                 ),
             );
         }
-        if self.settings.profiles.is_empty() {
-            row = row.child(
-                card("home-card-new".into(), art(0), tr("New instance"), false).on_click(
-                    cx.listener(|this, _, _, cx| this.new_instance(cx)),
-                ),
-            );
-        }
-        row.child(
+        shelf.child(
             div()
-                .id("home-all-instances")
-                .w(px(130. * s))
-                .h(height)
+                .id("home-new-instance")
+                .h(px(56. * s))
                 .flex_none()
-                .rounded(px(16. * s))
-                .bg(rgba(0x2a2b30cc))
+                .rounded(px(18. * s))
                 .border_1()
-                .border_color(rgba(0xffffff14))
+                .border_dashed()
+                .border_color(rgba(0xffffff33))
+                .bg(rgba(0x0b0b0d66))
                 .flex()
-                .flex_col()
                 .items_center()
                 .justify_center()
-                .gap(px(10. * s))
+                .gap(px(8. * s))
+                .text_size(px(15. * s))
                 .cursor_pointer()
-                .hover(|d| d.bg(rgba(0x3a3b42cc)))
-                .child(icon("dashboard-square-01", INK).size(px(40. * s)))
-                .child(
-                    div()
-                        .text_size(px(13. * s))
-                        .text_color(rgb(0xc9cbd1))
-                        .child(tr("All")),
-                )
-                .on_click(cx.listener(|this, _, _, cx| {
-                    this.page = Page::Instances;
-                    cx.notify();
-                })),
+                .hover(|d| d.border_color(rgba(0xffffff80)))
+                .child(icon("plus", INK).size(px(16. * s)))
+                .child(tr("New instance"))
+                .on_click(cx.listener(|this, _, _, cx| this.new_instance(cx))),
         )
     }
 
@@ -816,22 +958,26 @@ impl Launcher {
             .flex_col()
             .gap(px(6. * s))
             .child(
+                // Where this page sits: the page it came from, then this one.
                 div()
-                    .id("page-back")
-                    .self_start()
                     .flex()
                     .items_center()
                     .gap(px(8. * s))
-                    .text_size(px(16. * s))
-                    .text_color(rgb(0xd9dadd))
-                    .cursor_pointer()
-                    .hover(|d| d.text_color(rgb(INK)))
-                    .child(icon("chevron-left", INK).size(px(16. * s)))
-                    .child(tr(back_label))
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        this.page = back_page;
-                        cx.notify();
-                    })),
+                    .text_size(px(14. * s))
+                    .child(
+                        div()
+                            .id("page-back")
+                            .text_color(rgb(0x9a9ca4))
+                            .cursor_pointer()
+                            .hover(|d| d.text_color(rgb(INK)))
+                            .child(tr(back_label.trim_start_matches("Back to ")))
+                            .on_click(cx.listener(move |this, _, _, cx| {
+                                this.page = back_page;
+                                cx.notify();
+                            })),
+                    )
+                    .child(icon("chevron-right", 0x6b6d75).size(px(13. * s)))
+                    .child(div().text_color(rgb(0xd9dadd)).child(tr(title))),
             )
             .child(
                 div()
