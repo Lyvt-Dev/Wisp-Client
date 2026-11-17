@@ -62,6 +62,15 @@ windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Securit
 [profile.release]
 strip = true
 
+# The Store's and the Locker's figure is drawn on the CPU (wisp_cosmetics::preview): optimised
+# even in development builds, where it would otherwise draw a few frames a second.
+[profile.dev.package.wisp-cosmetics]
+opt-level = 3
+[profile.dev.package.glam]
+opt-level = 3
+[profile.dev.package.image]
+opt-level = 3
+
 [build-dependencies]
 wisp-compat = { path = "../crates/wisp-compat" }
 

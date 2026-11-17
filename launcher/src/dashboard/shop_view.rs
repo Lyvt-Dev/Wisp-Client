@@ -28,8 +28,9 @@ const PITCH_START: f32 = 8.0;
 /// How far the figure tilts (degrees, down is positive) and zooms.
 const PITCH: (f32, f32) = (-30.0, 60.0);
 const ZOOM: (f32, f32) = (0.7, 1.7);
-/// Pictures kept of the figure (angles and animation frames) before they are drawn again.
-const FIGURES_KEPT: usize = 24;
+/// Pictures kept of the figure (angles and animation frames) before they are drawn again:
+/// every frame of a 64-frame texture at one angle, and some.
+const FIGURES_KEPT: usize = 72;
 
 pub(super) struct ShopUi {
     /// The kind the list shows; None: every kind.
@@ -625,20 +626,19 @@ impl Launcher {
         let yaw = (self.shop.yaw / FIGURE_STEP).round() * FIGURE_STEP;
         let pitch = (self.shop.pitch / FIGURE_STEP).round() * FIGURE_STEP;
         let item = offer.item.and_then(|bytes| Item::parse(bytes).ok());
-        // The moment of its animations, in game ticks, held to its texture's frame time: the
-        // frame due now, and the swing at that moment.
+        // The texture's frame due now (the game shows each for `frametime` ticks). The item
+        // stands still otherwise, so an angle's frames are drawn once and then replayed.
         let step = item.as_ref().map_or(2, |i| i.frametime.max(1)) as f32;
-        let ticks = (self.shop.started.elapsed().as_secs_f32() * 20.0 / step).floor() * step;
-        let frame = item
-            .as_ref()
-            .map_or(0, |i| (ticks / step) as usize % i.frames.len().max(1));
+        let frame = item.as_ref().map_or(0, |i| {
+            (self.shop.started.elapsed().as_secs_f32() * 20.0 / step) as usize
+                % i.frames.len().max(1)
+        });
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
         self.avatar_key.hash(&mut hasher);
         self.skin.is_some().hash(&mut hasher);
         yaw.to_bits().hash(&mut hasher);
         pitch.to_bits().hash(&mut hasher);
-        // The swing repeats every 70 ticks; frames repeat with the texture.
-        (ticks as u32 % 1680).hash(&mut hasher);
+        frame.hash(&mut hasher);
         offer.id.hash(&mut hasher);
         let key = hasher.finish();
         if let Some(picture) = self.shop.figure.borrow().get(&key) {
@@ -664,7 +664,7 @@ impl Launcher {
         }];
         if let Some(item) = &item {
             let texture = item.frames.get(frame).unwrap_or(&item.texture);
-            draws.extend(Draw::item(item, &body, ticks).into_iter().map(|mut d| {
+            draws.extend(Draw::item(item, &body, 0.0).into_iter().map(|mut d| {
                 d.texture = texture;
                 d
             }));
@@ -678,58 +678,10 @@ impl Launcher {
         picture
     }
 
-    /// The figure in the middle of the Store: drag across it to turn it; the arrows turn it a
-    /// quarter, Front and Back face it straight.
+    /// The figure in the middle of the Store: drag to turn and tilt it, scroll to zoom.
     fn shop_figure(&self, offer: &'static Offer, cx: &mut Context<Self>) -> Div {
         let s = self.ui_scale;
         let size = px(560. * s);
-        let round = |id: &'static str, glyph: &'static str| {
-            div()
-                .id(id)
-                .size(px(40. * s))
-                .rounded_full()
-                .bg(rgba(0x0b0b0d99))
-                .border_1()
-                .border_color(rgba(0xffffff26))
-                .flex()
-                .items_center()
-                .justify_center()
-                .cursor_pointer()
-                .hover(|d| d.bg(rgba(0xffffff1f)))
-                .child(icon(glyph, INK).size(px(18. * s)))
-        };
-        let face = |id: &'static str, label: &str, yaw: f32| {
-            let on = ((self.shop.yaw - yaw).rem_euclid(360.))
-                .min((yaw - self.shop.yaw).rem_euclid(360.))
-                < 1.;
-            div()
-                .id(id)
-                .h(px(40. * s))
-                .px(px(16. * s))
-                .rounded_full()
-                .flex()
-                .items_center()
-                .text_size(px(14. * s))
-                .cursor_pointer()
-                .when(on, |d| {
-                    d.bg(rgb(0xffffff))
-                        .text_color(rgb(0x0b0b0d))
-                        .font_weight(FontWeight::SEMIBOLD)
-                })
-                .when(!on, |d| {
-                    d.bg(rgba(0x0b0b0d99))
-                        .border_1()
-                        .border_color(rgba(0xffffff26))
-                        .hover(|d| d.bg(rgba(0xffffff1f)))
-                })
-                .child(tr(label))
-                .on_click(cx.listener(move |this, _, _, cx| {
-                    this.shop.yaw = yaw;
-                    this.shop.pitch = PITCH_START;
-                    this.shop.zoom = 1.0;
-                    cx.notify();
-                }))
-        };
         div()
             .flex()
             .flex_col()
@@ -783,30 +735,6 @@ impl Launcher {
                         this.shop.zoom = (this.shop.zoom * (1.0 + lines * 0.1)).clamp(ZOOM.0, ZOOM.1);
                         cx.notify();
                     })),
-            )
-            .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .gap(px(8. * s))
-                    .child(
-                        round("shop-turn-left", "chevron-left").on_click(cx.listener(
-                            |this, _, _, cx| {
-                                this.shop.yaw = (this.shop.yaw + 90.).rem_euclid(360.);
-                                cx.notify();
-                            },
-                        )),
-                    )
-                    .child(face("shop-face-front", "Front", 0.))
-                    .child(face("shop-face-back", "Back", 180.))
-                    .child(
-                        round("shop-turn-right", "chevron-right").on_click(cx.listener(
-                            |this, _, _, cx| {
-                                this.shop.yaw = (this.shop.yaw - 90.).rem_euclid(360.);
-                                cx.notify();
-                            },
-                        )),
-                    ),
             )
             .child(
                 div()

@@ -5,7 +5,7 @@ Wisp's own art, with no Minecraft assets.
 
 The shop sells one item: the **Wisp Founders Cape**, free for Wisp's first players. It draws
 Wisp's own mark (`crates/wisp-theme/icons/wisp-256.png`) at 8× Minecraft's cape (an 80×128×8
-box, 176×136 texels a frame), animated over 24 frames: smoke and stars, a ring with sparks
+box, 176×136 texels a frame), animated over 48 frames at 20 a second: smoke and stars, a ring with sparks
 running round it, a breathing halo, a light sweep across the feather and a gold hem.
 
 - `founders_cape.json`: the item.

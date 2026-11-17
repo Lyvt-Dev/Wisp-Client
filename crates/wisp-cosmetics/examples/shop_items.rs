@@ -162,9 +162,9 @@ fn png_canvas(bytes: &[u8]) -> Canvas {
 /// 176×136 texels (vanilla's cape layout at 8×, cropped to the cape), under the format's 256.
 const CAPE: (i32, i32, i32) = (80, 128, 8);
 const CAPE_TEX: (u32, u32) = (176, 136);
-/// Frames and the game ticks each shows: a 2.4 s loop.
-const CAPE_FRAMES: u32 = 24;
-const CAPE_FRAMETIME: u32 = 2;
+/// Frames and the game ticks each shows: a 2.4 s loop at 20 frames a second (every tick).
+const CAPE_FRAMES: u32 = 48;
+const CAPE_FRAMETIME: u32 = 1;
 
 /// Wisp's own mark (a white feather on black), as the launcher and the game show it.
 const WISP_MARK: &[u8] = include_bytes!(concat!(
