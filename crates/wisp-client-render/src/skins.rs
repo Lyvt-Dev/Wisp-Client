@@ -1187,16 +1187,16 @@ mod tests {
         for (h, model, slim) in [(64, "slim", true), (32, "classic", false), (64, "", false)] {
             let (bytes, rgba) = png(64, h);
             std::fs::write(&file, bytes).unwrap();
-            let (skin, is_slim) = super::read_offline_skin(&file, model).unwrap();
+            let (skin, is_slim) = super::read_offline_skin(&file, model == "slim").unwrap();
             assert_eq!(skin, super::process_legacy_skin(64, h, &rgba).unwrap());
             assert_eq!(skin.len(), 64 * 64 * 4);
             assert_eq!(is_slim, slim);
         }
         std::fs::write(&file, png(32, 32).0).unwrap();
-        assert!(super::read_offline_skin(&file, "slim").is_err());
+        assert!(super::read_offline_skin(&file, true).is_err());
         std::fs::write(&file, b"not a png").unwrap();
-        assert!(super::read_offline_skin(&file, "slim").is_err());
-        assert!(super::read_offline_skin(&dir.join("missing.png"), "").is_err());
+        assert!(super::read_offline_skin(&file, true).is_err());
+        assert!(super::read_offline_skin(&dir.join("missing.png"), false).is_err());
         let _ = std::fs::remove_dir_all(&dir);
     }
 
