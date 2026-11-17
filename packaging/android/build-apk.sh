@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Builds the Wisp phone app: libwisp_android.so for arm64 phones, packed with the manifest and
-# icons into a signed APK. No Gradle: aapt2, zipalign and apksigner from the Android SDK.
+# icons into a signed APK. No Gradle: javac, d8, aapt2, zipalign and apksigner.
 #
 #   packaging/android/build-apk.sh [--profile release|fast] [--out DIR]
 #
@@ -52,9 +52,14 @@ rm -rf "$work" && mkdir -p "$work/res" "$work/lib/arm64-v8a" "$out"
   --min-sdk-version 29 --target-sdk-version 35 \
   --version-code "$code" --version-name "$version" \
   "$work/res.zip"
+# WispActivity (the system bars hidden), compiled to classes.dex.
+mkdir -p "$work/classes"
+javac -source 8 -target 8 -nowarn -Xlint:-options -classpath "$ANDROID_PLATFORM_JAR"   -d "$work/classes" "$here/java/dev/wisp/client/WispActivity.java"
+"$bt/d8$bat" --release --min-api 29 --lib "$ANDROID_PLATFORM_JAR" --output "$work"   $(find "$work/classes" -name '*.class')
 py="$(command -v python || command -v python3)"
 (cd "$work" && "$py" -c 'import zipfile
 with zipfile.ZipFile("unsigned.apk", "a", zipfile.ZIP_DEFLATED) as z:
+    z.write("classes.dex")
     z.write("lib/arm64-v8a/libwisp_android.so")')
 "$bt/zipalign$exe" -p -f 4 "$work/unsigned.apk" "$work/aligned.apk"
 

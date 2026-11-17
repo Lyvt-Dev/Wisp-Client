@@ -84,6 +84,54 @@ const BUTTON: f32 = wisp_theme::UI.px + 1.0;
 const CONTROL: f32 = 52.0;
 const KEY: f32 = 64.0;
 const GAP: f32 = 12.0;
+/// The home screen's Play button: the one thing to press.
+const HERO: f32 = 76.0;
+/// Room along the screen's edges (rounded corners, a camera cutout).
+const MARGIN: f32 = 56.0;
+const CARD_PAD: f32 = 24.0;
+const LIVE: u32 = color::hex(wisp_theme::glass::LIVE, 255);
+const WARN: u32 = color::hex(wisp_theme::glass::WARN, 255);
+const DANGER: u32 = color::hex(wisp_theme::glass::DANGER, 255);
+
+/// What a home card shows at its top right.
+enum Badge {
+    Avatar(Option<String>),
+    Dot(u32),
+}
+
+/// The small Wisp mark at the top left of every step but home.
+fn header() -> [Item; 2] {
+    [
+        Item::Feather {
+            x: MARGIN + 6.0,
+            y: 40.0,
+            size: 28.0,
+        },
+        Item::Text {
+            face: Face::Heading,
+            size: 22.0,
+            x: MARGIN + 26.0,
+            y: 28.0,
+            color: color::TEXT,
+            text: wisp_theme::brand::NAME.into(),
+        },
+    ]
+}
+
+/// The page behind every step: dark, with a soft light behind the left half.
+fn backdrop(ui: &mut Ui) {
+    ui.rounded(0.0, 0.0, ui.w, ui.h, 0.0, color::BG);
+    let (gx, gy) = (ui.w * 0.26, ui.h * 0.5);
+    for i in 0..10 {
+        let r = ui.h * (1.05 - i as f32 * 0.085);
+        ui.circle(gx, gy, r, color::hex(0xffffff, 4));
+    }
+    // A second, fainter light at the bottom right.
+    for i in 0..6 {
+        let r = ui.h * (0.6 - i as f32 * 0.09);
+        ui.circle(ui.w * 0.92, ui.h * 1.02, r, color::hex(0xffffff, 3));
+    }
+}
 
 #[derive(Clone, Copy)]
 struct Rect {
@@ -101,6 +149,8 @@ impl Rect {
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Kind {
+    /// Home's Play: large, white.
+    Hero,
     Primary,
     Secondary,
     Key,
@@ -125,6 +175,18 @@ enum Item {
         label: String,
         action: Action,
         kind: Kind,
+    },
+    Circle {
+        x: f32,
+        y: f32,
+        r: f32,
+        color: u32,
+    },
+    /// Wisp's feather (`Ui::feather`), centred at `x`, `y`.
+    Feather {
+        x: f32,
+        y: f32,
+        size: f32,
     },
 }
 
@@ -269,49 +331,10 @@ impl Setup {
         };
         match self.step {
             Step::Home => {
-                title(&mut c, "title");
-                c.text(Face::Regular, BODY, LINE, color::MUTED, t("intro"));
-                c.gap(24.0);
-                c.text(Face::Medium, BODY, LINE, color::TEXT, t("account"));
-                match &shared.account {
-                    Some(account) => {
-                        let text = tf("signed_in_as", &[("name", &account.name)]);
-                        c.text(Face::Regular, BODY, LINE, color::MUTED, &text);
-                        c.gap(8.0);
-                        c.buttons(&[(t("sign_out").into(), Action::SignOut, Kind::Secondary)]);
-                    }
-                    None => {
-                        c.text(Face::Regular, BODY, LINE, color::MUTED, t("not_signed_in"));
-                        c.gap(8.0);
-                        c.buttons(&[(t("sign_in").into(), Action::SignIn, Kind::Secondary)]);
-                    }
-                }
-                c.gap(20.0);
-                c.text(Face::Medium, BODY, LINE, color::TEXT, t("game_files"));
-                let ready = self.files_ready();
-                let state = if ready {
-                    tf("files_ready", &[("version", wisp_core::VANILLA_VERSION)])
-                } else {
-                    t("files_missing").to_owned()
-                };
-                c.text(Face::Regular, BODY, LINE, color::MUTED, &state);
-                c.gap(8.0);
-                let label = if ready { "update_files" } else { "get_files" };
-                c.buttons(&[(t(label).into(), Action::GetFiles, Kind::Secondary)]);
-                c.gap(28.0);
-                if ready {
-                    c.buttons(&[(t("play").into(), Action::Play, Kind::Primary)]);
-                    if shared.account.is_none() {
-                        c.gap(8.0);
-                        c.text(
-                            Face::Regular,
-                            wisp_theme::CAPTION.px,
-                            18.0,
-                            color::MUTED,
-                            t("play_offline_note"),
-                        );
-                    }
-                }
+                let account = shared.account.clone();
+                let error = shared.error.clone();
+                drop(shared);
+                return self.home(ui, account.as_ref(), error.as_deref());
             }
             Step::SignIn => {
                 title(&mut c, "sign_in_title");
@@ -496,19 +519,258 @@ impl Setup {
             let (x, y) = match item {
                 Item::Text { x, y, .. } => (*x, y),
                 Item::Plate { rect, .. } | Item::Button { rect, .. } => (rect.x, &mut rect.y),
+                Item::Circle { x, y, .. } | Item::Feather { x, y, .. } => (*x, y),
             };
             if x < column_right {
                 *y += shift;
             }
+        }
+        items.extend(header());
+        items
+    }
+
+    /// The home screen, the phone's launcher: Wisp and Play on the left, the account and the
+    /// game files as cards on the right.
+    fn home(&self, ui: &Ui, account: Option<&Account>, error: Option<&str>) -> Vec<Item> {
+        let mut items = Vec::new();
+        let ready = self.files_ready();
+        let m = MARGIN;
+        let split = (ui.w * 0.54).round();
+        let caption = wisp_theme::CAPTION.px + 1.0;
+
+        // Left: the feather, the name, Play (or the first step), and where things stand.
+        let hero_w = (split - 2.0 * m).min(560.0);
+        let hero_h = 88.0 + 14.0 + 64.0 + 30.0 + 34.0 + HERO + 18.0 + 24.0;
+        let lx = m + 8.0;
+        let mut y = ((ui.h - hero_h) / 2.0).max(m).round();
+        items.push(Item::Feather {
+            x: lx + 40.0,
+            y: y + 44.0,
+            size: 88.0,
+        });
+        y += 88.0 + 14.0;
+        items.push(Item::Text {
+            face: Face::Heading,
+            size: 60.0,
+            x: lx,
+            y,
+            color: color::TEXT,
+            text: wisp_theme::brand::NAME.into(),
+        });
+        y += 64.0;
+        items.push(Item::Text {
+            face: Face::Regular,
+            size: BODY + 2.0,
+            x: lx,
+            y,
+            color: color::MUTED,
+            text: tf("tagline", &[("version", wisp_core::VANILLA_VERSION)]),
+        });
+        y += 30.0 + 34.0;
+        let (label, action) = if ready {
+            (t("play"), Action::Play)
+        } else {
+            (t("get_files"), Action::GetFiles)
+        };
+        items.push(Item::Button {
+            rect: Rect {
+                x: lx,
+                y,
+                w: hero_w.min(380.0),
+                h: HERO,
+            },
+            label: label.into(),
+            action,
+            kind: Kind::Hero,
+        });
+        y += HERO + 18.0;
+        let (dot, state) = match (ready, account.is_some()) {
+            (true, true) => (LIVE, t("ready_to_play")),
+            (true, false) => (WARN, t("play_offline_note")),
+            (false, _) => (WARN, t("setup_first")),
+        };
+        items.push(Item::Circle {
+            x: lx + 6.0,
+            y: y + 11.0,
+            r: 5.0,
+            color: dot,
+        });
+        let lines = wrap(ui, Face::Regular, caption, state, hero_w - 22.0);
+        let below = y + 2.0 + lines.len() as f32 * 20.0 + 14.0;
+        for (i, line) in lines.into_iter().enumerate() {
+            items.push(Item::Text {
+                face: Face::Regular,
+                size: caption,
+                x: lx + 22.0,
+                y: y + 2.0 + i as f32 * 20.0,
+                color: color::MUTED,
+                text: line,
+            });
+        }
+        if let Some(error) = error {
+            for (i, line) in wrap(ui, Face::Medium, caption, error, hero_w)
+                .into_iter()
+                .enumerate()
+            {
+                items.push(Item::Text {
+                    face: Face::Medium,
+                    size: caption,
+                    x: lx,
+                    y: below + i as f32 * 20.0,
+                    color: DANGER,
+                    text: line,
+                });
+            }
+        }
+
+        // A faint rule between the halves.
+        items.push(Item::Plate {
+            rect: Rect {
+                x: split,
+                y: (ui.h * 0.22).round(),
+                w: 1.0,
+                h: (ui.h * 0.56).round(),
+            },
+            radius: 0.0,
+            color: color::with_alpha(color::BORDER, 0.6),
+        });
+
+        // Right: the account and the game files, each a card.
+        let card_w = (ui.w - split - 2.0 * m).clamp(260.0, 500.0);
+        let cx = (ui.w - m - card_w).max(split + m * 0.5).round();
+        let card_h = CARD_PAD * 2.0 + 18.0 + 6.0 + 28.0 + 18.0 + CONTROL;
+        let mut y = ((ui.h - (2.0 * card_h + 20.0)) / 2.0).max(m).round();
+        let (name, account_button) = match account {
+            Some(a) => (a.name.clone(), (t("sign_out"), Action::SignOut)),
+            None => (
+                t("not_signed_in").to_owned(),
+                (t("sign_in"), Action::SignIn),
+            ),
+        };
+        let initial = account
+            .and_then(|a| a.name.chars().next())
+            .map(|c| c.to_uppercase().to_string());
+        let files = if ready {
+            tf("files_ready", &[("version", wisp_core::VANILLA_VERSION)])
+        } else {
+            t("files_missing").to_owned()
+        };
+        let files_button = if ready { "update_files" } else { "get_files" };
+        let cards = [
+            (t("account"), name, account_button, Badge::Avatar(initial)),
+            (
+                t("game_files"),
+                files,
+                (t(files_button), Action::GetFiles),
+                Badge::Dot(if ready { LIVE } else { WARN }),
+            ),
+        ];
+        for (label, value, (button, action), badge) in cards {
+            items.push(Item::Plate {
+                rect: Rect {
+                    x: cx,
+                    y,
+                    w: card_w,
+                    h: card_h,
+                },
+                radius: wisp_theme::glass::radius::PANEL,
+                color: color::RAISED,
+            });
+            let (ix, iy) = (cx + CARD_PAD, y + CARD_PAD);
+            // The badge: the account's initial in a circle, or the files' state as a dot.
+            let bx = cx + card_w - CARD_PAD - 22.0;
+            match badge {
+                Badge::Avatar(initial) => {
+                    let signed_in = initial.is_some();
+                    items.push(Item::Circle {
+                        x: bx,
+                        y: iy + 22.0,
+                        r: 22.0,
+                        color: if signed_in {
+                            color::ACCENT
+                        } else {
+                            color::HOVER
+                        },
+                    });
+                    let letter = initial.unwrap_or_else(|| "?".into());
+                    let lw = ui.measure(Face::Heading, 22.0, &letter);
+                    items.push(Item::Text {
+                        face: Face::Heading,
+                        size: 22.0,
+                        x: (bx - lw / 2.0).round(),
+                        y: iy + 8.0,
+                        color: if signed_in {
+                            color::ON_ACCENT
+                        } else {
+                            color::MUTED
+                        },
+                        text: letter,
+                    });
+                }
+                Badge::Dot(dot) => {
+                    items.push(Item::Circle {
+                        x: bx,
+                        y: iy + 22.0,
+                        r: 22.0,
+                        color: color::with_alpha(dot, 0.16),
+                    });
+                    items.push(Item::Circle {
+                        x: bx,
+                        y: iy + 22.0,
+                        r: 7.0,
+                        color: dot,
+                    });
+                }
+            }
+            items.push(Item::Text {
+                face: Face::Medium,
+                size: wisp_theme::CAPTION.px,
+                x: ix,
+                y: iy,
+                color: color::MUTED,
+                text: label.to_uppercase(),
+            });
+            let value_w = card_w - 2.0 * CARD_PAD - 56.0;
+            let value = wrap(ui, Face::Medium, BODY + 4.0, &value, value_w)
+                .into_iter()
+                .next()
+                .unwrap_or_default();
+            items.push(Item::Text {
+                face: Face::Medium,
+                size: BODY + 4.0,
+                x: ix,
+                y: iy + 18.0 + 6.0,
+                color: color::TEXT,
+                text: value,
+            });
+            let bw = (ui.measure(Face::Medium, BUTTON, button) + 48.0)
+                .round()
+                .clamp(140.0, card_w - 2.0 * CARD_PAD);
+            items.push(Item::Button {
+                rect: Rect {
+                    x: ix,
+                    y: iy + 18.0 + 6.0 + 28.0 + 18.0,
+                    w: bw,
+                    h: CONTROL,
+                },
+                label: button.into(),
+                action,
+                kind: Kind::Secondary,
+            });
+            y += card_h + 20.0;
         }
         items
     }
 
     pub fn draw(&mut self, ui: &mut Ui) {
         let items = self.layout(ui);
-        ui.rounded(0.0, 0.0, ui.w, ui.h, 0.0, color::BG);
+        backdrop(ui);
         for item in &items {
             match item {
+                Item::Circle { x, y, r, color } => ui.circle(*x, *y, *r, *color),
+                Item::Feather { x, y, size } => {
+                    ui.feather(*x, *y, *size, color::TEXT, color::BG);
+                }
                 Item::Text {
                     face,
                     size,
@@ -532,7 +794,9 @@ impl Setup {
                 } => {
                     let pressed = rect.contains(ui.cursor);
                     let (plate, ink, radius) = match kind {
-                        Kind::Primary => (color::ACCENT, color::ON_ACCENT, rect.h / 2.0),
+                        Kind::Hero | Kind::Primary => {
+                            (color::ACCENT, color::ON_ACCENT, rect.h / 2.0)
+                        }
                         Kind::Secondary => (color::RAISED, color::TEXT, rect.h / 2.0),
                         Kind::Key => (color::RAISED, color::TEXT, wisp_theme::RADIUS_PLATE),
                     };
@@ -560,10 +824,14 @@ impl Setup {
                         );
                         continue;
                     }
-                    let size = if *kind == Kind::Key { 26.0 } else { BUTTON };
-                    let lw = ui.measure(Face::Medium, size, label);
+                    let (face, size) = match kind {
+                        Kind::Key => (Face::Medium, 26.0),
+                        Kind::Hero => (Face::Heading, 24.0),
+                        _ => (Face::Medium, BUTTON),
+                    };
+                    let lw = ui.measure(face, size, label);
                     ui.text_line(
-                        Face::Medium,
+                        face,
                         size,
                         rect.h,
                         rect.x + ((rect.w - lw) / 2.0).round(),

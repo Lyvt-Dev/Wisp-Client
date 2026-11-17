@@ -1,3 +1,21 @@
+# Handover: Wisp for Android 0.15.2 (2026-11-17)
+
+The owner's bug list from the first real phone: very laggy (top priority), buttons near the edge
+closed the app, the setup screen looked plain, the joystick was mirrored. All four addressed in
+0.15.2 (`packaging/android/releases/0.15.2.md`):
+
+- Performance: `phone::apply_phone_defaults` (once per `PHONE_DEFAULTS_VERSION`, also on
+  existing installs): world at 50 % resolution, fast graphics, render 6 / simulation 5, 60 FPS,
+  battery mode, 2 MiB upload budget per frame, culling. **Not measured on a real phone** (none
+  here, and the emulator uses SwiftShader): ask the owner how it runs; next steps if still slow
+  are a lower resolution scale or render distance 5, and profiling with `adb logcat -s wisp`.
+- Edges: `WispActivity` (`packaging/android/java`, the APK's first Java) hides the system bars
+  sticky; touch buttons keep `Layout::edge` free; back on the setup's home does nothing.
+- New setup home (`Setup::home`): feather, big Play, account and files cards, backdrop glow.
+- Not yet seen in the emulator: the PC ran out of memory during the test (the emulator's game
+  files may sit in `/sdcard/Download/wisp-files-backup` there; move them back into
+  `/sdcard/Android/data/dev.wisp.client/files`).
+
 # Handover: Wisp for Android (2026-11-16, branch `android-port`)
 
 The owner asked for the Wisp Client on phones (Android APK, everything incl. cosmetics), released

@@ -60,7 +60,8 @@ fn android_main(app: AndroidApp) {
     );
     wisp_client::game::set_android_app(app);
 
-    first_start_options(&home);
+    // Options a phone holds: once on the first start, once more when they change.
+    wisp_client::phone::apply_phone_defaults(&home);
 
     let path = |p: &PathBuf| p.to_string_lossy().into_owned();
     wisp_client::entry::set_args(vec![
@@ -79,21 +80,6 @@ fn android_main(app: AndroidApp) {
     // A new start of the app must be a new process: the game's one-time state (the event loop,
     // the installed hooks) can't be made twice.
     std::process::exit(0);
-}
-
-/// A phone's first start: no keyboard tutorial (its toasts name W, A, S, D and Space) and a
-/// render distance a phone holds. Vanilla's own option keys; later changes are the player's.
-fn first_start_options(home: &std::path::Path) {
-    let options = home.join("options.txt");
-    if !options.exists() {
-        let _ = std::fs::write(
-            options,
-            "tutorialStep:none
-renderDistance:8
-simulationDistance:8
-",
-        );
-    }
 }
 
 /// Opens `url` in the phone's browser: an `ACTION_VIEW` intent from the activity.

@@ -184,10 +184,12 @@ impl ApplicationHandler for Screen {
                 window.request_redraw();
             }
             WindowEvent::KeyboardInput { event, .. } if event.state == ElementState::Pressed => {
-                // Android's back button (and Escape on a PC): a step back, else leave.
+                // Android's back button (and Escape on a PC): a step back. On the phone's
+                // home it does nothing: a stray back gesture mustn't close the app (Android's
+                // home and app switcher still leave it).
                 let back = matches!(event.logical_key, Key::Named(NamedKey::BrowserBack))
                     || event.physical_key == PhysicalKey::Code(KeyCode::Escape);
-                if back && !self.setup.back() {
+                if back && !self.setup.back() && !wisp_client::phone::on_phone() {
                     event_loop.exit();
                 }
                 window.request_redraw();

@@ -1,7 +1,8 @@
 # Wisp for Android
 
 The phone app runs the same Rust game as the PC (Minecraft: Java Edition 26.3), as a library in a
-NativeActivity: no Java or Kotlin code, no Gradle.
+NativeActivity, no Gradle. The only Java is `WispActivity` (`packaging/android/java`), a
+NativeActivity that hides the system bars; `build-apk.sh` compiles it with javac and d8.
 
 | Part | Where |
 |---|---|
@@ -35,6 +36,13 @@ the APK. The launcher on the player's PC offers its prepared folder while Settin
   folder. The app answers the game's session renewals itself (`phone::msa::renew_in_background`).
 - Android allows one winit event loop per process: the setup screen and the game share it
   (`game::run_app`, `run_app_on_demand`), and the game's `resumed` is replayed for the second app.
+- The system bars are hidden "sticky" (`WispActivity`): a swipe from an edge first only shows
+  them, so a thumb sliding off the screen doesn't go home. The touch buttons keep
+  `Layout::edge` (0.45 units) free along the edges, and back on the setup's home does nothing.
+- Phone options (`phone::apply_phone_defaults`, once per `PHONE_DEFAULTS_VERSION`): fast
+  graphics, render distance 6 and simulation distance 5, 60 FPS, no clouds/shadows/smooth
+  lighting, the world at 50 % resolution, a 2 MiB chunk upload budget per frame, culling and
+  battery mode. Bump the version to give installs new ones.
 - Going to the background drops the window surface (`Renderer::suspend_surface`), pauses and saves
   the world; coming back makes a new surface.
 - mimalloc is built with local-dynamic TLS on Android (a dlopened library can't use initial-exec).

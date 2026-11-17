@@ -47,6 +47,17 @@ const TEXTS: &[(&str, &str, &str)] = &[
     ),
     ("account", "Account", "Konto"),
     (
+        "tagline",
+        "Minecraft {version}, in your pocket",
+        "Minecraft {version} für die Hosentasche",
+    ),
+    ("ready_to_play", "Ready to play", "Bereit zum Spielen"),
+    (
+        "setup_first",
+        "Two quick steps, then you play",
+        "Zwei kurze Schritte, dann geht's los",
+    ),
+    (
         "signed_in_as",
         "Signed in as {name}",
         "Angemeldet als {name}",

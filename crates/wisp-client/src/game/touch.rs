@@ -126,25 +126,42 @@ impl Layout {
         }
     }
 
+    /// Room kept free along the screen's edges: rounded corners, a camera cutout and the
+    /// system's edge gestures sit there, and a thumb that reaches for a button at the very edge
+    /// slides off the screen.
+    fn edge(&self) -> f64 {
+        0.45 * self.unit
+    }
+
     /// A button's centre and radius.
     fn button(&self, button: Button) -> ((f64, f64), f64) {
         let u = self.unit;
+        let e = self.edge();
         let (w, h) = (self.w, self.h);
         // The hotbar's ends (vanilla: 182 × 22 GUI pixels, centred at the bottom).
         let bar = 91.0 * self.gui;
         // Level with the hotbar, but never off the bottom edge.
-        let bar_y = (h - 11.0 * self.gui).min(h - 0.5 * u);
+        let bar_y = (h - 11.0 * self.gui).min(h - 0.55 * u);
+        // The top row: Pause alone in the corner, the others apart from it, so a reach for chat
+        // doesn't pause the game.
+        let top = e + 0.45 * u;
         match button {
-            Button::Jump => ((w - 1.35 * u, h - 1.7 * u), 0.8 * u),
-            Button::Sneak => ((w - 3.2 * u, h - 1.1 * u), 0.6 * u),
-            Button::Inventory => ((w / 2.0 + bar + 0.6 * u, bar_y), 0.45 * u),
-            Button::Drop => ((w / 2.0 - bar - 0.6 * u, bar_y), 0.45 * u),
+            Button::Jump => ((w - e - 1.05 * u, h - e - 1.35 * u), 0.85 * u),
+            Button::Sneak => ((w - e - 3.0 * u, h - e - 0.75 * u), 0.62 * u),
+            Button::Inventory => ((w / 2.0 + bar + 0.65 * u, bar_y), 0.47 * u),
+            Button::Drop => ((w / 2.0 - bar - 0.65 * u, bar_y), 0.47 * u),
             // Top left: the top right is where toasts (advancements, the tutorial) appear.
-            Button::Pause => ((0.7 * u, 0.7 * u), 0.42 * u),
-            Button::Chat => ((1.85 * u, 0.7 * u), 0.42 * u),
-            Button::Perspective => ((3.0 * u, 0.7 * u), 0.42 * u),
-            Button::WispMenu => ((4.15 * u, 0.7 * u), 0.42 * u),
+            Button::Pause => ((e + 0.45 * u, top), 0.42 * u),
+            Button::Chat => ((e + 2.0 * u, top), 0.42 * u),
+            Button::Perspective => ((e + 3.2 * u, top), 0.42 * u),
+            Button::WispMenu => ((e + 4.4 * u, top), 0.42 * u),
         }
+    }
+
+    /// Where the joystick rests until a thumb lands (it is drawn faintly there).
+    fn stick_home(&self) -> (f64, f64) {
+        let e = self.edge();
+        (e + 1.6 * self.unit, self.h - e - 1.6 * self.unit)
     }
 
     fn button_at(&self, at: (f64, f64)) -> Option<Button> {
@@ -191,6 +208,12 @@ fn tilt(origin: (f64, f64), at: (f64, f64), radius: f64) -> ([f32; 2], bool) {
     ([dx as f32, dy as f32], length >= 0.95 && dy > 0.6)
 }
 
+/// The game's move vector `[left, forward]` (vanilla's `leftImpulse`, `forwardImpulse`) from the
+/// stick's tilt (x right): pushed to the right walks right.
+fn move_vector(stick: [f32; 2]) -> [f32; 2] {
+    [-stick[0], stick[1]]
+}
+
 impl Game<'_> {
     fn touch_layout(&self) -> Option<Layout> {
         let renderer = self.renderer.as_ref()?;
@@ -213,7 +236,7 @@ impl Game<'_> {
     /// The joystick's move vector while playing (like the controller's left stick).
     pub(super) fn touch_move(&self) -> Option<[f32; 2]> {
         (self.touch.active && self.touch.stick != [0.0; 2] && self.touch_playing())
-            .then_some(self.touch.stick)
+            .then(|| move_vector(self.touch.stick))
     }
 
     /// A finger on the window.
@@ -607,15 +630,32 @@ impl Game<'_> {
                 _ => None,
             })
             .collect();
+        let rim = color::with_alpha(color::hex(0xffffff, 255), 0.22);
         for button in BUTTONS {
             let ((x, y), r) = layout.button(button);
             let (x, y, r) = (x as f32, y as f32, r as f32);
             let on =
                 held.contains(&button) || (button == Button::Sneak && self.touch.sneak_latched);
-            ui.circle(x, y, r, if on { lit } else { plate });
+            // A thin light rim, so the buttons read on bright ground (snow, sand, the sky).
+            ui.circle(x, y, r, if on { lit } else { rim });
+            ui.circle(x, y, r * 0.9, if on { lit } else { plate });
             draw_glyph(&mut ui, button, x, y, r, ink);
         }
-        // The joystick: its ring where the thumb landed, the knob under the thumb.
+        // The joystick: faint where it rests, else its ring where the thumb landed and the
+        // knob under the thumb.
+        if !self
+            .touch
+            .fingers
+            .iter()
+            .any(|f| matches!(f.role, Role::Stick { .. }))
+        {
+            let (x, y) = layout.stick_home();
+            let r = layout.stick_radius() as f32;
+            let faint = color::with_alpha(color::hex(0xffffff, 255), 0.12);
+            ui.circle(x as f32, y as f32, r, faint);
+            ui.circle(x as f32, y as f32, r * 0.94, color::with_alpha(plate, 0.5));
+            ui.circle(x as f32, y as f32, r * 0.42, faint);
+        }
         for finger in &self.touch.fingers {
             if let Role::Stick { origin } = finger.role {
                 let r = layout.stick_radius() as f32;
@@ -720,6 +760,30 @@ mod tests {
     }
 
     #[test]
+    fn buttons_keep_clear_of_the_edges_and_of_each_others_touch() {
+        // Edge gestures, rounded corners: the side and top buttons keep the edge's room free.
+        for l in [
+            phone(),
+            Layout::new(1920.0, 1080.0, 3.0),
+            Layout::new(2960.0, 1440.0, 4.0),
+        ] {
+            let e = l.edge();
+            for b in BUTTONS {
+                let ((x, y), r) = l.button(b);
+                assert!(
+                    x - r >= e * 0.99 && x + r <= l.w - e * 0.99 && y - r >= e * 0.99,
+                    "{b:?}"
+                );
+                for other in BUTTONS.into_iter().filter(|o| *o != b) {
+                    let (c, ro) = l.button(other);
+                    // Their touch areas (a third wider than the drawing) don't meet.
+                    assert!(distance((x, y), c) > (r + ro) * 1.35, "{b:?} and {other:?}");
+                }
+            }
+        }
+    }
+
+    #[test]
     fn the_hotbar_slots() {
         let l = phone();
         let left = 1200.0 - 91.0 * 4.0;
@@ -742,5 +806,15 @@ mod tests {
         assert_eq!((full, edge), ([0.0, 1.0], true));
         // Full to the side moves sideways without sprinting.
         assert!(!tilt((0.0, 0.0), (300.0, 0.0), r).1);
+    }
+
+    #[test]
+    fn the_stick_pushed_right_walks_right() {
+        // The move vector is [left, forward], as `Keys::with_stick` and the controller take it.
+        let (right, _) = tilt((0.0, 0.0), (300.0, 0.0), 100.0);
+        let [left, forward] = move_vector(right);
+        assert!(left < -0.9 && forward == 0.0);
+        let keys = wisp_client::sprint::Keys::default().with_stick(Some(move_vector(right)));
+        assert!(keys.right && !keys.left);
     }
 }
