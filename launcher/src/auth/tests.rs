@@ -358,3 +358,24 @@ fn several_accounts_are_kept_and_one_plays() {
     remove(&scratch.0, &second.account.uuid).unwrap();
     assert!(saved(&scratch.0).unwrap().is_none());
 }
+
+#[test]
+fn a_failing_entitlements_service_falls_back_to_the_profile() {
+    let mut replies = login_replies(true);
+    let profile = replies.pop().unwrap();
+    // The entitlements service is busy; the profile answers for it, then the sign-in reads it.
+    replies.last_mut().unwrap().1 = 503;
+    replies.push(profile.clone());
+    replies.push(profile);
+    let (ep, worker) = mock(replies);
+    let (account, _) = finish_sign_in(
+        &ep,
+        MsTokens {
+            access: "fixture-ms".into(),
+            refresh: "fixture-refresh".into(),
+        },
+    )
+    .unwrap();
+    assert_eq!(account.name, "TestPlayer");
+    worker.join().unwrap();
+}

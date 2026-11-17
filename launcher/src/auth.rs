@@ -406,7 +406,21 @@ fn owns_game(ep: &Endpoints, token: &str) -> Result<bool, String> {
         "the Minecraft services",
     )?;
     if status != 200 {
-        return Err("Could not check which games this account owns.".into());
+        // The entitlements service fails now and then (busy, rate limited) while the rest of the
+        // sign-in works. A Java Edition profile exists only for an account that owns the game
+        // (Game Pass included), so it answers instead.
+        eprintln!("Wisp launcher: entitlements answered {status}, asking the profile instead");
+        return match profile(ep, token) {
+            Ok(Some(_)) => Ok(true),
+            Ok(None) => Ok(false),
+            Err(_) if status == 429 => {
+                Err("Too many sign-ins in a short time. Wait a minute and try again.".into())
+            }
+            // The status says why: 403 is an app Mojang hasn't approved, 5xx a busy service.
+            Err(_) => Err(format!(
+                "Could not check which games this account owns (Minecraft services: {status})."
+            )),
+        };
     }
     Ok(v.get("items")
         .and_then(Value::as_array)
