@@ -7,7 +7,6 @@
 //! follows its price.
 use super::catalog_views::cat_panel;
 use super::friends_view::FriendCmd;
-use super::reference_views::{glow, luminous};
 use super::*;
 use wisp_launcher::{
     catalog,
@@ -124,13 +123,13 @@ fn coins(n: u32) -> String {
     out
 }
 
-/// The dark boxes of search, filter, sort and the header pills.
+/// The glass plates of search, filter, sort, notices and the header pills.
 fn field(s: f32) -> Div {
     div()
-        .rounded(px(10. * s))
+        .rounded(px(12. * s))
         .border_1()
-        .border_color(rgb(tone(0x2e3035)))
-        .bg(rgb(tone(0x17181b)))
+        .border_color(rgba(0xffffff1f))
+        .bg(rgba(0x0b0b0dc4))
 }
 
 /// An item's price: with a creator's `discount` (percent) the lower price, the full one struck
@@ -215,7 +214,7 @@ impl Launcher {
             .flex()
             .items_center()
             .gap(px(12. * s))
-            .child(icon("star", accent_tone(ACCENT)).size(px(18. * s)));
+            .child(icon("star", 0xf2c14e).size(px(18. * s)));
         match &self.server_wallet.supporting {
             Some((name, code)) => row
                 .child(
@@ -293,22 +292,16 @@ impl Launcher {
         let id = offer.id;
         div()
             .id(SharedString::from(format!("shop-{key}-{id}")))
-            .h(px(if big { 46. } else { 32. } * s))
-            .px(px(if big { 26. } else { 14. } * s))
+            .h(px(if big { 52. } else { 34. } * s))
+            .px(px(if big { 28. } else { 14. } * s))
             .flex_none()
-            .rounded(px(if big { 10. } else { 8. } * s))
-            .border_1()
-            .border_color(rgb(if bright {
-                accent_tone(0x6fe792)
-            } else {
-                tone(0x3a3c43)
-            }))
-            .bg(if bright {
-                luminous()
-            } else {
-                rgb(tone(0x232429)).into()
+            .rounded_full()
+            .when(bright, |d| d.bg(rgb(0xffffff)).text_color(rgb(0x0b0b0d)))
+            .when(!bright, |d| {
+                d.bg(rgba(0xffffff14))
+                    .border_1()
+                    .border_color(rgba(0xffffff2e))
             })
-            .when(bright && big, |d| d.shadow(glow(s)))
             .when(short, |d| d.opacity(0.55))
             .flex()
             .items_center()
@@ -318,7 +311,10 @@ impl Launcher {
             .font_weight(FontWeight::SEMIBOLD)
             .cursor_pointer()
             .hover(|d| d.opacity(0.86))
-            .child(icon(glyph, INK).size(px(if big { 19. } else { 14. } * s)))
+            .child(
+                icon(glyph, if bright { 0x0b0b0d } else { INK })
+                    .size(px(if big { 19. } else { 14. } * s)),
+            )
             .child(tr(label))
             .on_click(cx.listener(move |this, _, _, cx| this.shop_act(id, cx)))
     }
@@ -347,10 +343,8 @@ impl Launcher {
                     .items_center()
                     .gap(px(9. * s))
                     .cursor_pointer()
-                    .when(self.shop.show == Show::Owned, |d| {
-                        d.border_color(rgb(accent_tone(ACCENT)))
-                    })
-                    .hover(|d| d.bg(rgb(tone(0x202125))))
+                    .when(self.shop.show == Show::Owned, |d| d.border_color(rgba(0xffffffcc)))
+                    .hover(|d| d.bg(rgba(0xffffff14)))
                     .child(icon("star", INK).size(px(19. * s)))
                     .child(
                         div()
@@ -444,11 +438,11 @@ impl Launcher {
                     .flex_1()
                     .min_w_0()
                     .h_full()
-                    .rounded(px(14. * s))
+                    .rounded(px(20. * s))
                     .border_1()
-                    .border_color(rgb(tone(0x2e3035)))
+                    .border_color(rgba(0xffffff1f))
                     .overflow_hidden()
-                    .bg(rgb(tone(0x151618)))
+                    .bg(rgba(0x0b0b0dc4))
                     .child(
                         img(format!("shop/banner_{id}.png"))
                             .absolute()
@@ -477,21 +471,21 @@ impl Launcher {
                                     .gap(px(8. * s))
                                     .child(
                                         div()
-                                            .px(px(10. * s))
+                                            .px(px(12. * s))
                                             .py(px(4. * s))
-                                            .rounded(px(6. * s))
-                                            .bg(rgba(accent_tone_a(0x3ccf6a33)))
-                                            .border_1()
-                                            .border_color(rgb(accent_tone(0x3ccf6a)))
+                                            .rounded_full()
+                                            .bg(rgb(0xffffff))
+                                            .text_color(rgb(0x0b0b0d))
                                             .text_size(px(13. * s))
                                             .font_weight(FontWeight::SEMIBOLD)
                                             .child(tr(chip).to_uppercase()),
                                     )
                                     .child(
                                         div()
-                                            .px(px(10. * s))
+                                            .px(px(12. * s))
                                             .py(px(4. * s))
-                                            .rounded(px(6. * s))
+                                            .rounded_full()
+                                            .bg(rgba(0x0b0b0d99))
                                             .border_1()
                                             .border_color(rgb(tier_colour))
                                             .text_color(rgb(tier_colour))
@@ -537,11 +531,7 @@ impl Launcher {
                                     .h(px(4. * s))
                                     .w(px(if i == current { 28. } else { 12. } * s))
                                     .rounded_full()
-                                    .bg(if i == current {
-                                        luminous()
-                                    } else {
-                                        rgba(0xffffff40).into()
-                                    })
+                                    .bg(rgba(if i == current { 0xffffffff } else { 0xffffff40 }))
                             })),
                     ),
             )
@@ -558,14 +548,10 @@ impl Launcher {
                             .id(("shop-slide", i))
                             .flex_1()
                             .relative()
-                            .rounded(px(12. * s))
+                            .rounded(px(16. * s))
                             .overflow_hidden()
                             .border_2()
-                            .border_color(if on {
-                                rgb(accent_tone(ACCENT))
-                            } else {
-                                rgb(tone(0x2e3035))
-                            })
+                            .border_color(rgba(if on { 0xffffffd9 } else { 0xffffff14 }))
                             .cursor_pointer()
                             .child(
                                 img(format!("shop/{id}.png"))
@@ -590,7 +576,7 @@ impl Launcher {
                                     .child(
                                         div()
                                             .text_size(px(11. * s))
-                                            .text_color(rgb(accent_tone(0x6fe792)))
+                                            .text_color(rgb(0xb4b6bd))
                                             .font_weight(FontWeight::SEMIBOLD)
                                             .child(tr(chip).to_uppercase()),
                                     )
@@ -624,30 +610,27 @@ impl Launcher {
             .count();
         div()
             .id(("shop-tab", i))
-            .h(px(40. * s))
-            .px(px(12. * s))
-            .rounded(px(8. * s))
+            .h(px(38. * s))
+            .px(px(14. * s))
+            .rounded_full()
             .flex()
             .items_center()
             .gap(px(8. * s))
             .cursor_pointer()
-            .when(on, |d| d.bg(rgb(tone(0x232429))))
-            .when(!on, |d| d.hover(|d| d.bg(rgb(tone(0x1c1d21)))))
-            .child(icon(glyph, if on { accent_tone(ACCENT) } else { MUTED }).size(px(17. * s)))
+            .when(on, |d| d.bg(rgb(0xffffff)))
+            .when(!on, |d| d.hover(|d| d.bg(rgba(0xffffff14))))
+            .child(icon(glyph, if on { 0x0b0b0d } else { 0xb4b6bd }).size(px(16. * s)))
             .child(
                 div()
                     .text_size(px(15. * s))
-                    .text_color(rgb(if on { INK } else { 0xc4c6cc }))
+                    .text_color(rgb(if on { 0x0b0b0d } else { 0xc4c6cc }))
                     .when(on, |d| d.font_weight(FontWeight::SEMIBOLD))
                     .child(tr(label)),
             )
             .child(
                 div()
-                    .px(px(6. * s))
-                    .rounded(px(5. * s))
-                    .bg(rgb(tone(if on { 0x34363d } else { 0x1f2024 })))
-                    .text_size(px(11. * s))
-                    .text_color(rgb(MUTED))
+                    .text_size(px(12. * s))
+                    .text_color(rgb(if on { 0x55575e } else { 0x8e9099 }))
                     .child(count.to_string()),
             )
             .on_click(cx.listener(move |this, _, _, cx| {
@@ -680,7 +663,7 @@ impl Launcher {
             .flex()
             .items_center()
             .gap(px(10. * s))
-            .child(icon(kind_icon(kind), accent_tone(ACCENT)).size(px(20. * s)))
+            .child(icon(kind_icon(kind), INK).size(px(20. * s)))
             .child(
                 div()
                     .text_size(px(20. * s))
@@ -698,7 +681,7 @@ impl Launcher {
                     .flex_1()
                     .h(px(1.))
                     .mx(px(8. * s))
-                    .bg(rgb(tone(0x26272c))),
+                    .bg(rgba(0xffffff14)),
             )
             .child(
                 div()
@@ -712,7 +695,7 @@ impl Launcher {
                     .cursor_pointer()
                     .text_size(px(14. * s))
                     .text_color(rgb(MUTED))
-                    .hover(|d| d.bg(rgb(tone(0x1f2024))).text_color(rgb(INK)))
+                    .hover(|d| d.bg(rgba(0xffffff14)).text_color(rgb(INK)))
                     .child(tr("See all"))
                     .child(icon("chevron-right", MUTED).size(px(14. * s)))
                     .on_click(cx.listener(move |this, _, _, cx| {
@@ -728,7 +711,7 @@ impl Launcher {
         let worn = self.wallet.wears(offer.id);
         let (tier_name, tier_colour) = tier(offer);
         let state = if worn {
-            Some(("Equipped", accent_tone(ACCENT)))
+            Some(("Equipped", 0xffffff))
         } else if owned {
             Some(("Owned", 0xc4c6cc))
         } else {
@@ -738,24 +721,22 @@ impl Launcher {
             .id(SharedString::from(format!("shop-card-{}", offer.id)))
             .flex_1()
             .min_w_0()
-            .rounded(px(12. * s))
-            .overflow_hidden()
+            .p(px(8. * s))
+            .rounded(px(18. * s))
             .border_1()
-            .border_color(rgb(if worn {
-                accent_tone(0x2f9e52)
-            } else {
-                tone(0x2a2b30)
-            }))
-            .bg(rgb(tone(0x17181b)))
-            .hover(|d| d.border_color(rgb(tone(0x4a4c54))))
+            .border_color(rgba(if worn { 0xffffffcc } else { 0xffffff17 }))
+            .bg(rgba(0x111215e6))
+            .hover(move |d| d.border_color(rgba(if worn { 0xffffffcc } else { 0xffffff47 })))
             .child(
                 div()
                     .relative()
-                    .h(px(132. * s))
+                    .h(px(150. * s))
+                    .rounded(px(12. * s))
+                    .overflow_hidden()
                     .bg(gpui::linear_gradient(
                         0.,
                         gpui::linear_color_stop(rgba((tier_colour << 8) | 0x40), 0.),
-                        gpui::linear_color_stop(rgba(tone_a(0x17181bff)), 1.),
+                        gpui::linear_color_stop(rgba(0x16171aff), 1.),
                     ))
                     .child(
                         img(format!("shop/{}.png", offer.id))
@@ -779,8 +760,8 @@ impl Launcher {
                                 .right(px(8. * s))
                                 .px(px(8. * s))
                                 .py(px(3. * s))
-                                .rounded(px(6. * s))
-                                .bg(rgba(tone_a(0x0e0f11d0)))
+                                .rounded_full()
+                                .bg(rgba(0x0b0b0dd0))
                                 .flex()
                                 .items_center()
                                 .gap(px(5. * s))
@@ -799,8 +780,8 @@ impl Launcher {
                                 .left(px(8. * s))
                                 .px(px(8. * s))
                                 .py(px(3. * s))
-                                .rounded(px(6. * s))
-                                .bg(rgba(tone_a(0x0e0f11d0)))
+                                .rounded_full()
+                                .bg(rgba(0x0b0b0dd0))
                                 .text_size(px(11. * s))
                                 .child(format!("{} {creator}", tr("by"))),
                         )
@@ -808,9 +789,9 @@ impl Launcher {
             )
             .child(
                 div()
-                    .px(px(12. * s))
-                    .pt(px(10. * s))
-                    .pb(px(12. * s))
+                    .px(px(6. * s))
+                    .pt(px(12. * s))
+                    .pb(px(6. * s))
                     .child(
                         div()
                             .flex()
@@ -929,8 +910,8 @@ impl Launcher {
                 .items_center()
                 .gap(px(8. * s))
                 .cursor_pointer()
-                .hover(|d| d.bg(rgb(tone(0x202125))))
-                .child(icon(glyph, MUTED).size(px(16. * s)))
+                .hover(|d| d.bg(rgba(0xffffff14)))
+                .child(icon(glyph, INK).size(px(16. * s)))
                 .child(div().text_size(px(14. * s)).child(tr(label)))
                 .child(icon("down", MUTED).size(px(14. * s)))
         };
@@ -945,7 +926,7 @@ impl Launcher {
                     field(s)
                         .px(px(14. * s))
                         .py(px(10. * s))
-                        .border_color(rgb(0x9a536a))
+                        .border_color(rgba(0xff8a8a66))
                         .flex()
                         .items_center()
                         .gap(px(10. * s))
@@ -962,16 +943,16 @@ impl Launcher {
                     .flex()
                     .items_center()
                     .gap(px(10. * s))
-                    .pb(px(10. * s))
-                    .border_b_1()
-                    .border_color(rgb(tone(0x232429)))
                     .child(
                         div()
                             .flex()
                             .flex_wrap()
-                            .gap(px(4. * s))
-                            .flex_1()
-                            .min_w_0()
+                            .gap(px(2. * s))
+                            .p(px(5. * s))
+                            .rounded(px(26. * s))
+                            .bg(rgba(0x0b0b0d8c))
+                            .border_1()
+                            .border_color(rgba(0xffffff1a))
                             .children(
                                 std::iter::once(None)
                                     .chain(Kind::ALL.into_iter().map(Some))
@@ -1016,14 +997,14 @@ impl Launcher {
                     field(s)
                         .px(px(14. * s))
                         .py(px(10. * s))
-                        .border_color(rgb(if bad { 0x9a536a } else { accent_tone(0x2f9e52) }))
+                        .border_color(rgba(if bad { 0xff8a8a66 } else { 0xffffff40 }))
                         .flex()
                         .items_center()
                         .gap(px(10. * s))
                         .child(
                             icon(
                                 if bad { "info" } else { "check-circle" },
-                                if bad { 0xf08a96 } else { accent_tone(ACCENT) },
+                                if bad { 0xf08a96 } else { 0x4ade80 },
                             )
                             .size(px(18. * s)),
                         )
