@@ -244,23 +244,17 @@ impl Launcher {
             b.sort();
             a != b
         });
-        let header = div()
+        let summary = trf(
+            "{owned} items owned, {worn} equipped. Pick items to try them on, then equip the look you like.",
+            &[
+                ("owned", &owned.len().to_string()),
+                ("worn", &self.wallet.equipped.len().to_string()),
+            ],
+        );
+        let actions = div()
             .flex()
             .items_center()
             .gap(px(10. * s))
-            .child(
-                div()
-                    .flex_1()
-                    .min_w_0()
-                    .child(div().text_size(px(30. * s)).font_weight(FontWeight::SEMIBOLD).child(tr("Locker")))
-                    .child(div().text_size(px(15. * s)).text_color(rgb(MUTED)).child(trf(
-                        "{owned} items owned, {worn} equipped. Pick items to try them on, then equip the look you like.",
-                        &[
-                            ("owned", &owned.len().to_string()),
-                            ("worn", &self.wallet.equipped.len().to_string()),
-                        ],
-                    ))),
-            )
             .when(changed, |d| {
                 d.child(
                     self.locker_button("locker-reset", "Reset", "refresh", false)
@@ -275,6 +269,7 @@ impl Launcher {
                     .when(!changed, |d| d.opacity(0.6))
                     .when(changed, |d| d.on_click(cx.listener(|this, _, _, cx| this.locker_equip(cx)))),
             );
+        let header = self.page_head(("Back to Home", Page::Home), "Cosmetics", &summary, Some(actions), cx);
         if owned.is_empty() {
             return div()
                 .flex()

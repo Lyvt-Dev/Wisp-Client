@@ -70,7 +70,7 @@ impl Launcher {
 
     /// The friends column on the right. The launcher has no friends service: it shows the
     /// player and how to play together through invite codes.
-    pub(super) fn friends_panel(&self, cx: &mut Context<Self>) -> Div {
+    pub(super) fn friends_panel(&self, cx: &mut Context<Self>) -> Stateful<Div> {
         let s = self.ui_scale;
         let presence = if self.child.is_some() {
             tr("Playing Wisp")
@@ -80,14 +80,25 @@ impl Launcher {
             tr("Not signed in")
         };
         div()
-            .w(px(300. * s))
+            .id("friends-panel")
+            .w(px(340. * s))
             .h_full()
             .flex_none()
             .flex()
             .flex_col()
-            .border_l_1()
-            .border_color(rgb(tone(RULE)))
-            .bg(rgb(tone(0x141518)))
+            .overflow_hidden()
+            .rounded(px(18. * s))
+            .border_1()
+            .border_color(rgba(0xffffff1a))
+            .bg(rgba(0x111215f2))
+            .shadow(vec![gpui::BoxShadow {
+                color: rgba(0x00000080).into(),
+                offset: gpui::point(px(0.), px(12. * s)),
+                blur_radius: px(40. * s),
+                spread_radius: px(0.),
+                inset: false,
+            }])
+            .occlude()
             .child(
                 div()
                     .h(px(52. * s))

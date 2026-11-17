@@ -962,11 +962,17 @@ impl Render for Launcher {
                                 )
                             }),
                     )
-                    .when(
-                        self.prefs.side_panel && f32::from(viewport.width) >= 1100.,
-                        |d| d.child(self.friends_panel(cx)),
-                    ),
             )
+            .when(self.prefs.side_panel, |d| {
+                d.child(
+                    div()
+                        .absolute()
+                        .top(px(84. * s))
+                        .right(px(24. * s))
+                        .bottom(px(24. * s))
+                        .child(self.friends_panel(cx)),
+                )
+            })
     }
 }
 

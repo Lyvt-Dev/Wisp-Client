@@ -329,25 +329,15 @@ impl Launcher {
         let collected = self.wallet.bonus_day == Some(shop::today());
         div()
             .flex()
-            .items_center()
+            .items_end()
             .gap(px(14. * s))
-            .child(
-                div()
-                    .flex_1()
-                    .min_w_0()
-                    .child(
-                        div()
-                            .text_size(px(30. * s))
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .child(tr("Store")),
-                    )
-                    .child(
-                        div()
-                            .text_size(px(15. * s))
-                            .text_color(rgb(MUTED))
-                            .child(tr("Capes, wings, pets, trails, auras and emotes for your Wisp player.")),
-                    ),
-            )
+            .child(div().flex_1().min_w_0().child(self.page_head(
+                ("Back to Home", Page::Home),
+                "Store",
+                "Capes, wings, pets, trails, auras and emotes for your Wisp player.",
+                None,
+                cx,
+            )))
             .child(
                 field(s)
                     .id("shop-owned")
