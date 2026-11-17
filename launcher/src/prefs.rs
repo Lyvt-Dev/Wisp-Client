@@ -262,7 +262,7 @@ impl Default for Prefs {
             accent: Accent::Mono,
             backdrop: Backdrop::Black,
             banner: Banner::Lake,
-            side_panel: true,
+            side_panel: false,
             service_url: String::new(),
             show_mine: true,
             others: Others::Shown,

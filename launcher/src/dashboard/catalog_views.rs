@@ -20,7 +20,6 @@ pub(super) struct CatalogUi {
     pub shader_clouds: bool,
     pub local_only: bool,
     pub favorites_only: bool,
-    pub expanded_instance: Option<usize>,
     pub activity: bool,
     /// The Mods page's category tab (None: all).
     pub mods_category: Option<usize>,

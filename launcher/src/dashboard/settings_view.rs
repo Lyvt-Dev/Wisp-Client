@@ -801,9 +801,34 @@ impl Launcher {
                 backdrops,
             ))
             .child(heading("Home", s))
+            .child(row(
+                "Background pictures",
+                "Put your own pictures (PNG or JPG) in this folder: they take turns behind the launcher and on the instance cards. Without any, Wisp shows your newest screenshot or the title screen of your Minecraft.",
+                div()
+                    .id("open-backgrounds")
+                    .flex_none()
+                    .px(px(14. * s))
+                    .py(px(8. * s))
+                    .rounded(px(8. * s))
+                    .border_1()
+                    .border_color(rgb(tone(RULE)))
+                    .text_size(px(14. * s))
+                    .cursor_pointer()
+                    .hover(|d| d.bg(rgb(tone(RAISED))))
+                    .child(tr("Open folder"))
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        let dir = this.home.join(super::shell::BACKGROUNDS);
+                        if let Err(e) = std::fs::create_dir_all(&dir) {
+                            this.error(e.to_string());
+                            return;
+                        }
+                        this.show_path(dir, cx);
+                    })),
+                s,
+            ))
             .child(block(
                 "Banner artwork",
-                "The picture behind the Launch button.",
+                "Shown when there is no background picture, screenshot or Minecraft title screen yet.",
                 banners,
             ))
             .child(heading("Layout", s))

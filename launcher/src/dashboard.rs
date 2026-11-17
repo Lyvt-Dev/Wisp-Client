@@ -30,6 +30,7 @@ mod profile_view;
 mod reference_views;
 mod search_input;
 mod settings_view;
+mod shell;
 mod shaders_view;
 mod shop_view;
 mod theme;
@@ -277,6 +278,10 @@ struct Launcher {
     slide: usize,
     ui_scale: f32,
     instance_menu: bool,
+    /// Real Minecraft pictures from the player's own files, for the backdrop and the cards.
+    art: shell::Art,
+    /// The window's size at the last frame, in pixels.
+    viewport: (f32, f32),
     avatar_key: Option<String>,
     avatar: Option<Arc<gpui::RenderImage>>,
     /// The player's whole front view, for the profile page.
@@ -542,6 +547,8 @@ impl Launcher {
             slide: 0,
             ui_scale: 0.8,
             instance_menu: false,
+            art: shell::Art::default(),
+            viewport: (1340., 754.),
             avatar_key: None,
             avatar: None,
             body: None,
@@ -876,6 +883,8 @@ impl Render for Launcher {
             window.minimize_window();
         }
         theme::apply(&self.prefs);
+        self.viewport = (f32::from(viewport.width), f32::from(viewport.height));
+        self.art.refresh(&self.home, &self.settings);
         self.content.refresh(
             &self.home,
             self.settings.current().map(|p| p.game_home.as_path()),
@@ -907,35 +916,36 @@ impl Render for Launcher {
                 this.page = Page::Setup;
                 cx.notify();
             }))
+            .relative()
             .flex_col()
-            .child(self.titlebar(cx))
+            .child(self.backdrop())
+            .child(self.topbar(cx))
             .child(
                 div()
                     .flex_1()
                     .min_h_0()
                     .flex()
-                    .child(self.sidebar(cx))
                     .child(
                         div()
                             .flex_1()
                             .min_w_0()
                             .flex()
                             .flex_col()
-                            .rounded_tl(px(14. * s))
-                            .border_t_1()
-                            .border_l_1()
-                            .border_color(rgb(tone(RULE)))
-                            .bg(rgb(tone(PAGE)))
-                            .px(px(22. * s))
-                            .pt(px(if self.page == Page::Home { 4. } else { 18. } * s))
-                            .pb(px(if self.is_catalog() { 18. } else { 0. } * s))
+                            .when(self.page != Page::Home, |d| {
+                                d.px(px(64. * s)).pt(px(8. * s))
+                            })
+                            .pb(px(if self.is_catalog() { 24. } else { 0. } * s))
                             .child(
                                 div()
                                     .id("page-scroll")
                                     .flex_1()
                                     .min_h_0()
-                                    .when(self.is_catalog(), |d| d.overflow_hidden())
-                                    .when(!self.is_catalog(), |d| d.overflow_y_scroll())
+                                    .when(self.is_catalog() || self.page == Page::Home, |d| {
+                                        d.overflow_hidden()
+                                    })
+                                    .when(!self.is_catalog() && self.page != Page::Home, |d| {
+                                        d.overflow_y_scroll()
+                                    })
                                     .child(self.page_content(cx)),
                             )
                             .when(self.failed && self.page != Page::Home, |s| {
