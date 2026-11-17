@@ -32,6 +32,16 @@ impl Category {
             Self::Utility => "Utility",
         }
     }
+    /// The card banner's colour.
+    fn colour(self) -> u32 {
+        match self {
+            Self::Hud => 0x4f7cff,
+            Self::Panel => 0x22a99a,
+            Self::Combat => 0xe5534b,
+            Self::Visual => 0xf09a2e,
+            Self::Utility => 0x8b6cff,
+        }
+    }
     fn icon(self) -> &'static str {
         match self {
             Self::Hud => "dashboard-square-01",
@@ -99,14 +109,14 @@ fn switch(on: bool, s: f32) -> Div {
         .flex_none()
         .rounded_full()
         .p(px(3. * s))
-        .when(on, |d| d.bg(luminous()).justify_end())
+        .when(on, |d| d.bg(rgb(0xffffff)).justify_end())
         .when(!on, |d| d.bg(rgb(tone(0x2c2e33))))
         .flex()
         .child(
             div()
                 .size(px(16. * s))
                 .rounded_full()
-                .bg(rgb(if on { 0xffffff } else { 0x80838c })),
+                .bg(rgb(if on { 0x0b0b0d } else { 0x80838c })),
         )
 }
 
@@ -156,6 +166,8 @@ impl Launcher {
             .child(tr(label))
     }
 
+    /// A built-in feature as a card: a coloured banner with its category's icon, its name,
+    /// what it does, and its switch.
     fn feature_tile(
         &self,
         index: usize,
@@ -167,34 +179,22 @@ impl Launcher {
     ) -> Stateful<Div> {
         let s = self.ui_scale;
         let (category, text) = about(key);
+        let hue = category.colour();
         div()
             .id(("builtin-feature", index))
             .flex_1()
             .min_w_0()
-            .p(px(14. * s))
-            .rounded(px(12. * s))
+            .rounded(px(16. * s))
+            .overflow_hidden()
             .border_1()
-            .border_color(rgb(if on {
-                accent_tone(0x2f9e52)
-            } else {
-                tone(0x2a2b30)
-            }))
-            .bg(if on {
-                gpui::linear_gradient(
-                    135.,
-                    gpui::linear_color_stop(rgba(accent_tone_a(0x3ccf6a14)), 0.),
-                    gpui::linear_color_stop(rgba(tone_a(0x17181bff)), 1.),
-                )
-            } else {
-                rgb(tone(0x17181b)).into()
-            })
+            .border_color(rgba(if on { 0xffffff59 } else { 0xffffff14 }))
+            .bg(rgba(0x16171ae6))
             .flex()
-            .items_center()
-            .gap(px(12. * s))
+            .flex_col()
             .when(locked, |d| d.opacity(0.5))
             .when(!locked, |d| {
                 d.cursor_pointer()
-                    .hover(|d| d.border_color(rgb(tone(0x4a4c54))))
+                    .hover(|d| d.border_color(rgba(0xffffff40)))
             })
             .on_click(cx.listener(move |this, _, _, cx| {
                 if this.mods_locked() {
@@ -209,48 +209,100 @@ impl Launcher {
             }))
             .child(
                 div()
-                    .size(px(40. * s))
-                    .flex_none()
-                    .rounded(px(10. * s))
-                    .bg(if on {
-                        rgba(accent_tone_a(0x3ccf6a26))
-                    } else {
-                        rgba(tone_a(0x232429ff))
-                    })
+                    .relative()
+                    .h(px(118. * s))
                     .flex()
                     .items_center()
                     .justify_center()
+                    .bg(gpui::linear_gradient(
+                        160.,
+                        gpui::linear_color_stop(rgba((hue << 8) | 0x59), 0.),
+                        gpui::linear_color_stop(rgba((hue << 8) | 0x0d), 1.),
+                    ))
                     .child(
-                        icon(
-                            category.icon(),
-                            if on { accent_tone(ACCENT) } else { MUTED },
-                        )
-                        .size(px(19. * s)),
+                        div()
+                            .size(px(64. * s))
+                            .rounded(px(16. * s))
+                            .bg(rgb(hue))
+                            .shadow(vec![gpui::BoxShadow {
+                                color: rgba((hue << 8) | 0x55).into(),
+                                offset: gpui::point(px(0.), px(6. * s)),
+                                blur_radius: px(22. * s),
+                                spread_radius: px(0.),
+                                inset: false,
+                            }])
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .child(icon(category.icon(), 0xffffff).size(px(30. * s))),
                     ),
             )
             .child(
                 div()
-                    .flex_1()
-                    .min_w_0()
+                    .px(px(18. * s))
+                    .pt(px(14. * s))
+                    .pb(px(16. * s))
+                    .flex()
+                    .flex_col()
+                    .gap(px(6. * s))
                     .child(
                         div()
                             .truncate()
-                            .text_size(px(15. * s))
+                            .text_size(px(19. * s))
                             .font_weight(FontWeight::SEMIBOLD)
                             .child(tr(label)),
                     )
                     .child(
                         div()
-                            .mt(px(2. * s))
-                            .h(px(32. * s))
+                            .flex()
+                            .items_center()
+                            .gap(px(6. * s))
+                            .text_size(px(13. * s))
+                            .text_color(rgb(0xa9abb3))
+                            .child(tr("by Wisp"))
+                            .child(icon("check-circle", 0x3ccf6a).size(px(13. * s))),
+                    )
+                    .child(
+                        div()
+                            .h(px(40. * s))
                             .overflow_hidden()
-                            .text_size(px(12. * s))
-                            .line_height(px(16. * s))
-                            .text_color(rgb(MUTED))
+                            .text_size(px(14. * s))
+                            .line_height(px(20. * s))
+                            .text_color(rgb(0xc4c6cc))
                             .child(tr(text)),
+                    )
+                    .child(
+                        div()
+                            .mt(px(6. * s))
+                            .flex()
+                            .items_center()
+                            .justify_between()
+                            .child(
+                                div()
+                                    .flex()
+                                    .items_center()
+                                    .gap(px(8. * s))
+                                    .text_size(px(13. * s))
+                                    .text_color(rgb(if on { INK } else { 0x8e9099 }))
+                                    .child(switch(on, s))
+                                    .child(tr(if on { "On" } else { "Off" })),
+                            )
+                            .child(
+                                div()
+                                    .px(px(10. * s))
+                                    .py(px(3. * s))
+                                    .rounded_full()
+                                    .bg(rgba(0xffffff12))
+                                    .flex()
+                                    .items_center()
+                                    .gap(px(5. * s))
+                                    .text_size(px(12. * s))
+                                    .text_color(rgb(0xd9dadd))
+                                    .child(icon("check-circle", 0xd9dadd).size(px(12. * s)))
+                                    .child(tr("Built in")),
+                            ),
                     ),
             )
-            .child(switch(on, s))
     }
 
     /// The `.amod` modules: Zoom (installable from Wisp) and anything imported.
@@ -546,6 +598,103 @@ impl Launcher {
             .children(cards)
     }
 
+    /// What Browse shows: these mods, shaders or resource packs (each its own page).
+    pub(super) fn browse_kinds(&self, cx: &mut Context<Self>) -> Div {
+        let s = self.ui_scale;
+        let kinds = [
+            ("Mods", Page::Mods, "puzzle"),
+            ("Shaders", Page::Shaders, "sun"),
+            ("Resource packs", Page::Packs, "layers"),
+        ];
+        div()
+            .flex()
+            .p(px(4. * s))
+            .rounded(px(12. * s))
+            .bg(rgba(0x16171acc))
+            .border_1()
+            .border_color(rgba(0xffffff1a))
+            .children(kinds.into_iter().enumerate().map(|(i, (label, page, glyph))| {
+                let on = self.page == page;
+                div()
+                    .id(("browse-kind", i))
+                    .h(px(38. * s))
+                    .px(px(16. * s))
+                    .rounded(px(9. * s))
+                    .flex()
+                    .items_center()
+                    .gap(px(8. * s))
+                    .text_size(px(15. * s))
+                    .cursor_pointer()
+                    .when(on, |d| {
+                        d.bg(rgba(0xffffff1f)).font_weight(FontWeight::SEMIBOLD)
+                    })
+                    .when(!on, |d| {
+                        d.text_color(rgb(0xb4b6bd))
+                            .hover(|d| d.bg(rgba(0xffffff12)))
+                    })
+                    .child(icon(glyph, if on { INK } else { 0xb4b6bd }).size(px(17. * s)))
+                    .child(tr(label))
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        this.page = page;
+                        cx.notify();
+                    }))
+            }))
+    }
+
+    /// "for <instance>": the instance Browse changes, with the list to pick another.
+    pub(super) fn browse_for(&self, cx: &mut Context<Self>) -> Div {
+        let s = self.ui_scale;
+        let name = self
+            .settings
+            .current()
+            .map_or_else(|| tr("No instance yet"), |p| p.name.clone());
+        div()
+            .flex()
+            .items_center()
+            .gap(px(12. * s))
+            .child(
+                div()
+                    .text_size(px(18. * s))
+                    .text_color(rgb(0xa9abb3))
+                    .child(tr("for")),
+            )
+            .child(
+                div()
+                    .relative()
+                    .child(
+                        div()
+                            .id("browse-instance")
+                            .h(px(42. * s))
+                            .px(px(18. * s))
+                            .rounded(px(10. * s))
+                            .bg(rgba(0x16171acc))
+                            .border_1()
+                            .border_color(rgba(0xffffff1a))
+                            .flex()
+                            .items_center()
+                            .gap(px(10. * s))
+                            .text_size(px(16. * s))
+                            .cursor_pointer()
+                            .hover(|d| d.bg(rgba(0xffffff12)))
+                            .child(trf(
+                                "{instance} · Minecraft {version}",
+                                &[("instance", &name), ("version", engine::version())],
+                            ))
+                            .child(icon("down", MUTED).size(px(14. * s)))
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.instance_menu = !this.instance_menu;
+                                cx.notify();
+                            })),
+                    )
+                    .when(self.instance_menu, |d| {
+                        d.child(
+                            gpui::deferred(self.instance_menu(cx).top(px(48. * s)).min_w(px(300. * s)))
+                                .with_priority(1),
+                        )
+                    }),
+            )
+    }
+
     pub(super) fn mods_page(&self, cx: &mut Context<Self>) -> Div {
         let s = self.ui_scale;
         let locked = self.mods_locked();
@@ -597,160 +746,135 @@ impl Launcher {
             })
             .map(|(i, (k, l))| (i, k, l))
             .collect();
-        let tab = |id: usize, label: String, glyph: &'static str, count: usize, on: bool| {
+
+        // The categories down the left, as in a store.
+        let entry = |id: usize, label: String, count: usize, on: bool| {
             div()
                 .id(("mods-category", id))
-                .h(px(36. * s))
-                .px(px(12. * s))
-                .rounded(px(8. * s))
+                .py(px(9. * s))
                 .flex()
                 .items_center()
-                .gap(px(7. * s))
-                .text_size(px(14. * s))
+                .justify_between()
+                .text_size(px(18. * s))
                 .cursor_pointer()
-                .when(on, |d| {
-                    d.bg(rgb(tone(0x232429))).font_weight(FontWeight::SEMIBOLD)
-                })
-                .when(!on, |d| {
-                    d.text_color(rgb(0xc4c6cc))
-                        .hover(|d| d.bg(rgb(tone(0x1c1d21))))
-                })
-                .child(icon(glyph, if on { accent_tone(ACCENT) } else { MUTED }).size(px(16. * s)))
+                .text_color(rgb(if on { INK } else { 0x9a9ca4 }))
+                .when(on, |d| d.font_weight(FontWeight::SEMIBOLD))
+                .hover(|d| d.text_color(rgb(INK)))
                 .child(label)
                 .child(
                     div()
-                        .px(px(6. * s))
-                        .rounded(px(5. * s))
-                        .bg(rgb(tone(if on { 0x34363d } else { 0x1f2024 })))
-                        .text_size(px(11. * s))
-                        .text_color(rgb(MUTED))
+                        .text_size(px(13. * s))
+                        .text_color(rgb(0x6b6d75))
                         .child(count.to_string()),
                 )
         };
-        let mut tabs = vec![
-            tab(99, tr("All"), "star", features.len(), chosen.is_none()).on_click(cx.listener(
-                |this, _, _, cx| {
-                    this.catalog.mods_category = None;
-                    cx.notify();
-                },
-            )),
-        ];
+        let mut sidebar = div()
+            .w(px(230. * s))
+            .flex_none()
+            .flex()
+            .flex_col()
+            .child(
+                div()
+                    .pb(px(8. * s))
+                    .text_size(px(13. * s))
+                    .text_color(rgb(0x8e9099))
+                    .child(tr("CATEGORIES")),
+            )
+            .child(
+                entry(99, tr("All"), features.len(), chosen.is_none()).on_click(cx.listener(
+                    |this, _, _, cx| {
+                        this.catalog.mods_category = None;
+                        cx.notify();
+                    },
+                )),
+            );
         for (i, category) in Category::ALL.into_iter().enumerate() {
             let count = features
                 .iter()
                 .filter(|(k, _)| about(k).0 == category)
                 .count();
-            tabs.push(
-                tab(
-                    i,
-                    tr(category.label()),
-                    category.icon(),
-                    count,
-                    chosen == Some(i),
-                )
-                .on_click(cx.listener(move |this, _, _, cx| {
-                    this.catalog.mods_category = Some(i);
-                    cx.notify();
-                })),
+            sidebar = sidebar.child(
+                entry(i, tr(category.label()), count, chosen == Some(i)).on_click(cx.listener(
+                    move |this, _, _, cx| {
+                        this.catalog.mods_category = Some(i);
+                        cx.notify();
+                    },
+                )),
             );
         }
-        let mut grid = div().flex().flex_col().gap(px(12. * s));
-        for category in Category::ALL {
-            let group: Vec<_> = shown
-                .iter()
-                .filter(|(_, key, _)| about(key).0 == category)
-                .collect();
-            if group.is_empty() {
-                continue;
-            }
-            if chosen.is_none() {
-                grid = grid.child(
-                    div()
-                        .mt(px(6. * s))
-                        .flex()
-                        .items_center()
-                        .gap(px(8. * s))
-                        .child(icon(category.icon(), accent_tone(ACCENT)).size(px(16. * s)))
-                        .child(
-                            div()
-                                .text_size(px(16. * s))
-                                .font_weight(FontWeight::SEMIBOLD)
-                                .child(tr(category.label())),
-                        )
-                        .child(
-                            div()
-                                .text_size(px(13. * s))
-                                .text_color(rgb(MUTED))
-                                .child(group.len().to_string()),
-                        )
-                        .child(
-                            div()
-                                .flex_1()
-                                .h(px(1.))
-                                .ml(px(8. * s))
-                                .bg(rgb(tone(0x26272c))),
-                        ),
-                );
-            }
-            for row in group.chunks(3) {
-                let missing = 3 - row.len();
-                grid = grid.child(
-                    div()
-                        .flex()
-                        .gap(px(12. * s))
-                        .children(row.iter().map(|(i, key, label)| {
-                            self.feature_tile(*i, key, label, on_of(key), locked, cx)
-                        }))
-                        .children((0..missing).map(|_| {
-                            div()
-                                .flex_1()
-                                .min_w_0()
-                                .p(px(14. * s))
-                                .border_1()
-                                .border_color(rgba(0))
-                        })),
-                );
-            }
-        }
-        let page = div()
-            .flex()
-            .flex_col()
-            .gap(px(16. * s))
-            .pb(px(20. * s))
+        sidebar = sidebar
+            .child(div().h(px(1.)).my(px(14. * s)).bg(rgba(0xffffff14)))
             .child(
                 div()
+                    .id("enabled-module-filter")
                     .flex()
                     .items_center()
                     .gap(px(10. * s))
-                    .child(
-                        div()
-                            .flex_1()
-                            .min_w_0()
-                            .child(
-                                div()
-                                    .text_size(px(30. * s))
-                                    .font_weight(FontWeight::SEMIBOLD)
-                                    .child(tr("Mods")),
-                            )
-                            .child(div().text_size(px(15. * s)).text_color(rgb(MUTED)).child(trf(
-                                "{on} of {all} client features on for {instance}. Changes apply when Minecraft starts.",
-                                &[
-                                    ("on", &enabled.to_string()),
-                                    ("all", &features.len().to_string()),
-                                    ("instance", &profile.name),
-                                ],
-                            ))),
-                    )
-                    .child(
-                        self.mods_action("open-catalog-mods", "Mods folder", "folder", false)
-                            .on_click(cx.listener(|this, _, _, cx| this.open_game_folder("wisp-mods", cx))),
-                    )
-                    .child(
-                        self.mods_action("import-catalog-amod", "Import .amod", "download", true)
-                            .when(locked, |d| d.opacity(0.45))
-                            .when(!locked, |d| d.on_click(cx.listener(|this, _, _, cx| this.import_amod(cx)))),
-                    ),
+                    .text_size(px(15. * s))
+                    .cursor_pointer()
+                    .child(switch(self.catalog.enabled_only, s * 0.9))
+                    .child(trf("Only on ({count})", &[("count", &enabled.to_string())]))
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        this.catalog.enabled_only = !this.catalog.enabled_only;
+                        cx.notify();
+                    })),
             )
+            .child(div().h(px(18. * s)))
+            .child(
+                self.quiet_button("open-catalog-mods", "Mods folder", "folder")
+                    .on_click(cx.listener(|this, _, _, cx| this.open_game_folder("wisp-mods", cx))),
+            )
+            .child(div().h(px(10. * s)))
+            .child(
+                self.quiet_button("import-catalog-amod", "Import .amod", "download")
+                    .when(locked, |d| d.opacity(0.45))
+                    .when(!locked, |d| {
+                        d.on_click(cx.listener(|this, _, _, cx| this.import_amod(cx)))
+                    }),
+            );
+
+        let mut grid = div().flex().flex_col().gap(px(18. * s));
+        for row in shown.chunks(3) {
+            let missing = 3 - row.len();
+            grid = grid.child(
+                div()
+                    .flex()
+                    .gap(px(18. * s))
+                    .children(row.iter().map(|(i, key, label)| {
+                        self.feature_tile(*i, key, label, on_of(key), locked, cx)
+                    }))
+                    .children((0..missing).map(|_| div().flex_1().min_w_0())),
+            );
+        }
+
+        let toolbar = div()
+            .flex()
+            .items_center()
+            .gap(px(12. * s))
+            .child(self.browse_for(cx))
+            .child(div().flex_1())
+            .child(self.browse_kinds(cx))
+            .child(div().w(px(320. * s)).flex_none().child(self.mod_search.clone()));
+
+        div()
+            .size_full()
+            .flex()
+            .flex_col()
+            .gap(px(18. * s))
+            .child(self.page_head(
+                ("Back to Instances", Page::Instances),
+                "Browse Mods",
+                &trf(
+                    "{on} of {all} Wisp features are on. Changes apply when Minecraft starts.",
+                    &[
+                        ("on", &enabled.to_string()),
+                        ("all", &features.len().to_string()),
+                    ],
+                ),
+                None,
+                cx,
+            ))
+            .child(toolbar)
             .when(locked, |d| {
                 d.child(
                     div()
@@ -772,57 +896,28 @@ impl Launcher {
             .when(self.catalog.activity, |d| d.child(self.activity_panel(cx)))
             .child(
                 div()
+                    .flex_1()
+                    .min_h_0()
                     .flex()
-                    .items_center()
-                    .gap(px(4. * s))
-                    .pb(px(10. * s))
-                    .border_b_1()
-                    .border_color(rgb(tone(0x232429)))
-                    .children(tabs),
-            )
-            .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .gap(px(10. * s))
-                    .child(div().flex_1().child(self.mod_search.clone()))
+                    .gap(px(28. * s))
+                    .child(sidebar)
                     .child(
                         div()
-                            .id("enabled-module-filter")
-                            .h(px(40. * s))
-                            .px(px(14. * s))
-                            .rounded(px(10. * s))
-                            .border_1()
-                            .border_color(rgb(if self.catalog.enabled_only {
-                                accent_tone(ACCENT)
-                            } else {
-                                tone(0x2e3035)
-                            }))
+                            .id("mods-scroll")
+                            .flex_1()
+                            .min_w_0()
+                            .overflow_y_scroll()
                             .flex()
-                            .items_center()
-                            .gap(px(8. * s))
-                            .text_size(px(14. * s))
-                            .cursor_pointer()
-                            .hover(|d| d.bg(rgb(tone(0x202125))))
-                            .child(switch(self.catalog.enabled_only, s * 0.8))
-                            .child(trf("Only on ({count})", &[("count", &enabled.to_string())]))
-                            .on_click(cx.listener(|this, _, _, cx| {
-                                this.catalog.enabled_only = !this.catalog.enabled_only;
-                                cx.notify();
-                            })),
+                            .flex_col()
+                            .gap(px(18. * s))
+                            .when(shown.is_empty(), |d| {
+                                d.child(quiet("No features match these filters."))
+                            })
+                            .child(grid)
+                            .child(self.amod_section(profile, cx))
+                            .child(div().h(px(8. * s))),
                     ),
             )
-            .when(shown.is_empty(), |d| d.child(quiet("No features match these filters.")))
-            .child(grid)
-            .child(div().h(px(8. * s)))
-            .child(self.amod_section(profile, cx));
-        div().size_full().child(
-            div()
-                .id("mods-scroll")
-                .size_full()
-                .overflow_y_scroll()
-                .child(page),
-        )
     }
 
     pub(super) fn import_amod(&mut self, cx: &mut Context<Self>) {
