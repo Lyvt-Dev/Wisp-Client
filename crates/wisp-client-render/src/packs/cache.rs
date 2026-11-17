@@ -18,6 +18,9 @@ const VERSION: u32 = 9;
 #[derive(Default, Serialize, Deserialize)]
 pub(super) struct Dependencies {
     entries: Vec<(PathBuf, bool, String)>,
+    /// What the build read, not stamped yet.
+    #[serde(skip)]
+    pending: Vec<(PathBuf, bool)>,
     pub(super) overrides: Vec<String>,
     pub(super) hidden: Vec<String>,
     #[serde(skip)]
@@ -29,13 +32,27 @@ pub(super) struct Dependencies {
     vanilla: PathBuf,
 }
 impl Dependencies {
+    /// Noted during the build, stamped together at its end ([`Self::settle`]).
     fn record(&mut self, path: &Path, directory: bool) {
-        if !self.tracking {
-            return;
+        if self.tracking {
+            self.pending.push((path.into(), directory));
         }
-        match dependency_signature(path, directory, &self.vanilla) {
-            Ok(signature) => self.entries.push((path.into(), directory, signature)),
-            Err(_) => self.failed = true,
+    }
+    /// Stamps what the build read, on many threads: a big pack reads tens of thousands of
+    /// files and folders, and one stat after another took seconds on Windows.
+    pub(super) fn settle(&mut self) {
+        let pending = std::mem::take(&mut self.pending);
+        let vanilla = self.vanilla.clone();
+        let stamped =
+            crate::par::par_map_on(crate::par::IO_THREADS, &pending, |(path, directory)| {
+                dependency_signature(path, *directory, &vanilla)
+                    .map(|signature| (path.clone(), *directory, signature))
+            });
+        for entry in stamped {
+            match entry {
+                Ok(entry) => self.entries.push(entry),
+                Err(_) => self.failed = true,
+            }
         }
     }
     pub(super) fn file(&mut self, path: &Path) {
@@ -44,11 +61,27 @@ impl Dependencies {
     pub(super) fn directory(&mut self, path: &Path) {
         self.record(path, true);
     }
+    /// Every stamp still matches: checked on many threads, stopping at the first change (a
+    /// cache hit with a big server pack checks tens of thousands, seconds one by one on Windows).
     fn valid(&self) -> bool {
-        !self.failed
-            && self.entries.iter().all(|(path, directory, signature)| {
-                dependency_signature(path, *directory, &self.vanilla).is_ok_and(|s| s == *signature)
-            })
+        use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
+        if self.failed || !self.pending.is_empty() {
+            return false;
+        }
+        let changed = AtomicBool::new(false);
+        crate::par::par_map_on(
+            crate::par::IO_THREADS,
+            &self.entries,
+            |(path, directory, signature)| {
+                if !changed.load(Relaxed)
+                    && !dependency_signature(path, *directory, &self.vanilla)
+                        .is_ok_and(|s| s == *signature)
+                {
+                    changed.store(true, Relaxed);
+                }
+            },
+        );
+        !changed.load(Relaxed)
     }
 }
 
@@ -348,6 +381,7 @@ pub(super) fn build(vanilla: &Path, packs: &[Pack], out: &Path) -> io::Result<()
         ..Dependencies::default()
     };
     build_overlay_uncached(vanilla, packs, out, &mut dependencies)?;
+    dependencies.settle();
     wisp_core::prepared_files::register_overlay(
         out,
         vanilla,

@@ -68,6 +68,11 @@ impl PackPrompt {
 }
 
 impl ServerPackState {
+    /// The server packs on screen are no longer known (a reload of the player's own failed):
+    /// the next set the server asks for reloads even if it is the same.
+    pub(super) fn forget_applied(&mut self) {
+        self.applied = None;
+    }
     /// The `ToastManager` slots the download toasts hold.
     pub(super) fn toast_slots(&self) -> impl Iterator<Item = usize> + '_ {
         self.notifiers
@@ -92,6 +97,10 @@ pub(super) struct ServerPackState {
     user: (String, u128),
     /// The packs loaded on top of the player's own, bottom first.
     pub(super) active: Vec<packs::Pack>,
+    /// The server pack files the last good reload applied, bottom first (none: unknown), and
+    /// the ones the reload under way applies.
+    applied: Option<Vec<PathBuf>>,
+    reloading: Option<Vec<PathBuf>>,
     /// The download batches' notifiers, oldest first.
     notifiers: Vec<PackNotifier>,
     /// `SystemToastId.PACK_LOAD_FAILURE`: the toast `Minecraft.clearResourcePacksOnError` adds.
@@ -444,6 +453,21 @@ impl Game<'_> {
             self.finish_pack_reload(false);
             return;
         };
+        let files: Vec<PathBuf> = load.iter().map(|(_, path)| path.clone()).collect();
+        // The server sent again what is loaded already (a pack pushed once more after it
+        // loaded, same file): its packs are reported loaded without reloading everything
+        // a second time, which held the join up for seconds.
+        if self.server_packs.applied.as_ref() == Some(&files) && self.pack_reload.is_none() {
+            log::info!(
+                "Wisp: server packs unchanged ({} packs), no reload",
+                files.len()
+            );
+            self.server_packs.active = server;
+            self.server_packs.reloading = None;
+            self.finish_pack_reload(true);
+            return;
+        }
+        self.server_packs.reloading = Some(files);
         self.server_packs.active = server;
         if let Err(e) = self.spawn_pack_reload(ReloadKind::Server) {
             log::error!("Wisp: could not start the pack reload worker: {e}");
@@ -452,6 +476,12 @@ impl Game<'_> {
     }
     /// `ServerPacks::reloaded` and the recovery reload it can ask for.
     pub(super) fn finish_pack_reload(&mut self, ok: bool) {
+        let reloading = self.server_packs.reloading.take();
+        self.server_packs.applied = if ok {
+            reloading.or_else(|| self.server_packs.applied.take())
+        } else {
+            None
+        };
         if let Some(recovery) = self.server_packs.packs.reloaded(ok) {
             self.start_pack_reload(&recovery);
         }

@@ -143,13 +143,24 @@ fn icon(name: &'static str, color: u32) -> Svg {
         .flex_none()
         .text_color(rgb(color))
 }
+/// The glass every card is made of: a frosted, see-through plate over the picture, lighter at
+/// its top edge than at its foot, with a bright rim ([`GLASS_RIM`]).
+fn glass_fill() -> gpui::Background {
+    gpui::linear_gradient(
+        170.,
+        gpui::linear_color_stop(rgba(0x30323c70), 0.),
+        gpui::linear_color_stop(rgba(0x14151b94), 1.),
+    )
+}
+/// The glass plates' rim.
+const GLASS_RIM: u32 = 0xffffff30;
 /// A glass plate over the backdrop, as the shell's cards.
 fn panel() -> Div {
     div()
         .rounded(px(16.))
         .border_1()
-        .border_color(rgba(0xffffff1a))
-        .bg(rgba(0x0b0b0dc4))
+        .border_color(rgba(GLASS_RIM))
+        .bg(glass_fill())
 }
 fn button(id: impl Into<ElementId>, label: &str, glyph: &'static str) -> Stateful<Div> {
     div()

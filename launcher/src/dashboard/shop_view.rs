@@ -135,9 +135,9 @@ fn coins(n: u32) -> String {
 fn glass(s: f32) -> Div {
     div()
         .rounded(px(16. * s))
-        .bg(rgba(0x0b0b0dc4))
+        .bg(glass_fill())
         .border_1()
-        .border_color(rgba(0xffffff1f))
+        .border_color(rgba(GLASS_RIM))
 }
 
 /// An item's price: with a creator's `discount` (percent) the lower price, the full one struck
@@ -488,9 +488,15 @@ impl Launcher {
                     .p(px(8. * s))
                     .pr(px(16. * s))
                     .rounded(px(18. * s))
-                    .bg(rgba(if on { 0x1b1c20f0 } else { 0x0b0b0dc4 }))
+                    .map(|d| {
+                        if on {
+                            d.bg(rgba(0xffffff2e))
+                        } else {
+                            d.bg(glass_fill())
+                        }
+                    })
                     .border_1()
-                    .border_color(rgba(if on { 0xffffffd9 } else { 0xffffff1a }))
+                    .border_color(rgba(if on { 0xffffffd9 } else { GLASS_RIM }))
                     .flex()
                     .items_center()
                     .gap(px(14. * s))

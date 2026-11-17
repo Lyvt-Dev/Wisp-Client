@@ -155,31 +155,27 @@ impl Launcher {
             .absolute()
             .inset_0()
             .bg(rgb(page))
-            .child(self.backdrop_picture().when(!home, |d| d.opacity(0.35)))
+            // The picture stays bright and warm: only a light veil where the text sits, the
+            // cards' glass does the rest.
+            .child(self.backdrop_picture().when(!home, |d| d.opacity(0.8)))
             .child(div().absolute().inset_0().bg(if home {
-                // Dark under the top bar and at the bottom, where the text and cards sit.
                 gpui::linear_gradient(
                     180.,
-                    gpui::linear_color_stop(shade(0xb0), 0.),
-                    gpui::linear_color_stop(shade(0x30), 0.3),
+                    gpui::linear_color_stop(shade(0x48), 0.),
+                    gpui::linear_color_stop(shade(0x00), 0.22),
                 )
             } else {
                 gpui::linear_gradient(
                     180.,
-                    gpui::linear_color_stop(shade(0xa0), 0.),
-                    gpui::linear_color_stop(shade(0xff), 0.42),
+                    gpui::linear_color_stop(shade(0x58), 0.),
+                    gpui::linear_color_stop(shade(0x70), 0.5),
                 )
             }))
             .when(home, |d| {
                 d.child(div().absolute().inset_0().bg(gpui::linear_gradient(
                     180.,
-                    gpui::linear_color_stop(shade(0x00), 0.35),
-                    gpui::linear_color_stop(shade(0xf0), 1.),
-                )))
-                .child(div().absolute().inset_0().bg(gpui::linear_gradient(
-                    90.,
-                    gpui::linear_color_stop(shade(0xb8), 0.),
-                    gpui::linear_color_stop(shade(0x00), 0.6),
+                    gpui::linear_color_stop(shade(0x00), 0.55),
+                    gpui::linear_color_stop(shade(0x50), 1.),
                 )))
             })
     }
@@ -292,36 +288,30 @@ impl Launcher {
             )
             .child(drag("drag-left"))
             .child(
-                // The pages in a glass capsule; the one shown is a white pill.
+                // The pages as plain text: the one shown bright and bold, the others soft.
                 div()
                     .flex()
                     .items_center()
-                    .gap(px(2. * s))
-                    .p(px(5. * s))
-                    .rounded_full()
-                    .bg(rgba(0x0b0b0d8c))
-                    .border_1()
-                    .border_color(rgba(0xffffff1a))
+                    .gap(px(6. * s))
                     .children(NAV.iter().enumerate().map(|(i, (label, page, lit))| {
                         let page = *page;
                         let active = lit.contains(&self.page);
                         div()
                             .id(("nav", i))
                             .h(px(38. * s))
-                            .px(px(18. * s))
-                            .rounded_full()
+                            .px(px(12. * s))
                             .flex()
                             .items_center()
                             .text_size(px(16. * s))
                             .cursor_pointer()
                             .when(active, |d| {
-                                d.bg(rgb(0xffffff))
-                                    .text_color(rgb(0x0b0b0d))
+                                d.text_color(rgb(0xffffff))
                                     .font_weight(FontWeight::SEMIBOLD)
                             })
                             .when(!active, |d| {
-                                d.text_color(rgb(0xb4b6bd))
-                                    .hover(|d| d.bg(rgba(0xffffff14)).text_color(rgb(INK)))
+                                d.text_color(rgba(0xffffffa6))
+                                    .font_weight(FontWeight::MEDIUM)
+                                    .hover(|d| d.text_color(rgb(0xffffff)))
                             })
                             .child(tr(label))
                             .on_click(cx.listener(move |this, _, _, cx| {
@@ -682,9 +672,9 @@ impl Launcher {
             .flex_none()
             .p(px(14. * s))
             .rounded(px(16. * s))
-            .bg(rgba(0x0b0b0dc4))
+            .bg(glass_fill())
             .border_1()
-            .border_color(rgba(0xffffff1f))
+            .border_color(rgba(GLASS_RIM))
             .flex()
             .items_center()
             .gap(px(14. * s))
@@ -735,9 +725,15 @@ impl Launcher {
                 .p(px(8. * s))
                 .pr(px(16. * s))
                 .rounded(px(18. * s))
-                .bg(rgba(if chosen { 0x1b1c20f0 } else { 0x0b0b0dc4 }))
+                .map(|d| {
+                    if chosen {
+                        d.bg(rgba(0xffffff2e))
+                    } else {
+                        d.bg(glass_fill())
+                    }
+                })
                 .border_1()
-                .border_color(rgba(if chosen { 0xffffffd9 } else { 0xffffff1a }))
+                .border_color(rgba(if chosen { 0xffffffd9 } else { GLASS_RIM }))
                 .flex()
                 .items_center()
                 .gap(px(14. * s))
@@ -891,9 +887,9 @@ impl Launcher {
             .flex_none()
             .p(px(14. * s))
             .rounded(px(16. * s))
-            .bg(rgba(0x0b0b0dc4))
+            .bg(glass_fill())
             .border_1()
-            .border_color(rgba(0xffffff1f))
+            .border_color(rgba(GLASS_RIM))
             .flex()
             .items_center()
             .gap(px(14. * s))

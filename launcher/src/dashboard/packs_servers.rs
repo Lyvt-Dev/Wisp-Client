@@ -777,11 +777,12 @@ impl Launcher {
             .rounded(px(14. * s))
             .overflow_hidden()
             .border_1()
-            .border_color(rgb(0x2a7a48))
+            .border_color(rgba(0x3ccf6a66))
+            // Glass, with a green glow from the left: the featured server.
             .bg(gpui::linear_gradient(
                 100.,
-                gpui::linear_color_stop(rgb(0x0f3d24), 0.),
-                gpui::linear_color_stop(rgba(tone_a(0x17181bff)), 0.85),
+                gpui::linear_color_stop(rgba(0x1f6b4280), 0.),
+                gpui::linear_color_stop(rgba(0x14151b80), 0.85),
             ))
             .flex()
             .items_center()

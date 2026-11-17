@@ -248,6 +248,8 @@ impl Game<'_> {
     /// screen again, with the error.
     fn selection_reload_failed(&mut self, error: &str) {
         log::warn!("Wisp: resource reload failed: {error}");
+        // What is on screen is no longer sure: the next server pack set reloads.
+        self.server_packs.forget_applied();
         let all = packs::discover(&self.vanilla_root(), &packs_dir());
         if packs::able_to_clear_any_pack(&all, &self.settings.resource_packs) {
             // clearResourcePacksOnError.

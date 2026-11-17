@@ -784,6 +784,7 @@ fn build_overlay_uncached(
         filters: &[&Filter],
         dependencies: &mut cache::Dependencies,
         extract: &mut Vec<Extract<'a>>,
+        links: &mut Vec<(PathBuf, PathBuf)>,
     ) -> io::Result<()> {
         let src = if rel.is_empty() {
             vanilla.to_path_buf()
@@ -830,7 +831,8 @@ fn build_overlay_uncached(
             } else if let Some((owner, (path, inner))) = files.get(&child) {
                 let target = out.join(&child);
                 match path {
-                    Some(p) => link(p, &target)?,
+                    // Linked after the walk, on many threads.
+                    Some(p) => links.push((p.clone(), target)),
                     // Inflated and written after the walk, on every thread.
                     None => extract.push((*owner, inner.as_str(), target)),
                 }
@@ -858,6 +860,7 @@ fn build_overlay_uncached(
                     filters,
                     dependencies,
                     extract,
+                    links,
                 )?;
             } else if filters.iter().any(|f| f.blocks(&child)) {
                 // Hidden by a pack's filter.
@@ -866,12 +869,13 @@ fn build_overlay_uncached(
                 if vanilla.join(&child).is_file() {
                     dependencies.file(&vanilla.join(&child));
                 }
-                link(&vanilla.join(&child), &out.join(&child))?;
+                links.push((vanilla.join(&child), out.join(&child)));
             }
         }
         Ok(())
     }
     let mut extract = Vec::new();
+    let mut links = Vec::new();
     mirror(
         "",
         vanilla,
@@ -883,10 +887,17 @@ fn build_overlay_uncached(
         &filters,
         dependencies,
         &mut extract,
+        &mut links,
     )?;
+    // One link after another was most of a cold build on Windows (tens of thousands of hard
+    // links into vanilla): they wait on the filesystem, so many at once.
+    crate::par::par_map_on(crate::par::IO_THREADS, &links, |(target, at)| link(target, at))
+        .into_iter()
+        .collect::<io::Result<()>>()?;
     // Inflating and writing a big pack's files one by one was most of a cold build; its
-    // folders all exist by now.
-    crate::par::par_map(&extract, |(owner, inner, target)| {
+    // folders all exist by now. Writing waits on the disk (and the antivirus) as much as
+    // inflating keeps a core busy.
+    crate::par::par_map_on(crate::par::IO_THREADS, &extract, |(owner, inner, target)| {
         let Some(Some(z)) = zips.get(*owner) else {
             return Ok(());
         };

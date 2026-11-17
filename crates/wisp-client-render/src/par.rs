@@ -7,7 +7,21 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 /// Threads take the next item as they finish one, so a run of slow items
 /// doesn't hold back the others.
 pub fn par_map<T: Sync, R: Send>(items: &[T], f: impl Fn(&T) -> R + Sync) -> Vec<R> {
-    let threads = wisp_threads::worker_count().min(items.len());
+    par_map_on(wisp_threads::worker_count(), items, f)
+}
+
+/// Threads for work that waits on the filesystem rather than the CPU (stats, links): on Windows
+/// each call is a trip through the antivirus, and many in flight finish far sooner than one
+/// after another, whatever the cores.
+pub const IO_THREADS: usize = 16;
+
+/// [`par_map`] on `threads` threads.
+pub fn par_map_on<T: Sync, R: Send>(
+    threads: usize,
+    items: &[T],
+    f: impl Fn(&T) -> R + Sync,
+) -> Vec<R> {
+    let threads = threads.min(items.len());
     if threads <= 1 {
         return items.iter().map(f).collect();
     }
