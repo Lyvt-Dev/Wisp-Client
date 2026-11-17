@@ -63,7 +63,7 @@ impl Game<'_> {
         self.open_wisp_menu();
     }
     /// Hands the Shop's work to the Wisp server's thread (nothing without a server).
-    fn shop_ask(&self, ask: ShopAsk) {
+    pub(super) fn shop_ask(&self, ask: ShopAsk) {
         if let Some(sharing) = &self.cosmetics.sharing {
             sharing.shop(ask);
         }
@@ -90,6 +90,8 @@ impl Game<'_> {
         let state = self.friends_state();
         let server = self.friends_server();
         let shop = self.cosmetics.sharing.as_ref().map(|s| s.shop_state());
+        let player = (self.options.player_name.clone())
+            .unwrap_or_else(|| self.acting_player_name().to_owned());
         let icons = {
             let atlas = &self.gui.atlas;
             let mut ui = Ui::new(atlas, batch, cursor);
@@ -104,6 +106,7 @@ impl Game<'_> {
                 &key_name,
                 friends,
                 shop.as_ref(),
+                &player,
             );
             ui.finish();
             icons

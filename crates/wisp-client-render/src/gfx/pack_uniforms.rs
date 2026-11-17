@@ -1434,6 +1434,7 @@ mod initial_history_tests {
             underwater: false,
             cave_culling: false,
             title: true,
+            title_picture: None,
             sky_blocked: false,
             skybox: false,
             end_sky: false,

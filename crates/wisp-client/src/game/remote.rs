@@ -5384,16 +5384,17 @@ impl Game<'_> {
         // An offline name's skin from the launcher, where neither the server
         // nor an account gives the local player one.
         if !resolved.iter().any(|(u, _)| *u == local)
-            && let Some((rgba, is_slim)) = wisp_client::skins::offline_skin()
+            && let Some(skin) = wisp_client::skins::offline_skin()
         {
-            const OFFLINE: &str = "wisp/offline_skin";
-            if !self.skin_slots.contains(OFFLINE) || !self.gui.atlas.sprites.contains_key(OFFLINE) {
-                self.store_skin(OFFLINE.into(), rgba.clone());
+            // The launcher's, or the one picked in the Wardrobe (a new sprite each time).
+            let sprite = wisp_client::skins::offline_skin_sprite();
+            if !self.skin_slots.contains(&sprite) || !self.gui.atlas.sprites.contains_key(&sprite) {
+                self.store_skin(sprite.clone(), skin.0.clone());
             }
-            if *is_slim {
+            if skin.1 {
                 slim.insert(local);
             }
-            resolved.push((local, OFFLINE.into()));
+            resolved.push((local, sprite));
         }
         // An offline name's cape from the launcher, where the profile has none.
         if !capes.contains_key(&local)
@@ -5574,7 +5575,7 @@ impl Game<'_> {
     /// Whether a downloaded skin or cape is in the atlas to draw, marking it
     /// drawn; if not (new, or its slot taken), its image is queued for upload
     /// again and it is drawn from the next frame.
-    fn again_skin(&mut self, location: &str) -> bool {
+    pub(super) fn again_skin(&mut self, location: &str) -> bool {
         let mut downloads = self.skin_downloads.borrow_mut();
         // A slot without its sprite (the atlas was rebuilt, or the upload
         // never happened) counts as missing, so the skin is stored again.

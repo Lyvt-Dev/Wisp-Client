@@ -24,7 +24,7 @@ pub fn preference(dir: &Path, key: &str) -> Option<String> {
     })
 }
 /// Set (or with None remove) one preference, keeping the others.
-pub(crate) fn set_preference(dir: &Path, key: &str, value: Option<&str>) {
+pub fn set_preference(dir: &Path, key: &str, value: Option<&str>) {
     let text = std::fs::read_to_string(dir.join("wisp.txt")).unwrap_or_default();
     let mut lines: Vec<String> = text
         .lines()
@@ -120,6 +120,78 @@ enum Key {
     Glyph(Face, u16, u16),
     /// A quarter disc (`false`) or a 1px quarter ring of this radius in pixels.
     Corner(u16, bool),
+    /// A line icon at this size in pixels.
+    Icon(Icon, u16),
+}
+
+/// The line icons the home screen and the Wisp Menu draw: 24-unit SVGs in the launcher's
+/// style (`assets/wisp/icons`, some the launcher's own), rasterized smooth at the size drawn.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Icon {
+    Play,
+    Globe,
+    Settings,
+    Friends,
+    Language,
+    Accessibility,
+    Close,
+    Hanger,
+    ChevronRight,
+    ChevronLeft,
+    Hud,
+    Mods,
+    Cart,
+    Spark,
+    ShieldCheck,
+    Folder,
+    Check,
+}
+impl Icon {
+    fn svg(self) -> &'static [u8] {
+        macro_rules! icon {
+            ($name:literal) => {
+                include_bytes!(concat!("../assets/wisp/icons/", $name, ".svg"))
+            };
+        }
+        match self {
+            Self::Play => icon!("play"),
+            Self::Globe => icon!("globe"),
+            Self::Settings => icon!("settings"),
+            Self::Friends => icon!("friends"),
+            Self::Language => icon!("language"),
+            Self::Accessibility => icon!("accessibility"),
+            Self::Close => icon!("close"),
+            Self::Hanger => icon!("hanger"),
+            Self::ChevronRight => icon!("chevron-right"),
+            Self::ChevronLeft => icon!("chevron-left"),
+            Self::Hud => icon!("hud"),
+            Self::Mods => icon!("mods"),
+            Self::Cart => icon!("cart"),
+            Self::Spark => icon!("spark"),
+            Self::ShieldCheck => icon!("shield-check"),
+            Self::Folder => icon!("folder"),
+            Self::Check => icon!("check"),
+        }
+    }
+    /// The icon's coverage, `px` pixels square, 0..1 per pixel.
+    fn coverage(self, px: u32) -> Option<Vec<f32>> {
+        let tree =
+            resvg::usvg::Tree::from_data(self.svg(), &resvg::usvg::Options::default()).ok()?;
+        let mut pixmap = resvg::tiny_skia::Pixmap::new(px, px)?;
+        let k = px as f32 / tree.size().width();
+        resvg::render(
+            &tree,
+            resvg::tiny_skia::Transform::from_scale(k, k),
+            &mut pixmap.as_mut(),
+        );
+        Some(
+            pixmap
+                .pixels()
+                .iter()
+                .map(|p| f32::from(p.alpha()) / 255.0)
+                .collect(),
+        )
+    }
 }
 #[derive(Clone, Copy)]
 struct Cached {
@@ -250,6 +322,25 @@ impl Cache {
             self.entries.insert(key, made);
         }
         made
+    }
+    fn icon(&mut self, atlas: &HudAtlas, icon: Icon, px: u16) -> Option<Rect> {
+        let key = Key::Icon(icon, px);
+        if let Some(c) = self.entries.get(&key) {
+            return c.rect;
+        }
+        let alpha = icon.coverage(u32::from(px))?;
+        let rect = self.upload(atlas, u32::from(px), u32::from(px), &alpha);
+        if rect.is_some() {
+            self.entries.insert(
+                key,
+                Cached {
+                    rect,
+                    left: 0.0,
+                    top: 0.0,
+                },
+            );
+        }
+        rect
     }
     fn corner(&mut self, atlas: &HudAtlas, r: u16, ring: bool) -> Option<Rect> {
         let key = Key::Corner(r, ring);
@@ -696,6 +787,22 @@ impl<'a> Ui<'a> {
     ) {
         let w = self.measure(face, size, text);
         self.text(face, size, cx - w / 2.0, y, color, text);
+    }
+
+    /// A line icon `size` dp square with its top left at `(x, y)`, smooth at any scale.
+    pub fn icon(&mut self, icon: Icon, x: f32, y: f32, size: f32, color: u32) {
+        if color >> 24 == 0 {
+            return;
+        }
+        let px = (size * self.density).round().clamp(4.0, 256.0) as u16;
+        let atlas = self.atlas;
+        let Some(rect) = with_cache(atlas, |c| c.icon(atlas, icon, px)) else {
+            return;
+        };
+        let s = self.scale;
+        let (x0, y0) = (self.px_x(x), self.px_y(y));
+        let side = f32::from(px) / s;
+        self.batch.rect_uv(x0 / s, y0 / s, side, side, rect, color);
     }
 
     // ---- the launcher's components ----

@@ -3410,6 +3410,23 @@ Would you like to enable the Narrator or visit the Accessibility Settings?",
             self.focused_button = None;
         }
     }
+    /// Vanilla's title menu is showing with nothing over it: no game rules, experiments or
+    /// world creation screen. Wisp's home screen (`wisp_home`) is drawn in its place then.
+    pub fn shows_main(&self) -> bool {
+        matches!(self.mode, Mode::Main)
+            && !self.preparing
+            && self.rules.borrow().is_none()
+            && self.experiments.borrow().is_none()
+            && self.confirm_experiments.borrow().is_none()
+    }
+    /// A press of one of the title menu's buttons by its id (`wisp_home::button`), as Wisp's
+    /// home screen sends them: what a click on that button does.
+    pub fn press_main(&mut self, id: u8, size: (f32, f32)) -> Action {
+        if !self.shows_main() {
+            return Action::None;
+        }
+        self.click_action(0.0, 0.0, size, Some(id))
+    }
     fn click_action(&mut self, x: f32, y: f32, (w, h): (f32, f32), hit: Option<u8>) -> Action {
         match (&mut self.mode, hit) {
             (Mode::Main, Some(1)) => {

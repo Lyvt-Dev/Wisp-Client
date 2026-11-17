@@ -185,6 +185,11 @@ impl Profile {
             .arg(&self.resources)
             .args(&self.args)
             .env("WISP_HOME", &self.game_home)
+            // The pictures the launcher's backdrop shows, for the game's home screen.
+            .env(
+                "WISP_BACKGROUNDS",
+                launcher_home().map_or_else(|_| PathBuf::new(), |h| h.join("backgrounds")),
+            )
             .env("WISP_TELEMETRY_URL", "off")
             .env("WISP_RELAY_URL", "")
             .env("WISP_FRIENDS_PATH", "direct")

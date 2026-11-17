@@ -27,7 +27,9 @@ impl Screen {
             | Self::ServerLinks
             | Self::ConfirmLink
             | Self::DialogWarning
-            | Self::DebugOptions => true,
+            | Self::DebugOptions
+            // The Wisp Menu floats over the blurred world, as the launcher's glass does.
+            | Self::WispMenu => true,
             Self::Playing
             | Self::GameModeSwitcher
             | Self::Chat
@@ -38,9 +40,7 @@ impl Screen {
             | Self::BlockEditor
             | Self::Mod
             // The HUD editor shows the HUD it edits, unblurred.
-            | Self::HudEditor
-            // The Wisp Menu draws its own scrim over the world.
-            | Self::WispMenu => false,
+            | Self::HudEditor => false,
             // WinScreen.extractBackground: the poem fills the screen with the End portal, the
             // credits alone blur. Game::menu_blur knows which one rolls.
             Self::Win => false,

@@ -73,7 +73,7 @@ pub fn coins(n: u32) -> String {
 }
 
 /// A kind's name, plural for the chips.
-fn kind_name(kind: Kind) -> String {
+pub fn kind_name(kind: Kind) -> String {
     let (key, name) = match kind {
         Kind::Cape => ("capes", "Capes"),
         Kind::Wings => ("wings", "Wings"),

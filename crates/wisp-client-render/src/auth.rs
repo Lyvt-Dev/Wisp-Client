@@ -631,6 +631,41 @@ pub fn own_textures(session: &AuthSession) -> Option<crate::skins::Textures> {
     Some(crate::skins::services_profile_textures(&profile))
 }
 
+/// Makes `png` the signed-in account's skin (`POST /minecraft/profile/skins`, as minecraft.net's
+/// skin page does), with the slim or classic model. The error is what to tell the player.
+pub fn upload_skin(session: &AuthSession, png: &[u8], slim: bool) -> Result<(), String> {
+    const BOUNDARY: &str = "----WispWardrobe7f3a9c";
+    let variant = if slim { "slim" } else { "classic" };
+    let mut body = format!(
+        "--{BOUNDARY}\r\nContent-Disposition: form-data; name=\"variant\"\r\n\r\n{variant}\r\n\
+         --{BOUNDARY}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"skin.png\"\r\n\
+         Content-Type: image/png\r\n\r\n"
+    )
+    .into_bytes();
+    body.extend_from_slice(png);
+    body.extend_from_slice(format!("\r\n--{BOUNDARY}--\r\n").as_bytes());
+    let sent = agent()
+        .post(&format!("{MINECRAFT_PROFILE}/skins"))
+        .set("Authorization", &format!("Bearer {}", session.access_token))
+        .set(
+            "Content-Type",
+            &format!("multipart/form-data; boundary={BOUNDARY}"),
+        )
+        .send_bytes(&body);
+    match sent {
+        Ok(_) => Ok(()),
+        Err(ureq::Error::Status(code, response)) => {
+            let text = response.into_string().unwrap_or_default();
+            let message = serde_json::from_str::<serde_json::Value>(&text)
+                .ok()
+                .and_then(|v| v["errorMessage"].as_str().map(str::to_owned))
+                .unwrap_or(text);
+            Err(format!("{code} {}", message.trim()))
+        }
+        Err(e) => Err(e.to_string()),
+    }
+}
+
 /// What the session service says about a player joining this server
 /// (MinecraftServicesSessionService.hasJoinedServer).
 #[derive(Clone, Debug, PartialEq)]

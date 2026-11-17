@@ -360,6 +360,7 @@ mod wandering_trader;
 mod waypoints;
 mod win;
 mod wind;
+mod wisp_home;
 mod wisp_menu;
 mod wither;
 mod world_loading;
@@ -2388,6 +2389,8 @@ struct Game<'a> {
     item_activation: wisp_client::item_activation::ItemActivation,
     weather_parameters: wisp_client::weather::ParameterCache,
     panorama_rotation: wisp_client::gfx::panorama::Rotation,
+    /// Wisp's home screen over the title (`game/wisp_home.rs`).
+    home: wisp_home::HomeState,
     world: World,
     /// The biome table the world plays with: the game's own with the world's
     /// packs over it (`Biomes::with_packs`), `None` before a world opens.
@@ -8604,7 +8607,9 @@ impl Game<'_> {
             // TitleScreen.extractRenderState, then ToastManager over it: vanilla
             // draws the toast manager on every screen, so a pack download or a
             // resource-reload failure still shows on the title (#4428).
-            if let Some(title) = &self.title {
+            if self.wisp_home_shown() {
+                self.draw_wisp_home(&mut batch);
+            } else if let Some(title) = &self.title {
                 title.draw_with_items(
                     &self.gui.atlas,
                     Some(&self.pack.item_renderer),
@@ -16030,6 +16035,7 @@ impl Game<'_> {
         let mut hud = wisp_client::spans::time("hud", || self.hud(size));
         self.flush_ime(&mut hud);
         let title = self.shows_panorama();
+        let title_picture = self.title_picture();
         let (yaw, pitch) = if title {
             // PanoramaRenderer: the title cube spins at 0.1 degrees per tick, pitched 10 degrees.
             (
@@ -16229,6 +16235,7 @@ impl Game<'_> {
                 self.water_plane(camera)
             },
             title,
+            title_picture: title_picture.as_ref().map(|(p, zoom)| (p, *zoom)),
             sky_blocked: self.potions.effects.get("blindness").is_some()
                 || self.potions.effects.get("darkness").is_some()
                 || matches!(
@@ -16457,6 +16464,10 @@ impl Game<'_> {
                     || self.dialog_open()
                     || (self.screen == Screen::Win && self.win_screen_pauses())));
         let radius = self.settings.menu_blur as f32;
+        // Wisp's home screen sits over its picture blurred as the launcher's glass is.
+        if self.wisp_home_shown() {
+            return Some(radius.max(8.0));
+        }
         (blurred && radius >= 1.0).then_some(radius)
     }
     /// `LevelExtractor` / `LevelRenderer`: the world border wall this frame.
@@ -18148,6 +18159,14 @@ impl Game<'_> {
                         title.release_field();
                     }
                 }
+                // Wisp's home screen in place of the title menu takes its own clicks.
+                WindowEvent::MouseInput {
+                    state: ElementState::Pressed,
+                    button: MouseButton::Left,
+                    ..
+                } if self.wisp_home_shown() => {
+                    self.wisp_home_press(event_loop)?;
+                }
                 WindowEvent::MouseInput {
                     state,
                     button: MouseButton::Left,
@@ -19124,6 +19143,7 @@ impl<'a> Game<'a> {
             item_activation: Default::default(),
             weather_parameters: Default::default(),
             panorama_rotation: Default::default(),
+            home: Default::default(),
             world,
             streaming,
             lod: None,
@@ -21061,6 +21081,7 @@ fn loading_frame(hud: &HudBatch) -> Frame<'_> {
         water_plane: None,
         cave_culling: false,
         title: true,
+        title_picture: None,
         sky_blocked: false,
         skybox: false,
         end_sky: false,

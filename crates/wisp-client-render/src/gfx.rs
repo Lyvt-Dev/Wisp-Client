@@ -196,6 +196,7 @@ pub mod pack_uniforms;
 mod pack_weather;
 mod page_runs;
 pub mod panorama;
+pub mod picture;
 mod readback;
 mod resident;
 mod reuse;
@@ -860,6 +861,9 @@ pub struct Frame<'a> {
     pub cave_culling: bool,
     /// Title screen: only the dedicated panorama cube map and the HUD.
     pub title: bool,
+    /// On the title: the player's picture shown instead of the panorama, and how far it is
+    /// zoomed in (1 is the whole picture cropped to the screen).
+    pub title_picture: Option<(&'a std::sync::Arc<picture::Picture>, f32)>,
     /// Lava, powder snow, blindness or darkness blocks the sky pass.
     pub sky_blocked: bool,
     /// Dimensions without a skybox (the Nether) clear to the fog colour.
@@ -1266,6 +1270,8 @@ pub struct Renderer {
     /// The glowing entities' outline (`LevelRenderer.entityOutlineTarget`).
     entity_outline: entity_outline::EntityOutline,
     panorama: panorama::Panorama,
+    /// Wisp's title backdrop: the player's own picture in place of the panorama.
+    title_picture: picture::TitlePicture,
     /// `RenderPipelines.WORLD_BORDER` and its buffers.
     border_pipeline: wgpu::RenderPipeline,
     border_group: wgpu::BindGroup,
@@ -4548,6 +4554,7 @@ impl Renderer {
             frame_format,
         );
         let panorama = panorama::Panorama::new(&device, frame_format, panorama_faces);
+        let title_picture = picture::TitlePicture::new(&device, frame_format);
         drop(pipelines_step);
         reuse.finish(generation);
         if previous.is_some() {
@@ -4665,6 +4672,7 @@ impl Renderer {
             stars,
             entity_outline,
             panorama,
+            title_picture,
             border_pipeline,
             border_group,
             border_uniform,
@@ -7231,7 +7239,15 @@ impl Renderer {
             frame.camera,
         );
         let jittered = jitter * view_proj;
-        if frame.title {
+        let picture = frame.title_picture.filter(|_| frame.title);
+        let picture_shown = self.title_picture.prepare(
+            &self.device,
+            &self.queue,
+            (self.config.width, self.config.height),
+            picture.map(|(p, _)| p),
+            picture.map_or(1.0, |(_, zoom)| zoom),
+        );
+        if frame.title && !picture_shown {
             self.panorama.prepare(
                 &self.device,
                 &self.queue,
@@ -7242,6 +7258,9 @@ impl Renderer {
             );
         } else {
             self.panorama.release();
+        }
+        if !frame.title {
+            self.title_picture.release();
         }
         let view = views.primary().view;
         // The hand's bob and view (`hand_globals`).
@@ -9401,7 +9420,9 @@ impl Renderer {
                     pass.set_bind_group(0, &self.group, &[]);
                 }
                 if frame.title {
-                    self.panorama.draw(&mut pass);
+                    if !self.title_picture.draw(&mut pass) {
+                        self.panorama.draw(&mut pass);
+                    }
                     pass.set_bind_group(0, &self.group, &[]);
                 } else if celestial_vertices > 0 || frame.end_sky {
                     pass.set_pipeline(&self.celestial_pipeline);

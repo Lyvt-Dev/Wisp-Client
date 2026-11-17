@@ -646,22 +646,57 @@ pub fn offline_cape() -> Option<&'static [u8]> {
 /// PNG's path, and `WISP_OFFLINE_SKIN_MODEL`, `classic` or `slim`;
 /// launcher/src/skins.rs): its 64x64 RGBA as `process_legacy_skin` lays it
 /// out, and whether it is slim. Read once.
-pub fn offline_skin() -> Option<&'static (Vec<u8>, bool)> {
-    static SKIN: std::sync::OnceLock<Option<(Vec<u8>, bool)>> = std::sync::OnceLock::new();
+/// The Wardrobe's choice ([`set_offline_skin`]) replaces it while the game runs.
+pub fn offline_skin() -> Option<std::sync::Arc<(Vec<u8>, bool)>> {
+    static SKIN: std::sync::OnceLock<Option<std::sync::Arc<(Vec<u8>, bool)>>> =
+        std::sync::OnceLock::new();
+    if let Some(chosen) = OFFLINE_CHOSEN
+        .read()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clone()
+    {
+        return Some(chosen);
+    }
     SKIN.get_or_init(|| {
         let path = wisp_compat::var_os("WISP_OFFLINE_SKIN").filter(|p| !p.is_empty())?;
         let model = wisp_compat::var("WISP_OFFLINE_SKIN_MODEL").unwrap_or_default();
-        read_offline_skin(std::path::Path::new(&path), &model)
+        read_offline_skin(std::path::Path::new(&path), &model == "slim")
             .inspect_err(|e| eprintln!("Wisp: no offline skin ({}): {e}", path.display()))
             .ok()
+            .map(std::sync::Arc::new)
     })
-    .as_ref()
+    .clone()
 }
-fn read_offline_skin(path: &std::path::Path, model: &str) -> Result<(Vec<u8>, bool), String> {
+
+static OFFLINE_CHOSEN: std::sync::RwLock<Option<std::sync::Arc<(Vec<u8>, bool)>>> =
+    std::sync::RwLock::new(None);
+/// Counts the Wardrobe's choices: each one is a new atlas sprite ([`offline_skin_sprite`]).
+static OFFLINE_GENERATION: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+
+/// The Wardrobe sets an offline name's skin (its 64x64 RGBA, slim or not) for the rest of the run.
+pub fn set_offline_skin(rgba: Vec<u8>, slim: bool) {
+    *OFFLINE_CHOSEN
+        .write()
+        .unwrap_or_else(std::sync::PoisonError::into_inner) =
+        Some(std::sync::Arc::new((rgba, slim)));
+    OFFLINE_GENERATION.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// The atlas sprite of [`offline_skin`]: a new name after each Wardrobe choice, so the
+/// skin slots store it again.
+pub fn offline_skin_sprite() -> String {
+    match OFFLINE_GENERATION.load(std::sync::atomic::Ordering::Relaxed) {
+        0 => "wisp/offline_skin".into(),
+        n => format!("wisp/offline_skin_{n}"),
+    }
+}
+
+/// A skin file as the game draws it: its 64x64 RGBA (a 64x32 one laid out as vanilla does).
+pub fn read_offline_skin(path: &std::path::Path, slim: bool) -> Result<(Vec<u8>, bool), String> {
     let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
     let (w, h, rgba) = crate::hud::decode_bytes(&bytes).map_err(|e| e.to_string())?;
     let skin = process_legacy_skin(w, h, &rgba).ok_or("not a 64x64 or 64x32 skin")?;
-    Ok((skin, model == "slim"))
+    Ok((skin, slim))
 }
 
 /// The signed-in account's own profile properties (`Minecraft.profileFuture`:

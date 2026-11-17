@@ -10,7 +10,9 @@ mod store;
 pub use friends::{
     FriendClick, FriendsView, tint as friend_tint, whereabouts as friend_whereabouts,
 };
-pub use store::{StoreClick, StoreField, StorePage, coins as store_coins};
+pub use store::{
+    StoreClick, StoreField, StorePage, coins as store_coins, kind_name as store_kind_name,
+};
 
 use crate::{
     extras::{
@@ -24,15 +26,13 @@ use crate::{
 // The launcher's dark look in the HUD encoding: neutral greys, the violet for what is selected,
 // green for what is on.
 const SCRIM: u32 = 0x050507;
-const PANEL: u32 = hex(0x0F0F12, 244);
-const HEADER: u32 = hex(0x16161B, 255);
+const PANEL: u32 = hex(0x111217, 238);
+const SIDEBAR: u32 = hex(0x0B0C10, 246);
 const ACCENT: u32 = hex(wisp_theme::glass::ACCENT, 255);
 const ACCENT_HOVER: u32 = hex(0xFFFFFF, 255);
 const ACCENT_SOFT: u32 = hex(0xD4D4D8, 255);
 /// Text on the accent: it is near white, so the text is dark.
 const ON_ACCENT: u32 = hex(wisp_theme::glass::ON_LIGHT, 255);
-const ON: u32 = hex(0x22C55E, 235);
-const ON_HOVER: u32 = hex(0x2BD46A, 255);
 const INK: u32 = hex(0xFFFFFF, 255);
 const INK_SOFT: u32 = hex(0xFFFFFF, 210);
 const MUTED: u32 = hex(0xFFFFFF, 150);
@@ -46,11 +46,14 @@ const fn accent_alpha(a: u8) -> u32 {
     hex(wisp_theme::glass::ACCENT, a)
 }
 
-/// The header (logo, search, Edit HUD) and the tab row under it, in dp.
-const HEADER_H: f32 = 60.0;
-const TABS_H: f32 = 44.0;
-const TILE_W: f32 = 150.0;
-const TILE_H: f32 = 158.0;
+/// The sidebar's width, the page's head (title, search, close) and the chips under it, in dp.
+const SIDEBAR_W: f32 = 228.0;
+const HEAD_H: f32 = 62.0;
+const CHIPS_H: f32 = 42.0;
+const TILE_W: f32 = 168.0;
+const TILE_H: f32 = 140.0;
+/// A module tile's name bar, which turns it on or off.
+const TILE_BAR: f32 = 38.0;
 const GAP: f32 = 12.0;
 const ROW_H: f32 = 50.0;
 const RADIUS: f32 = 16.0;
@@ -201,6 +204,7 @@ impl Menu {
         self.scroll = (self.scroll - delta * 40.0).clamp(0.0, self.scroll_room.max(0.0));
     }
     /// Draws the menu over the frame; returns the items to draw on top.
+    #[allow(clippy::too_many_arguments)]
     pub fn draw(
         &mut self,
         ui: &mut Ui,
@@ -208,6 +212,7 @@ impl Menu {
         key_name: &dyn Fn(&str) -> String,
         friends: FriendsView,
         store: Option<&wisp_cosmetics::share::ShopState>,
+        player: &str,
     ) -> Vec<Icon> {
         self.hits.clear();
         let mut icons = Vec::new();
@@ -216,10 +221,10 @@ impl Menu {
             .opened
             .map_or(1.0, |at| (at.elapsed().as_secs_f32() / OPEN_ANIM).min(1.0));
         let ease = 1.0 - (1.0 - t).powi(3);
-        ui.rounded(0.0, 0.0, w, h, 0.0, hex(SCRIM, (160.0 * ease) as u8));
+        ui.rounded(0.0, 0.0, w, h, 0.0, hex(SCRIM, (110.0 * ease) as u8));
         self.hit(ui, 0.0, 0.0, w, h, Action::Close);
-        let pw = (w - 40.0).clamp(440.0, 1000.0);
-        let ph = (h - 40.0).clamp(320.0, 600.0);
+        let pw = (w - 48.0).clamp(520.0, 1120.0);
+        let ph = (h - 48.0).clamp(340.0, 660.0);
         let px = ((w - pw) / 2.0).round();
         let py = ((h - ph) / 2.0).round() + (1.0 - ease) * 16.0;
         // A soft shadow, then the panel.
@@ -234,10 +239,19 @@ impl Menu {
         ui.rounded(px, py, pw, ph, RADIUS, PANEL);
         ui.border(px, py, pw, ph, RADIUS, STROKE);
         self.hit(ui, px, py, pw, ph, Action::Nothing);
-        self.draw_header(ui, e, (px, py, pw), friends, store);
-        let top = HEADER_H + TABS_H + 16.0;
-        let (mx, my) = (px + 24.0, py + top);
-        let (mw, mh) = (pw - 48.0, ph - top - 18.0);
+        self.draw_sidebar(ui, e, (px, py, ph), friends, store, player);
+        let (cx, cw) = (px + SIDEBAR_W + 28.0, pw - SIDEBAR_W - 56.0);
+        let modules = !self.friends_page && self.store_page.is_none();
+        let grid = modules && self.open.is_none();
+        self.draw_head(ui, e, (cx, py + 22.0, cw), grid);
+        let top = if grid {
+            self.draw_chips(ui, e, cx, py + 22.0 + HEAD_H, cw);
+            py + 22.0 + HEAD_H + CHIPS_H + 10.0
+        } else {
+            py + 22.0 + HEAD_H + 4.0
+        };
+        let (mx, my) = (cx, top);
+        let (mw, mh) = (cw, py + ph - top - 20.0);
         if let Some(page) = self.store_page {
             self.draw_store(ui, store, page, (mx, my, mw, mh));
             return icons;
@@ -253,72 +267,293 @@ impl Menu {
         icons
     }
 
-    /// The header: the mark and name, the search and Edit HUD; under it the tabs.
-    fn draw_header(
+    /// The sidebar: the wordmark, Edit HUD, the pages in their sections, the player at the foot.
+    fn draw_sidebar(
         &mut self,
         ui: &mut Ui,
         e: &Extras,
-        (px, py, pw): (f32, f32, f32),
+        (px, py, ph): (f32, f32, f32),
         friends: FriendsView,
         store: Option<&wisp_cosmetics::share::ShopState>,
+        player: &str,
     ) {
-        let other_page = self.friends_page || self.store_page.is_some();
-        // The header's plate keeps the panel's rounded top corners.
-        ui.rounded(px, py, pw, HEADER_H + TABS_H, RADIUS, HEADER);
-        ui.rounded(px, py + HEADER_H + TABS_H - RADIUS, pw, RADIUS, 0.0, HEADER);
-        ui.rounded(px, py + HEADER_H + TABS_H, pw, 1.0, 0.0, STROKE);
-        // The mark: Wisp's white feather on a black tile, as the app icon has it.
-        let (bx, by, side) = (px + 20.0, py + 14.0, 32.0);
+        // Its plate keeps the panel's rounded left corners; a rule parts it from the page.
+        ui.rounded(px, py, SIDEBAR_W, ph, RADIUS, SIDEBAR);
+        ui.rounded(px + SIDEBAR_W - RADIUS, py, RADIUS, ph, 0.0, SIDEBAR);
+        ui.rounded(px + SIDEBAR_W, py, 1.0, ph, 0.0, STROKE);
+        // The mark: Wisp's white feather on a black tile, and the wordmark.
+        let (bx, by, side) = (px + 22.0, py + 24.0, 34.0);
         let tile = hex(0x000000, 255);
-        ui.rounded(bx, by, side, side, 9.0, tile);
-        ui.border(bx, by, side, side, 9.0, STROKE);
+        ui.rounded(bx, by, side, side, 10.0, tile);
+        ui.border(bx, by, side, side, 10.0, STROKE);
         ui.feather(bx + side / 2.0, by + side / 2.0, side, INK, tile);
-        ui.text(Face::Heading, 18.0, bx + 42.0, by - 2.0, INK, "Wisp");
-        let client = lang::get_or("wisp.menu.client", "Client");
-        ui.text(Face::Regular, 11.0, bx + 42.0, by + 18.0, MUTED, &client);
-        // Edit HUD, the main action, at the right.
+        ui.text_line(Face::Heading, 22.0, side, bx + 46.0, by - 1.0, INK, "WISP");
+        let (x, w) = (px + 14.0, SIDEBAR_W - 28.0);
+        let mut y = py + 82.0;
         let label = lang::get_or("wisp.menu.edit_hud", "Edit HUD");
-        let ew = ui.measure(Face::Medium, 13.0, &label) + 30.0;
-        let (ex, ey, eh) = (px + pw - 20.0 - ew, py + 13.0, 34.0);
-        let fill = if hover(ui, ex, ey, ew, eh) {
-            ACCENT_HOVER
+        y = self.side_row(
+            ui,
+            (x, y, w),
+            Glyph::Hud,
+            &label,
+            false,
+            None,
+            Action::EditHud,
+        );
+        // Modules.
+        let other_page = self.friends_page || self.store_page.is_some();
+        let section = lang::get_or("wisp.menu.section.modules", "Mods & options");
+        y = side_section(ui, x, y, &section);
+        let on = features::FEATURES
+            .iter()
+            .filter(|f| e.feature_on(f.key))
+            .count();
+        let badge = (on > 0).then(|| (on.to_string(), hex(0xFFFFFF, 22)));
+        let label = lang::get_or("wisp.menu.mods", "Mods");
+        y = self.side_row(
+            ui,
+            (x, y, w),
+            Glyph::Mods,
+            &label,
+            !other_page,
+            badge,
+            Action::Category(self.category),
+        );
+        // Social.
+        let section = lang::get_or("wisp.menu.section.social", "Social");
+        y = side_section(ui, x, y, &section);
+        let list = friends.state.and_then(|s| s.list.as_ref());
+        let waiting = list.map_or(0, |l| l.incoming.len());
+        let online = list.map_or(0, |l| l.friends.iter().filter(|f| f.online).count());
+        let badge = if waiting > 0 {
+            Some((waiting.to_string(), hex(0xFF6B6B, 230)))
         } else {
-            ACCENT
+            (online > 0).then(|| (online.to_string(), hex(0x22C55E, 150)))
         };
-        ui.rounded(ex, ey, ew, eh, 10.0, fill);
-        ui.text_line(Face::Medium, 13.0, eh, ex + 15.0, ey, ON_ACCENT, &label);
-        self.hit(ui, ex, ey, ew, eh, Action::EditHud);
-        // The search, for the modules.
-        if !other_page {
-            let sw = 240.0_f32.min(pw * 0.32);
-            let (sx, sy, sh) = (ex - 10.0 - sw, ey, eh);
-            ui.rounded(sx, sy, sw, sh, 10.0, FIELD);
-            if self.search_focused {
-                ui.border(sx, sy, sw, sh, 10.0, ACCENT_SOFT);
+        let label = lang::get_or("wisp.menu.friends", "Friends");
+        y = self.side_row(
+            ui,
+            (x, y, w),
+            Glyph::Friends,
+            &label,
+            self.friends_page,
+            badge,
+            Action::Friends,
+        );
+        // The Shop: Store for everyone, Creator for creators, Admin for the owner.
+        let section = lang::get_or("wisp.menu.section.shop", "Shop");
+        y = side_section(ui, x, y, &section);
+        let me = store.map(|s| s.me.clone()).unwrap_or_default();
+        let pages = [
+            (
+                StorePage::Shop,
+                Glyph::Store,
+                "wisp.menu.store",
+                "Store",
+                true,
+            ),
+            (
+                StorePage::Creator,
+                Glyph::Creator,
+                "wisp.menu.creator",
+                "Creator",
+                me.creator,
+            ),
+            (
+                StorePage::Admin,
+                Glyph::Admin,
+                "wisp.menu.admin",
+                "Admin",
+                me.admin,
+            ),
+        ];
+        for (page, glyph, key, fallback, shown) in pages {
+            if !shown {
+                continue;
             }
-            ui.border(sx + 12.0, sy + 11.0, 11.0, 11.0, 5.5, MUTED);
-            ui.rounded(sx + 21.0, sy + 20.0, 4.0, 2.0, 1.0, MUTED);
-            let shown = if self.search.is_empty() {
-                lang::get_or("wisp.menu.search", "Search modules")
-            } else {
-                self.search.clone()
-            };
-            let colour = if self.search.is_empty() { FAINT } else { INK };
-            let text = fit(ui, Face::Regular, 13.0, &shown, sw - 48.0);
-            let tw = ui.text_line(Face::Regular, 13.0, sh, sx + 32.0, sy, colour, &text);
-            if self.search_focused && blink() {
-                let cx = if self.search.is_empty() {
-                    sx + 32.0
-                } else {
-                    sx + 33.0 + tw
-                };
-                ui.rounded(cx, sy + 9.0, 1.0, sh - 18.0, 0.0, INK);
-            }
-            self.hit(ui, sx, sy, sw, sh, Action::Search);
+            let label = lang::get_or(key, fallback);
+            let badge = (page == StorePage::Creator && me.supporters > 0)
+                .then(|| (me.supporters.to_string(), hex(0xF2C14E, 150)));
+            y = self.side_row(
+                ui,
+                (x, y, w),
+                glyph,
+                &label,
+                self.store_page == Some(page),
+                badge,
+                Action::Store(StoreClick::Page(page)),
+            );
         }
-        // The tabs: the categories, then Friends; the chosen one underlined in the accent.
-        let ty = py + HEADER_H;
-        let mut x = px + 14.0;
+        // The player, at the foot.
+        let fy = py + ph - 64.0;
+        if y < fy && !player.is_empty() {
+            ui.rounded(px, fy, SIDEBAR_W, 1.0, 0.0, STROKE);
+            let (ax, ay, side) = (px + 20.0, fy + 16.0, 32.0);
+            ui.rounded(ax, ay, side, side, 9.0, hex(0xFFFFFF, 20));
+            let initial = player.chars().take(1).collect::<String>().to_uppercase();
+            let iw = ui.measure(Face::SemiBold, 15.0, &initial);
+            ui.text_line(
+                Face::SemiBold,
+                15.0,
+                side,
+                ax + (side - iw) / 2.0,
+                ay,
+                INK,
+                &initial,
+            );
+            let name = fit(ui, Face::Medium, 13.0, player, SIDEBAR_W - 76.0);
+            ui.text(Face::Medium, 13.0, ax + 44.0, ay - 1.0, INK, &name);
+            let client = lang::get_or("wisp.menu.client_name", "Wisp Client");
+            ui.text(Face::Regular, 11.0, ax + 44.0, ay + 17.0, MUTED, &client);
+        }
+    }
+
+    /// One page in the sidebar; returns where the next row starts.
+    #[allow(clippy::too_many_arguments)]
+    fn side_row(
+        &mut self,
+        ui: &mut Ui,
+        (x, y, w): (f32, f32, f32),
+        glyph: Glyph,
+        label: &str,
+        selected: bool,
+        badge: Option<(String, u32)>,
+        action: Action,
+    ) -> f32 {
+        let h = 36.0;
+        let hovered = hover(ui, x, y, w, h);
+        if selected {
+            ui.rounded(x, y, w, h, 10.0, ACCENT);
+        } else if hovered {
+            ui.rounded(x, y, w, h, 10.0, CARD_HOVER);
+        }
+        let colour = if selected {
+            ON_ACCENT
+        } else if hovered {
+            INK
+        } else {
+            INK_SOFT
+        };
+        draw_glyph(ui, glyph, x + 12.0, y + 10.0, colour);
+        let face = if selected {
+            Face::Medium
+        } else {
+            Face::Regular
+        };
+        ui.text_line(face, 13.0, h, x + 38.0, y, colour, label);
+        if let Some((b, fill)) = badge {
+            let bw = ui.measure(Face::Mono, 10.0, &b) + 10.0;
+            let (bx, bh) = (x + w - 10.0 - bw, 16.0);
+            let by = y + (h - bh) / 2.0;
+            let (fill, ink) = if selected {
+                (hex(0x000000, 40), ON_ACCENT)
+            } else {
+                (fill, INK)
+            };
+            ui.rounded(bx, by, bw, bh, 8.0, fill);
+            ui.text_line(Face::Mono, 10.0, bh, bx + 5.0, by, ink, &b);
+        }
+        self.hit(ui, x, y, w, h, action);
+        y + h + 4.0
+    }
+
+    /// The page's head: Back on a module's page, the title, the search over the modules and
+    /// the close button.
+    fn draw_head(&mut self, ui: &mut Ui, e: &Extras, (x, y, w): (f32, f32, f32), grid: bool) {
+        let h = HEAD_H - 16.0;
+        // Close, at the right.
+        let (qx, qy, qs) = (x + w - 32.0, y + (h - 32.0) / 2.0, 32.0);
+        if hover(ui, qx, qy, qs, qs) {
+            ui.rounded(qx, qy, qs, qs, 10.0, CARD_HOVER);
+        }
+        draw_glyph(ui, Glyph::Close, qx + 9.0, qy + 9.0, INK_SOFT);
+        self.hit(ui, qx, qy, qs, qs, Action::Close);
+        let mut tx = x;
+        let module = if self.friends_page || self.store_page.is_some() {
+            None
+        } else {
+            self.open.and_then(features::feature)
+        };
+        if module.is_some() {
+            let (bx, by, bs) = (x - 6.0, y + (h - 32.0) / 2.0, 32.0);
+            if hover(ui, bx, by, bs, bs) {
+                ui.rounded(bx, by, bs, bs, 10.0, CARD_HOVER);
+            }
+            draw_glyph(ui, Glyph::Back, bx + 9.0, by + 9.0, INK);
+            self.hit(ui, bx, by, bs, bs, Action::Back);
+            tx += 34.0;
+        }
+        let title = if let Some(page) = self.store_page {
+            match page {
+                StorePage::Shop => lang::get_or("wisp.menu.store", "Store"),
+                StorePage::Creator => lang::get_or("wisp.menu.creator", "Creator"),
+                StorePage::Admin => lang::get_or("wisp.menu.admin", "Admin"),
+            }
+        } else if self.friends_page {
+            lang::get_or("wisp.menu.friends", "Friends")
+        } else if let Some(f) = module {
+            features::texts(f.key).0
+        } else {
+            lang::get_or("wisp.menu.mods", "Mods")
+        };
+        let title = fit(ui, Face::Heading, 26.0, &title, w * 0.45);
+        let tw = ui.measure(Face::Heading, 26.0, &title);
+        ui.text_line(Face::Heading, 26.0, h, tx, y - 1.0, INK, &title);
+        if !grid {
+            return;
+        }
+        // How many are on, beside the title.
+        let cards = self.cards(e);
+        let on = cards.iter().filter(|c| c.on).count();
+        let summary = format!(
+            "{on} / {} {}",
+            cards.len(),
+            lang::get_or("wisp.menu.on", "on")
+        );
+        ui.text_line(
+            Face::Regular,
+            12.0,
+            h,
+            tx + tw + 12.0,
+            y + 3.0,
+            MUTED,
+            &summary,
+        );
+        // The search.
+        let sw = 260.0_f32.min(w * 0.36);
+        let (sx, sy, sh) = (qx - 10.0 - sw, y + (h - 34.0) / 2.0, 34.0);
+        ui.rounded(sx, sy, sw, sh, 10.0, FIELD);
+        let edge = if self.search_focused {
+            ACCENT_SOFT
+        } else {
+            STROKE
+        };
+        ui.border(sx, sy, sw, sh, 10.0, edge);
+        ui.border(sx + 12.0, sy + 11.0, 11.0, 11.0, 5.5, MUTED);
+        ui.rounded(sx + 21.0, sy + 20.0, 4.0, 2.0, 1.0, MUTED);
+        let shown = if self.search.is_empty() {
+            lang::get_or("wisp.menu.search", "Search modules")
+        } else {
+            self.search.clone()
+        };
+        let colour = if self.search.is_empty() { FAINT } else { INK };
+        let text = fit(ui, Face::Regular, 13.0, &shown, sw - 48.0);
+        let tw = ui.text_line(Face::Regular, 13.0, sh, sx + 32.0, sy, colour, &text);
+        if self.search_focused && blink() {
+            let cx = if self.search.is_empty() {
+                sx + 32.0
+            } else {
+                sx + 33.0 + tw
+            };
+            ui.rounded(cx, sy + 9.0, 1.0, sh - 18.0, 0.0, INK);
+        }
+        self.hit(ui, sx, sy, sw, sh, Action::Search);
+    }
+
+    /// The categories as chips over the grid, the chosen one filled in the accent.
+    fn draw_chips(&mut self, ui: &mut Ui, e: &Extras, x0: f32, y: f32, w: f32) {
+        let mut x = x0;
+        let ch = CHIPS_H - 8.0;
         let tabs = std::iter::once(None).chain(Category::ALL.into_iter().map(Some));
         for tab in tabs {
             let name = match tab {
@@ -330,126 +565,40 @@ impl Menu {
                 .filter(|f| tab.is_none_or(|c| c == f.category))
                 .filter(|f| e.feature_on(f.key))
                 .count();
-            let selected = self.category == tab && !other_page;
-            let badge = (count > 0).then(|| {
-                (
-                    count.to_string(),
-                    if selected {
-                        accent_alpha(110)
-                    } else {
-                        hex(0xFFFFFF, 22)
-                    },
-                )
-            });
-            x = self.draw_tab(ui, x, ty, &name, selected, badge, Action::Category(tab));
-        }
-        ui.rounded(x + 4.0, ty + 14.0, 1.0, TABS_H - 28.0, 0.0, STROKE);
-        x += 10.0;
-        let list = friends.state.and_then(|s| s.list.as_ref());
-        let waiting = list.map_or(0, |l| l.incoming.len());
-        let online = list.map_or(0, |l| l.friends.iter().filter(|f| f.online).count());
-        let badge = if waiting > 0 {
-            Some((waiting.to_string(), hex(0xFF6B6B, 230)))
-        } else {
-            (online > 0).then(|| (online.to_string(), hex(0x22C55E, 150)))
-        };
-        let name = lang::get_or("wisp.menu.friends", "Friends");
-        x = self.draw_tab(ui, x, ty, &name, self.friends_page, badge, Action::Friends);
-        // The Shop: Store for everyone, Creator for creators, Admin for the owner.
-        ui.rounded(x + 4.0, ty + 14.0, 1.0, TABS_H - 28.0, 0.0, STROKE);
-        x += 10.0;
-        let me = store.map(|s| s.me.clone()).unwrap_or_default();
-        let pages = [
-            (StorePage::Shop, "wisp.menu.store", "Store", true),
-            (
-                StorePage::Creator,
-                "wisp.menu.creator",
-                "Creator",
-                me.creator,
-            ),
-            (StorePage::Admin, "wisp.menu.admin", "Admin", me.admin),
-        ];
-        for (page, key, fallback, shown) in pages {
-            if !shown {
-                continue;
+            let selected = self.category == tab;
+            let nw = ui.measure(Face::Medium, 13.0, &name);
+            let count = (count > 0).then(|| count.to_string());
+            let extra = count
+                .as_ref()
+                .map_or(0.0, |c| ui.measure(Face::Mono, 10.0, c) + 8.0);
+            let cw = nw + extra + 26.0;
+            if x + cw > x0 + w {
+                break;
             }
-            let name = lang::get_or(key, fallback);
-            let badge = (page == StorePage::Creator && me.supporters > 0)
-                .then(|| (me.supporters.to_string(), hex(0xF2C14E, 150)));
-            let selected = self.store_page == Some(page);
-            x = self.draw_tab(
-                ui,
-                x,
-                ty,
-                &name,
-                selected,
-                badge,
-                Action::Store(StoreClick::Page(page)),
-            );
+            let hovered = hover(ui, x, y, cw, ch);
+            let (fill, ink) = if selected {
+                (ACCENT, ON_ACCENT)
+            } else if hovered {
+                (CARD_HOVER, INK)
+            } else {
+                (CARD, INK_SOFT)
+            };
+            ui.rounded(x, y, cw, ch, 10.0, fill);
+            if !selected {
+                ui.border(x, y, cw, ch, 10.0, STROKE);
+            }
+            ui.text_line(Face::Medium, 13.0, ch, x + 13.0, y, ink, &name);
+            if let Some(c) = count {
+                let muted = if selected {
+                    hex(wisp_theme::glass::ON_LIGHT, 150)
+                } else {
+                    MUTED
+                };
+                ui.text_line(Face::Mono, 10.0, ch, x + 21.0 + nw, y + 1.0, muted, &c);
+            }
+            self.hit(ui, x, y, cw, ch, Action::Category(tab));
+            x += cw + 8.0;
         }
-        // How many are on, at the right of the tabs.
-        if !other_page && self.open.is_none() {
-            let cards = self.cards(e);
-            let on = cards.iter().filter(|c| c.on).count();
-            let summary = format!(
-                "{on} / {} {}",
-                cards.len(),
-                lang::get_or("wisp.menu.on", "on")
-            );
-            let sw = ui.measure(Face::Regular, 12.0, &summary);
-            ui.text_line(
-                Face::Regular,
-                12.0,
-                TABS_H,
-                px + pw - 24.0 - sw,
-                ty,
-                MUTED,
-                &summary,
-            );
-        }
-    }
-
-    /// A tab of the tab row; returns where the next one starts.
-    #[allow(clippy::too_many_arguments)]
-    fn draw_tab(
-        &mut self,
-        ui: &mut Ui,
-        x: f32,
-        ty: f32,
-        name: &str,
-        selected: bool,
-        badge: Option<(String, u32)>,
-        action: Action,
-    ) -> f32 {
-        let face = if selected {
-            Face::Medium
-        } else {
-            Face::Regular
-        };
-        let nw = ui.measure(face, 13.0, name);
-        let badge_w = badge
-            .as_ref()
-            .map_or(0.0, |(b, _)| ui.measure(Face::Mono, 10.0, b) + 10.0 + 6.0);
-        let tw = nw + badge_w + 20.0;
-        let (by, bh) = (ty + 7.0, TABS_H - 14.0);
-        let hovered = hover(ui, x, by, tw, bh);
-        if hovered && !selected {
-            ui.rounded(x, by, tw, bh, 8.0, CARD);
-        }
-        let colour = if selected || hovered { INK } else { MUTED };
-        ui.text_line(face, 13.0, TABS_H, x + 10.0, ty, colour, name);
-        if let Some((b, fill)) = badge {
-            let cw = ui.measure(Face::Mono, 10.0, &b);
-            let (bx, bw, bh2) = (x + 10.0 + nw + 6.0, cw + 10.0, 16.0);
-            let bty = ty + (TABS_H - bh2) / 2.0;
-            ui.rounded(bx, bty, bw, bh2, 8.0, fill);
-            ui.text_line(Face::Mono, 10.0, bh2, bx + 5.0, bty, INK, &b);
-        }
-        if selected {
-            ui.rounded(x + 8.0, ty + TABS_H - 3.0, tw - 16.0, 3.0, 1.5, ACCENT);
-        }
-        self.hit(ui, x, by, tw, bh, action);
-        x + tw + 2.0
     }
 
     fn draw_grid(
@@ -529,32 +678,13 @@ impl Menu {
         icons: &mut Vec<Icon>,
     ) -> bool {
         let hovered = hover(ui, x, y, w, TILE_H);
-        ui.rounded(
-            x,
-            y,
-            w,
-            TILE_H,
-            12.0,
-            if hovered { CARD_HOVER } else { CARD },
-        );
-        ui.border(
-            x,
-            y,
-            w,
-            TILE_H,
-            12.0,
-            if card.on { hex(0x22C55E, 70) } else { STROKE },
-        );
+        let plate = if hovered { CARD_HOVER } else { CARD };
+        ui.rounded(x, y, w, TILE_H, 12.0, plate);
+        ui.border(x, y, w, TILE_H, 12.0, STROKE);
         self.hit(ui, x, y, w, TILE_H, Action::Open(card.feature.key));
-        // The item on a soft disc.
-        let (cx, cy) = (x + w / 2.0, y + 50.0);
-        let disc = if card.on {
-            hex(0x22C55E, 30)
-        } else {
-            hex(0xFFFFFF, 10)
-        };
-        ui.circle(cx, cy, 31.0, disc);
-        let [gx, gy, gw, _] = ui.gui_rect(cx - 20.0, cy - 20.0, 40.0, 40.0);
+        // The item, big in the middle of the tile above the bar.
+        let (cx, cy) = (x + w / 2.0, y + (TILE_H - TILE_BAR) / 2.0);
+        let [gx, gy, gw, _] = ui.gui_rect(cx - 22.0, cy - 22.0, 44.0, 44.0);
         icons.push(Icon {
             item: card.feature.icon,
             x: gx,
@@ -562,54 +692,35 @@ impl Menu {
             size: gw,
             clip,
         });
-        // Its settings, on hover: three dots in the corner.
+        // A widget's tag in the corner; its settings, on hover, as three dots.
+        if card.feature.widget {
+            let tag = lang::get_or("wisp.menu.tag.widget", "HUD widget");
+            let tw = ui.measure(Face::Medium, 10.0, &tag) + 12.0;
+            ui.rounded(x + 8.0, y + 8.0, tw, 18.0, 9.0, hex(0xFFFFFF, 16));
+            ui.text_line(Face::Medium, 10.0, 18.0, x + 14.0, y + 8.0, MUTED, &tag);
+        }
         if hovered && (!card.feature.settings.is_empty() || card.feature.widget) {
             for i in 0..3 {
-                ui.circle(x + w - 22.0 + i as f32 * 5.0, y + 14.0, 1.6, MUTED);
+                ui.circle(x + w - 22.0 + i as f32 * 5.0, y + 16.0, 1.6, INK_SOFT);
             }
         }
-        let name = fit(ui, Face::Medium, 14.0, &card.name, w - 20.0);
+        // The bar with the name: the accent when the module is on. A click turns it on or off.
+        let (by, bh) = (y + TILE_H - TILE_BAR, TILE_BAR);
+        let over = hover(ui, x, by, w, bh);
+        let (fill, ink) = match (card.on, over) {
+            (true, false) => (ACCENT, ON_ACCENT),
+            (true, true) => (ACCENT_HOVER, ON_ACCENT),
+            (false, false) => (hex(0xFFFFFF, 16), INK_SOFT),
+            (false, true) => (hex(0xFFFFFF, 30), INK),
+        };
+        // Round at the bottom only: a taller rounded plate, cut at the bar's top.
+        let start = ui.mark();
+        ui.rounded(x, by - 12.0, w, bh + 12.0, 12.0, fill);
+        ui.clip_since(start, x, by, w, bh);
+        let name = fit(ui, Face::Medium, 14.0, &card.name, w - 24.0);
         let nw = ui.measure(Face::Medium, 14.0, &name);
-        ui.text(Face::Medium, 14.0, cx - nw / 2.0, y + 88.0, INK, &name);
-        let tag = if card.feature.widget {
-            lang::get_or("wisp.menu.tag.widget", "HUD widget")
-        } else {
-            lang::get_or(
-                card.feature.category.lang_key(),
-                card.feature.category.name(),
-            )
-        };
-        let tag = fit(ui, Face::Regular, 11.0, &tag, w - 20.0);
-        let tgw = ui.measure(Face::Regular, 11.0, &tag);
-        ui.text(Face::Regular, 11.0, cx - tgw / 2.0, y + 107.0, FAINT, &tag);
-        // The bar: green Enabled or grey Disabled.
-        let (bx, by, bw, bh) = (x + 8.0, y + TILE_H - 8.0 - 26.0, w - 16.0, 26.0);
-        let over = hover(ui, bx, by, bw, bh);
-        let fill = match (card.on, over) {
-            (true, false) => ON,
-            (true, true) => ON_HOVER,
-            (false, false) => hex(0xFFFFFF, 16),
-            (false, true) => hex(0xFFFFFF, 28),
-        };
-        ui.rounded(bx, by, bw, bh, 8.0, fill);
-        let label = if card.on {
-            lang::get_or("wisp.menu.enabled", "Enabled")
-        } else {
-            lang::get_or("wisp.menu.disabled", "Disabled")
-        }
-        .to_uppercase();
-        let lw = ui.measure(Face::SemiBold, 11.0, &label);
-        let colour = if card.on { INK } else { MUTED };
-        ui.text_line(
-            Face::SemiBold,
-            11.0,
-            bh,
-            bx + (bw - lw) / 2.0,
-            by,
-            colour,
-            &label,
-        );
-        self.hit(ui, bx, by, bw, bh, Action::Toggle(card.feature.key));
+        ui.text_line(Face::Medium, 14.0, bh, cx - nw / 2.0, by, ink, &name);
+        self.hit(ui, x, by, w, bh, Action::Toggle(card.feature.key));
         hovered
     }
 
@@ -623,34 +734,19 @@ impl Menu {
         key_name: &dyn Fn(&str) -> String,
         icons: &mut Vec<Icon>,
     ) {
-        // Back.
-        let back = format!("\u{2039}  {}", lang::get_or("gui.back", "Back"));
-        let bw = ui.measure(Face::Medium, 13.0, &back) + 24.0;
-        if hover(ui, mx - 8.0, my - 4.0, bw, 30.0) {
-            ui.rounded(mx - 8.0, my - 4.0, bw, 30.0, 10.0, CARD_HOVER);
-        }
-        ui.text_line(
-            Face::Medium,
-            13.0,
-            30.0,
-            mx + 4.0,
-            my - 4.0,
-            INK_SOFT,
-            &back,
-        );
-        self.hit(ui, mx - 8.0, my - 4.0, bw, 30.0, Action::Back);
-        // The head: icon, name, description and the switch.
-        let (name, description) = features::texts(f.key);
+        // The first card: the item, Enabled with the module's description, and its switch.
+        let (_, description) = features::texts(f.key);
         let on = e.feature_on(f.key);
-        let hy = my + 38.0;
-        let tile = if on {
-            hex(0x22C55E, 40)
-        } else {
-            hex(0xFFFFFF, 14)
-        };
-        ui.rounded(mx, hy, 52.0, 52.0, 14.0, tile);
+        let lines = wrap(ui, Face::Regular, 12.0, &description, mw - 66.0 - 80.0, 2);
+        let hh = 30.0 + lines.len().max(1) as f32 * 17.0;
+        let hh = hh.max(64.0);
+        let hy = my;
+        ui.rounded(mx, hy, mw, hh, 12.0, CARD);
+        ui.border(mx, hy, mw, hh, 12.0, STROKE);
+        let tile = hex(0xFFFFFF, 14);
+        ui.rounded(mx + 12.0, hy + (hh - 40.0) / 2.0, 40.0, 40.0, 10.0, tile);
         let whole = ui.gui_rect(0.0, 0.0, ui.w, ui.h);
-        let [gx, gy, gw, _] = ui.gui_rect(mx + 10.0, hy + 10.0, 32.0, 32.0);
+        let [gx, gy, gw, _] = ui.gui_rect(mx + 16.0, hy + (hh - 32.0) / 2.0, 32.0, 32.0);
         icons.push(Icon {
             item: f.icon,
             x: gx,
@@ -658,23 +754,24 @@ impl Menu {
             size: gw,
             clip: whole,
         });
-        ui.text(Face::Heading, 24.0, mx + 66.0, hy - 2.0, INK, &name);
-        let lines = wrap(ui, Face::Regular, 13.0, &description, mw - 66.0 - 70.0, 2);
+        let enabled = lang::get_or("wisp.menu.enabled_title", "Enabled");
+        let ty = hy + (hh - 18.0 - lines.len() as f32 * 17.0) / 2.0;
+        ui.text(Face::Medium, 14.0, mx + 66.0, ty - 2.0, INK, &enabled);
         for (i, line) in lines.iter().enumerate() {
             ui.text(
                 Face::Regular,
-                13.0,
+                12.0,
                 mx + 66.0,
-                hy + 30.0 + i as f32 * 18.0,
+                ty + 18.0 + i as f32 * 17.0,
                 MUTED,
                 line,
             );
         }
-        let (sx, sy) = (mx + mw - 38.0, hy + 4.0);
+        let (sx, sy) = (mx + mw - 16.0 - 38.0, hy + (hh - 22.0) / 2.0);
         draw_switch(ui, sx, sy, on);
-        self.hit(ui, sx - 6.0, sy - 6.0, 50.0, 34.0, Action::Toggle(f.key));
+        self.hit(ui, mx, hy, mw, hh, Action::Toggle(f.key));
         // The rows.
-        let top = hy + 76.0;
+        let top = hy + hh + 8.0;
         let foot = 44.0;
         let view = my + mh - foot - top;
         let mut rows: Vec<Row> = f.settings.iter().map(Row::Setting).collect();
@@ -752,6 +849,9 @@ impl Menu {
                 return;
             }
             Row::Position => {
+                ui.rounded(x, y, w, ROW_H, 12.0, CARD);
+                ui.border(x, y, w, ROW_H, 12.0, STROKE);
+                let (x, w) = (x + 16.0, w - 32.0);
                 let label = lang::get_or("wisp.menu.position", "Position");
                 ui.text_line(Face::Regular, 14.0, ROW_H, x, y, INK_SOFT, &label);
                 let button = lang::get_or("wisp.menu.edit_hud", "Edit HUD");
@@ -769,7 +869,10 @@ impl Menu {
             }
             Row::Setting(s) => *s,
         };
-        ui.rounded(x, y + ROW_H - 1.0, w, 1.0, 0.0, hex(0xFFFFFF, 14));
+        // Each setting on its own card.
+        ui.rounded(x, y, w, ROW_H, 12.0, CARD);
+        ui.border(x, y, w, ROW_H, 12.0, STROKE);
+        let (x, w) = (x + 16.0, w - 32.0);
         let label = lang::get_or(&format!("wisp.menu.setting.{}.{}", f.key, s.key), s.label);
         ui.text_line(Face::Regular, 14.0, ROW_H, x, y, INK_SOFT, &label);
         let right = x + w;
@@ -944,7 +1047,7 @@ impl Row {
     fn height(&self) -> f32 {
         match self {
             Row::Heading(_) => 40.0,
-            _ => ROW_H,
+            _ => ROW_H + 6.0,
         }
     }
 }
@@ -953,11 +1056,53 @@ fn hover(ui: &Ui, x: f32, y: f32, w: f32, h: f32) -> bool {
     let (cx, cy) = ui.cursor;
     cx >= x && cx < x + w && cy >= y && cy < y + h
 }
-/// A switch: a 38x22 pill, the accent when on, with a white knob.
+/// A switch: a 38x22 pill, the accent with a dark knob when on, grey with a white one when off.
 fn draw_switch(ui: &mut Ui, x: f32, y: f32, on: bool) {
-    ui.rounded(x, y, 38.0, 22.0, 11.0, if on { ON } else { SWITCH_OFF });
+    ui.rounded(x, y, 38.0, 22.0, 11.0, if on { ACCENT } else { SWITCH_OFF });
     let kx = if on { x + 27.0 } else { x + 11.0 };
-    ui.circle(kx, y + 11.0, 8.0, INK);
+    ui.circle(kx, y + 11.0, 8.0, if on { ON_ACCENT } else { INK });
+}
+
+/// A section's name in the sidebar; returns where its first row starts.
+fn side_section(ui: &mut Ui, x: f32, y: f32, name: &str) -> f32 {
+    ui.text(
+        Face::SemiBold,
+        10.0,
+        x + 10.0,
+        y + 14.0,
+        FAINT,
+        &name.to_uppercase(),
+    );
+    y + 34.0
+}
+
+/// The small line icons of the sidebar and the head, 16 dp square.
+#[derive(Clone, Copy)]
+enum Glyph {
+    Hud,
+    Mods,
+    Friends,
+    Store,
+    Creator,
+    Admin,
+    Close,
+    Back,
+}
+
+/// The launcher's line icons, smooth at any scale (`ui_theme::Icon`).
+fn draw_glyph(ui: &mut Ui, glyph: Glyph, x: f32, y: f32, ink: u32) {
+    use crate::ui_theme::Icon;
+    let icon = match glyph {
+        Glyph::Hud => Icon::Hud,
+        Glyph::Mods => Icon::Mods,
+        Glyph::Friends => Icon::Friends,
+        Glyph::Store => Icon::Cart,
+        Glyph::Creator => Icon::Spark,
+        Glyph::Admin => Icon::ShieldCheck,
+        Glyph::Close => Icon::Close,
+        Glyph::Back => Icon::ChevronLeft,
+    };
+    ui.icon(icon, x, y, 16.0, ink);
 }
 /// The text cut with an ellipsis to fit `max` dp.
 fn fit(ui: &Ui, face: Face, size: f32, text: &str, max: f32) -> String {

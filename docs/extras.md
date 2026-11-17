@@ -339,6 +339,41 @@ fullscreen is chosen), fog off and weather off are Graphics options (`fog`, `wea
 particle culling are Graphics > culling modes, and vanilla's FOV slider and FOV Effects cover a
 custom FOV.
 
+### Home screen and Wisp Menu look (`wisp_home.rs`, `wisp_menu.rs`)
+
+**Home screen** (`wisp_home.rs`, glue in `game/wisp_home.rs`): in place of vanilla's title menu
+(`Title::shows_main`), in the launcher's glass look: the wordmark and round buttons (Language,
+Accessibility, Friends, Options, Quit) at the top, Singleplayer, Multiplayer, Settings and Friends
+in the middle, and on the right the player's figure under their name tag with the Wardrobe's card
+below. Each button runs vanilla's title button of the same id (`Title::press_main`), so the
+screens behind them are vanilla's. The figure wears the account's skin (`/minecraft/profile`), else
+the offline skin, and the player's cosmetics while Show my cosmetics is on; it breathes, sways,
+turns its head after the cursor, and waves when the screen shows, every 14 seconds and when clicked.
+
+**Wardrobe** (`wisp_home/wardrobe.rs`, glue in `game/wisp_home/wardrobe.rs`): the figure large on
+the left; a Skin tab with the skins in the `skins` folder beside `options.txt` (each face shown,
+tried on with a click, Classic or Slim), and Wear this skin, which sends it to the Microsoft account
+(`POST /minecraft/profile/skins`) or, offline, wears it in this game and remembers it
+(`wardrobeSkin` and `wardrobeSlim` in `wisp.txt`); a Cosmetics tab with Show my cosmetics and each
+owned item to wear or take off (the Store's own requests).
+
+The home screen, the wardrobe and the Wisp Menu draw their icons from SVGs in the launcher's style
+(`assets/wisp/icons`, rasterized smooth at the size drawn by `ui_theme::Icon`).
+
+Behind it and every screen opened from the title, a picture from the player's own backgrounds
+folder (the launcher's, passed as `WISP_BACKGROUNDS`; else `backgrounds/` in the game folder) is
+drawn over the screen in place of the panorama (`gfx/picture.rs`), cropped to cover it, drifting
+in slowly, and blurred (at least radius 8). No picture there: the panorama, blurred. Wisp never
+ships pictures. `titleScreen:vanilla` in `wisp.txt`, or `WISP_VANILLA_TITLE`, brings vanilla's
+title menu and panorama back, for a run that compares the title with vanilla.
+
+**Wisp Menu** (Right Shift): a sidebar with the wordmark, Edit HUD and the pages in sections
+(Mods & options, Social, Shop), the player at its foot; the page's title with Back on a module's
+page, the search and Close in its head; the categories as chips over the grid; a module is a tile
+with its item, and its name on a bar that is white when it is on and turns it on or off. A
+module's page shows Enabled with its description first, then each setting on its own card. The
+world behind the menu is blurred.
+
 ## Shared rules
 
 - All extras are hidden with F1 and drawn in the HUD layer: under screens, over
