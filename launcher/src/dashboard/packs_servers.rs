@@ -30,30 +30,45 @@ fn switch(on: bool, s: f32) -> Div {
 }
 
 impl Launcher {
-    fn page_header(&self, title: &str, summary: String, actions: Vec<Stateful<Div>>) -> Div {
+    /// The page's head in the shell's style; Resource packs also gets Browse's instance
+    /// picker and its switch between Mods, Shaders and Resource packs.
+    fn page_header(
+        &self,
+        title: &str,
+        summary: String,
+        actions: Vec<Stateful<Div>>,
+        cx: &mut Context<Self>,
+    ) -> Div {
         let s = self.ui_scale;
+        let browse = self.page == Page::Packs;
+        let back = if browse {
+            ("Back to Instances", Page::Instances)
+        } else {
+            ("Back to Home", Page::Home)
+        };
+        let title = if browse { "Browse Resource packs" } else { title };
         div()
             .flex()
-            .items_center()
-            .gap(px(10. * s))
-            .child(
-                div()
-                    .flex_1()
-                    .min_w_0()
-                    .child(
-                        div()
-                            .text_size(px(30. * s))
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .child(tr(title)),
-                    )
-                    .child(
-                        div()
-                            .text_size(px(15. * s))
-                            .text_color(rgb(MUTED))
-                            .child(summary),
-                    ),
-            )
-            .children(actions)
+            .flex_col()
+            .gap(px(18. * s))
+            .child(self.page_head(
+                back,
+                title,
+                &summary,
+                Some(div().flex().gap(px(10. * s)).children(actions)),
+                cx,
+            ))
+            .when(browse, |d| {
+                d.child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .gap(px(12. * s))
+                        .child(self.browse_for(cx))
+                        .child(div().flex_1())
+                        .child(self.browse_kinds(cx)),
+                )
+            })
     }
 
     fn page_button(
@@ -75,16 +90,18 @@ impl Launcher {
             .text_size(px(14. * s))
             .cursor_pointer()
             .when(bright, |d| {
-                d.bg(luminous())
+                d.bg(rgb(0xffffff))
+                    .text_color(rgb(0x0b0b0d))
                     .font_weight(FontWeight::SEMIBOLD)
-                    .hover(|d| d.opacity(0.9))
+                    .hover(|d| d.bg(rgb(0xe4e5e8)))
             })
             .when(!bright, |d| {
-                d.border_1()
-                    .border_color(rgb(tone(0x2e3035)))
-                    .hover(|d| d.bg(rgb(tone(0x202125))))
+                d.bg(rgba(0x16171acc))
+                    .border_1()
+                    .border_color(rgba(0xffffff1f))
+                    .hover(|d| d.bg(rgba(0xffffff1a)))
             })
-            .child(icon(glyph, if bright { INK } else { MUTED }).size(px(15. * s)))
+            .child(icon(glyph, if bright { 0x0b0b0d } else { INK }).size(px(15. * s)))
             .child(tr(label))
     }
 
@@ -403,6 +420,7 @@ impl Launcher {
                 vec![self
                     .page_button("open-pack-folder", "Pack folder", "folder", true)
                     .on_click(cx.listener(|this, _, _, cx| this.open_game_folder("resourcepacks", cx)))],
+                cx,
             ))
             .when(locked, |d| d.child(self.running_notice("Minecraft is running. Close it to change resource packs; the game saves its own list when it quits.")))
             .when(packs.is_empty(), |d| {
@@ -669,6 +687,7 @@ impl Launcher {
                         .when(busy, |d| d.opacity(0.45))
                         .when(!busy, |d| d.on_click(cx.listener(|this, _, _, cx| this.play(cx)))),
                 ],
+                cx,
             ))
             .child(self.featured_server(cx))
             .when(servers.is_empty(), |d| {

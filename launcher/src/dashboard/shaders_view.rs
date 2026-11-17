@@ -624,46 +624,38 @@ impl Launcher {
             .flex_col()
             .gap(px(16. * s))
             .pb(px(20. * s))
+            .child(self.page_head(
+                ("Back to Instances", Page::Instances),
+                "Browse Shaders",
+                &summary,
+                Some(
+                    div()
+                        .flex()
+                        .gap(px(10. * s))
+                        .child(
+                            self.quiet_button("open-shaders-folder", "Shader folder", "folder")
+                                .on_click(cx.listener(|this, _, _, cx| {
+                                    this.open_game_folder("shaderpacks", cx)
+                                })),
+                        )
+                        .child(
+                            self.primary_button("import-native-shader", "Import .hshader", "download")
+                                .when(locked, |d| d.opacity(0.45))
+                                .when(!locked, |d| {
+                                    d.on_click(cx.listener(|this, _, _, cx| this.import_shader(cx)))
+                                }),
+                        ),
+                ),
+                cx,
+            ))
             .child(
                 div()
                     .flex()
                     .items_center()
-                    .gap(px(10. * s))
-                    .child(
-                        div()
-                            .flex_1()
-                            .min_w_0()
-                            .child(
-                                div()
-                                    .text_size(px(30. * s))
-                                    .font_weight(FontWeight::SEMIBOLD)
-                                    .child(tr("Shaders")),
-                            )
-                            .child(
-                                div()
-                                    .text_size(px(15. * s))
-                                    .text_color(rgb(MUTED))
-                                    .child(summary),
-                            ),
-                    )
-                    .child(
-                        self.shader_button("open-shaders-folder", "Shader folder", "folder", false)
-                            .on_click(cx.listener(|this, _, _, cx| {
-                                this.open_game_folder("shaderpacks", cx)
-                            })),
-                    )
-                    .child(
-                        self.shader_button(
-                            "import-native-shader",
-                            "Import .hshader",
-                            "download",
-                            true,
-                        )
-                        .when(locked, |d| d.opacity(0.45))
-                        .when(!locked, |d| {
-                            d.on_click(cx.listener(|this, _, _, cx| this.import_shader(cx)))
-                        }),
-                    ),
+                    .gap(px(12. * s))
+                    .child(self.browse_for(cx))
+                    .child(div().flex_1())
+                    .child(self.browse_kinds(cx)),
             )
             .when(locked, |d| {
                 d.child(
