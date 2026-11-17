@@ -279,8 +279,9 @@ struct Launcher {
     instance_menu: bool,
     /// Real Minecraft pictures from the player's own files, for the backdrop and the cards.
     art: shell::Art,
-    /// The window's size at the last frame, in pixels.
+    /// The window's size at the last frame, in pixels, and its physical pixels per pixel.
     viewport: (f32, f32),
+    pixel_ratio: f32,
     avatar_key: Option<String>,
     avatar: Option<Arc<gpui::RenderImage>>,
     /// The player's whole front view, for the profile page.
@@ -397,6 +398,24 @@ impl Launcher {
                 };
             });
         }
+        // The Store's figure is animated: 20 pictures a second while it is shown, the speed
+        // the game shows an item's texture frames at.
+        cx.spawn(async move |this, cx| loop {
+            cx.background_executor()
+                .timer(Duration::from_millis(50))
+                .await;
+            if this
+                .update(cx, |this, cx| {
+                    if this.page == Page::Shop {
+                        cx.notify();
+                    }
+                })
+                .is_err()
+            {
+                break;
+            }
+        })
+        .detach();
         cx.spawn(async move |this, cx| loop {
             cx.background_executor().timer(Duration::from_millis(200)).await;
             if this.update(cx, |this, cx| {
@@ -541,6 +560,7 @@ impl Launcher {
             instance_menu: false,
             art: shell::Art::default(),
             viewport: (1340., 754.),
+            pixel_ratio: 1.,
             avatar_key: None,
             avatar: None,
             body: None,
@@ -876,10 +896,7 @@ impl Render for Launcher {
         }
         theme::apply(&self.prefs);
         self.viewport = (f32::from(viewport.width), f32::from(viewport.height));
-        // The Store's figure is animated: draw the next frame too.
-        if self.page == Page::Shop {
-            window.request_animation_frame();
-        }
+        self.pixel_ratio = window.scale_factor();
         self.art.refresh(&self.home, &self.settings);
         self.content.refresh(
             &self.home,

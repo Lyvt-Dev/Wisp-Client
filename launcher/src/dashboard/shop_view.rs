@@ -17,9 +17,10 @@ use wisp_launcher::{
     shop::{self, Kind, Offer},
 };
 
-/// The figure's picture in pixels (drawn on the CPU, then scaled to fit), and the step its
-/// turning is drawn in (finer steps would only be drawn more often).
-const FIGURE: u32 = 560;
+/// The figure's frame on screen (logical pixels at size 1), and the step its turning is drawn
+/// in (finer steps would only be drawn more often). The picture is drawn at the screen's own
+/// pixels, so the HD textures stay sharp.
+const FIGURE: f32 = 560.0;
 const FIGURE_STEP: f32 = 3.0;
 /// Where the figure starts: its back, a little turned, so a cape shows; looked at a little
 /// from above.
@@ -49,8 +50,10 @@ pub(super) struct ShopUi {
     pub drag: Option<(f32, f32)>,
     /// When the Store's animations started: the item's texture frames and swing run from here.
     started: std::time::Instant,
-    /// Pictures of the figure by what they show (angle, frame, skin, item).
+    /// Pictures of the figure by what they show (angle, frame, size, skin, item).
     figure: RefCell<std::collections::HashMap<u64, Arc<gpui::RenderImage>>>,
+    /// Each item's file, read once (an HD animated texture is a megabyte to decode).
+    items: RefCell<std::collections::HashMap<&'static str, Option<std::rc::Rc<Item>>>>,
 }
 
 impl Default for ShopUi {
@@ -66,6 +69,7 @@ impl Default for ShopUi {
             drag: None,
             started: std::time::Instant::now(),
             figure: RefCell::new(std::collections::HashMap::new()),
+            items: RefCell::new(std::collections::HashMap::new()),
         }
     }
 }
@@ -622,10 +626,26 @@ impl Launcher {
 
     /// The player's own skin (a stand-in before signing in) wearing `offer`, turned to the
     /// figure's angle; drawn again only when the angle, the skin or the item changes.
-    fn shop_picture(&self, offer: &'static Offer) -> Arc<gpui::RenderImage> {
+    /// The item, read from its file once.
+    fn shop_item(&self, offer: &'static Offer) -> Option<std::rc::Rc<Item>> {
+        self.shop
+            .items
+            .borrow_mut()
+            .entry(offer.id)
+            .or_insert_with(|| {
+                offer
+                    .item
+                    .and_then(|bytes| Item::parse(bytes).ok())
+                    .map(std::rc::Rc::new)
+            })
+            .clone()
+    }
+
+    /// The figure `pixels` square.
+    fn shop_picture(&self, offer: &'static Offer, pixels: u32) -> Arc<gpui::RenderImage> {
         let yaw = (self.shop.yaw / FIGURE_STEP).round() * FIGURE_STEP;
         let pitch = (self.shop.pitch / FIGURE_STEP).round() * FIGURE_STEP;
-        let item = offer.item.and_then(|bytes| Item::parse(bytes).ok());
+        let item = self.shop_item(offer);
         // The texture's frame due now (the game shows each for `frametime` ticks). The item
         // stands still otherwise, so an angle's frames are drawn once and then replayed.
         let step = item.as_ref().map_or(2, |i| i.frametime.max(1)) as f32;
@@ -639,6 +659,7 @@ impl Launcher {
         yaw.to_bits().hash(&mut hasher);
         pitch.to_bits().hash(&mut hasher);
         frame.hash(&mut hasher);
+        pixels.hash(&mut hasher);
         offer.id.hash(&mut hasher);
         let key = hasher.finish();
         if let Some(picture) = self.shop.figure.borrow().get(&key) {
@@ -669,7 +690,7 @@ impl Launcher {
                 d
             }));
         }
-        let picture = to_render(&preview::render(&draws, FIGURE, FIGURE, yaw, pitch));
+        let picture = to_render(&preview::render(&draws, pixels, pixels, yaw, pitch));
         let mut kept = self.shop.figure.borrow_mut();
         if kept.len() >= FIGURES_KEPT {
             kept.clear();
@@ -681,7 +702,13 @@ impl Launcher {
     /// The figure in the middle of the Store: drag to turn and tilt it, scroll to zoom.
     fn shop_figure(&self, offer: &'static Offer, cx: &mut Context<Self>) -> Div {
         let s = self.ui_scale;
-        let size = px(560. * s);
+        let size = px(FIGURE * s);
+        // The picture at the screen's pixels: the zoom in steps of a tenth, so a zoom doesn't
+        // draw every size in between.
+        let zoom = (self.shop.zoom * 10.).round() / 10.;
+        // While a drag turns it, half as many: it follows the hand; sharp again once let go.
+        let drag = if self.shop.drag.is_some() { 0.5 } else { 1.0 };
+        let pixels = ((FIGURE * s * zoom * self.pixel_ratio * drag) / 16.).round() as u32 * 16;
         div()
             .flex()
             .flex_col()
@@ -714,9 +741,9 @@ impl Launcher {
                             .items_center()
                             .justify_center()
                             .child(
-                                img(self.shop_picture(offer))
+                                img(self.shop_picture(offer, pixels.clamp(192, 1600)))
                                     .flex_none()
-                                    .size(px(560. * s * self.shop.zoom)),
+                                    .size(px(FIGURE * s * zoom)),
                             ),
                     )
                     .on_mouse_down(
@@ -835,7 +862,7 @@ impl Launcher {
                 }
                 let (x, y) = (f32::from(event.position.x), f32::from(event.position.y));
                 this.shop.yaw = (this.shop.yaw - (x - last.0) * 0.6).rem_euclid(360.);
-                this.shop.pitch = (this.shop.pitch + (y - last.1) * 0.4).clamp(PITCH.0, PITCH.1);
+                this.shop.pitch = (this.shop.pitch - (y - last.1) * 0.4).clamp(PITCH.0, PITCH.1);
                 this.shop.drag = Some((x, y));
                 cx.notify();
             }))

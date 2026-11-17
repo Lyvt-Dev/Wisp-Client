@@ -115,7 +115,7 @@ macro_rules! offer {
     };
 }
 
-/// The Wisp Founders Cape: Wisp's feather in HD (8× Minecraft's cape), animated.
+/// The Wisp Founders Cape: Wisp's feather in HD (12× Minecraft's cape), animated.
 const FOUNDERS_CAPE: Offer = offer!(
     "founders_cape",
     "Wisp Founders Cape",
@@ -430,10 +430,11 @@ mod tests {
         assert_eq!(ids, [FOUNDERS]);
         let cape = offer(FOUNDERS).unwrap();
         assert!(cape.founders() && cape.price == 0 && cape.kind == Kind::Cape);
-        // HD and animated: an 8× cape's 176×136 frames, more than one of them.
+        // HD and animated: a 12× cape (at a twelfth of the scale), more than one frame.
         let v: serde_json::Value = serde_json::from_slice(cape.item.unwrap()).unwrap();
         assert!(v["texture"]["frames"].as_u64().unwrap() > 1);
-        assert_eq!(v["attach"]["scale"], 0.125);
+        let scale = v["attach"]["scale"].as_f64().unwrap();
+        assert!((scale - 1.0 / 12.0).abs() < 1e-6, "{scale}");
     }
 
     #[test]

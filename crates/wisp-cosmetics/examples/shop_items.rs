@@ -157,11 +157,15 @@ fn png_canvas(bytes: &[u8]) -> Canvas {
 
 // ---------------------------------------------------------------- the Wisp Founders Cape
 
-/// The cape at 8× Minecraft's: an 80×128×8 box at an eighth of the scale, so it has the size
-/// of vanilla's 10×16×1 cape with 64 texels where vanilla has one. Its unfolded faces take
-/// 176×136 texels (vanilla's cape layout at 8×, cropped to the cape), under the format's 256.
-const CAPE: (i32, i32, i32) = (80, 128, 8);
-const CAPE_TEX: (u32, u32) = (176, 136);
+/// Texels per pixel of vanilla's cape: 12, the most the format's 256-texel frames hold.
+const RES: i32 = 12;
+/// The design was drawn at 8×: its sizes grow by this.
+const K: f32 = RES as f32 / 8.0;
+/// The cape at 12× Minecraft's: a 120×192×8 box at a twelfth of the scale, so it has the size
+/// of vanilla's 10×16×1 cape (two thirds as thick) with 144 texels where vanilla has one. Its
+/// unfolded faces take 256×200 texels, the format's widest.
+const CAPE: (i32, i32, i32) = (10 * RES, 16 * RES, 8);
+const CAPE_TEX: (u32, u32) = ((2 * (8 + 10 * RES)) as u32, (8 + 16 * RES) as u32);
 /// Frames and the game ticks each shows: a 2.4 s loop at 20 frames a second (every tick).
 const CAPE_FRAMES: u32 = 48;
 const CAPE_FRAMETIME: u32 = 1;
@@ -175,7 +179,7 @@ const WISP_MARK: &[u8] = include_bytes!(concat!(
 /// The founders' gold: the hem and the sparks that cross it.
 const GOLD: Rgba = hex(0xf2c14e);
 
-/// The Wisp Founders Cape: Wisp's feather large on a black night, at 8×, animated: smoke
+/// The Wisp Founders Cape: Wisp's feather large on a black night, at 12×, animated: smoke
 /// drifting behind, stars twinkling, a ring round the mark with a spark running along it, a
 /// halo breathing round the feather, its edge glowing, a sweep of light crossing it, and a gold
 /// hem with a glint running along it.
@@ -197,11 +201,11 @@ fn founders_frames() -> Vec<Canvas> {
     assert!(x0 < x1 && y0 < y1, "the icon has a mark");
     let (w, h, d) = CAPE;
     // The feather 50 texels wide, a little above the middle; the ring round it.
-    let mw = 50.0;
+    let mw = 50.0 * K;
     let mh = mw * (y1 - y0) as f32 / (x1 - x0) as f32;
-    let centre_y = 54.0;
+    let centre_y = 54.0 * K;
     let (mx, my) = ((w as f32 - mw) / 2.0, centre_y - mh / 2.0);
-    let (rcx, rcy, radius) = (w as f32 / 2.0, centre_y, (mh / 2.0 + 6.0).min(36.0));
+    let (rcx, rcy, radius) = (w as f32 / 2.0, centre_y, (mh / 2.0 + 6.0 * K).min(36.0 * K));
     // How much of each texel the feather covers (4×4 samples), and its colour there.
     let mut cover = vec![0.0f32; (w * h) as usize];
     let mut tint = vec![[0.0f32; 3]; (w * h) as usize];
@@ -241,14 +245,14 @@ fn founders_frames() -> Vec<Canvas> {
         }
     };
     // A soft halo: the coverage blurred.
-    let r = 8;
+    let r = RES;
     let mut halo = vec![0.0f32; (w * h) as usize];
     for y in 0..h {
         for x in 0..w {
             let (mut s, mut n) = (0.0, 0.0);
             for dy in -r..=r {
                 for dx in -r..=r {
-                    let k = (-((dx * dx + dy * dy) as f32) / 24.0).exp();
+                    let k = (-((dx * dx + dy * dy) as f32) / (24.0 * K * K)).exp();
                     s += at(&cover, x + dx, y + dy) * k;
                     n += k;
                 }
@@ -286,20 +290,21 @@ fn founders_frames() -> Vec<Canvas> {
             for y in 0..h {
                 for x in 0..w {
                     // Design units: the 20×32 of a 2× cape, so the smoke keeps its size.
-                    let (u, v) = (x as f32 / 4.0, y as f32 / 4.0);
+                    let (u, v) = (x as f32 / (RES / 2) as f32, y as f32 / (RES / 2) as f32);
                     let i = (y * w + x) as usize;
                     let mut col = mix(night, deep, v / 32.0 * 0.9);
                     let haze = fbm(u * 0.2 + lx, v * 0.2 + ly, 131);
                     col = add_light(col, [92.0, 92.0, 104.0], (haze - 0.5).max(0.0) * 0.75);
                     // Stars, each on its own beat; none on the halo.
-                    if noise(x / 2, y / 2, 133) > 0.982 && halo[i] < 0.1 {
-                        let beat = (turn + noise(x / 2, y / 2, 134) * tau).sin();
+                    let star = RES / 4;
+                    if noise(x / star, y / star, 133) > 0.982 && halo[i] < 0.1 {
+                        let beat = (turn + noise(x / star, y / star, 134) * tau).sin();
                         col = mix(col, hex(0xf4f4f6), 0.25 + 0.6 * (0.5 + 0.5 * beat));
                     }
                     // The ring, and two sparks running round it once a loop.
                     let (dx, dy) = (x as f32 + 0.5 - rcx, y as f32 + 0.5 - rcy);
                     let off = (dx.hypot(dy) - radius).abs();
-                    let ring = (-off * off / 1.2).exp();
+                    let ring = (-off * off / (1.2 * K * K)).exp();
                     col = add_light(col, [200.0, 200.0, 212.0], ring * 0.32);
                     let angle = dy.atan2(dx);
                     let spark = |lead: f32| {
@@ -322,9 +327,9 @@ fn founders_frames() -> Vec<Canvas> {
                         ];
                         col = mix(col, lifted, cover[i]);
                         // A sweep of light crossing the feather once a loop.
-                        let pos = -60.0 + t * 280.0;
-                        let off = (x as f32 * 0.9 - y as f32 * 0.45 + 40.0) - pos;
-                        let sweep = (-off * off / 90.0).exp() * 0.7;
+                        let pos = (-60.0 + t * 280.0) * K;
+                        let off = (x as f32 * 0.9 - y as f32 * 0.45 + 40.0 * K) - pos;
+                        let sweep = (-off * off / (90.0 * K * K)).exp() * 0.7;
                         col = add_light(col, [255.0, 255.0, 255.0], sweep * cover[i]);
                     }
                     let e = edge(x, y);
@@ -335,30 +340,32 @@ fn founders_frames() -> Vec<Canvas> {
                 }
             }
             // A fine silver border; the gold hem with a glint running along it.
+            let line = RES / 4;
+            let hem = 3 * line;
             for x in 0..w {
-                for k in 0..2 {
+                for k in 0..line {
                     c.set(fx + x, fy + k, hex(0xbdbdc2));
                 }
                 let glint = {
-                    let pos = t * (w as f32 + 40.0) - 20.0;
+                    let pos = t * (w as f32 + 40.0 * K) - 20.0 * K;
                     let off = x as f32 - pos;
-                    (-off * off / 30.0).exp()
+                    (-off * off / (30.0 * K * K)).exp()
                 };
-                for k in 0..6 {
-                    let base = match k {
-                        0 | 1 => hex(0x3a3a40),
-                        2 | 3 => GOLD,
+                for k in 0..hem {
+                    let base = match k / line {
+                        0 => hex(0x3a3a40),
+                        1 => GOLD,
                         _ => mix(GOLD, hex(0x8a6a1e), 0.5),
                     };
                     c.set(
                         fx + x,
-                        fy + h - 6 + k,
+                        fy + h - hem + k,
                         add_light(base, [255.0, 240.0, 200.0], glint * 0.6),
                     );
                 }
             }
-            for y in 0..h - 6 {
-                for k in 0..2 {
+            for y in 0..h - hem {
+                for k in 0..line {
                     c.set(fx + k, fy + y, hex(0xbdbdc2));
                     c.set(fx + w - 1 - k, fy + y, hex(0xbdbdc2));
                 }
@@ -388,9 +395,9 @@ fn cape_item(id: &str, frames: &[Canvas]) -> Value {
         "bone": "body",
         // A night-sky cape stays bright in the dark.
         "glow": true,
-        // Behind the back, turned round like vanilla's cape, at an eighth of the scale for its
-        // 8× texture.
-        "attach": { "offset": [0, 0, 2], "rotation": [0, 180, 0], "scale": 0.125 },
+        // Behind the back, turned round like vanilla's cape, at a twelfth of the scale for its
+        // 12× texture.
+        "attach": { "offset": [0, 0, 2], "rotation": [0, 180, 0], "scale": 1.0 / RES as f32 },
         "texture": { "png": b64(&strip(frames).png()), "frames": frames.len(), "frametime": CAPE_FRAMETIME },
         "parts": [{
             "name": "cape", "pivot": [0, 0, 0], "rotation": [-7, 0, 0],

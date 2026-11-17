@@ -466,8 +466,9 @@ pub struct Http {
     base: String,
 }
 
-/// Answers are small; anything longer is refused.
-const MAX_ANSWER: u64 = 1 << 20;
+/// The longest answer taken: an item file, as large as the service takes one (its `MAX_ITEM`,
+/// 4 MiB: an HD animated cape is about 1 MiB); anything longer is refused.
+const MAX_ANSWER: u64 = 4 << 20;
 
 impl Http {
     /// `base` without a trailing slash, e.g. `https://cosmetics.example`.

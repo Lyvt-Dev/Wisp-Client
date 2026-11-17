@@ -108,9 +108,11 @@ motes shed around the pet now and then, at its attachment beside the wearer's sh
 An **animated texture**: `"texture": {"png": ..., "frames": 24, "frametime": 2}`, the PNG a
 vertical strip of `frames` equal frames, each shown `frametime` game ticks, looping. The game puts
 the frame that is due into the item's atlas slot as the animation runs (`game/cosmetics.rs`
-`store_cosmetic`); pictures (the Shop's cards, the Wardrobe) show the first frame. A frame larger
-than 64×64 makes an HD item: the Shop's capes are 4× Minecraft's cape (a 40×64×4 box at a quarter
-scale, 88×68 texels), the Founders Cape at its own 256×128 artwork's resolution.
+`store_cosmetic`); the Shop's cards show the first frame, the launcher's Store and Locker
+figures the frame that is due. A frame larger than 64×64 makes an HD item: the Wisp Founders Cape
+is 12× Minecraft's cape (a 120×192×8 box at a twelfth of the scale, 256×200 texels, the widest a
+frame may be), 48 frames of one tick, about 1 MiB. Clients take item files up to 4 MiB, as the
+service does.
 
 `"glow": true` (any model item, optional) draws the item at full brightness whatever the light
 where its wearer stands: a star pet stays bright at night and underground.
