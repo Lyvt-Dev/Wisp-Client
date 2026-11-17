@@ -48,7 +48,7 @@ fn kind_label(kind: Kind) -> &'static str {
 }
 
 /// A plain stand-in skin when the account has none (or isn't signed in).
-fn stand_in_skin() -> Texture {
+pub(super) fn stand_in_skin() -> Texture {
     let mut rgba = vec![0u8; 64 * 64 * 4];
     let mut fill = |x0: usize, y0: usize, w: usize, h: usize, c: [u8; 3]| {
         for y in y0..y0 + h {
@@ -73,7 +73,7 @@ fn stand_in_skin() -> Texture {
 }
 
 /// Straight-alpha RGBA as the BGRA, premultiplied picture GPUI draws.
-fn to_render(image: &preview::Image) -> Arc<gpui::RenderImage> {
+pub(super) fn to_render(image: &preview::Image) -> Arc<gpui::RenderImage> {
     let mut buf = image::RgbaImage::new(image.width, image.height);
     for (px, src) in buf.pixels_mut().zip(image.rgba.as_chunks::<4>().0) {
         let a = src[3] as u32;

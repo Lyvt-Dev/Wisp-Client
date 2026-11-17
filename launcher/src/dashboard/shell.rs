@@ -189,15 +189,13 @@ impl Launcher {
     /// seamlessly); else the bundled banner.
     fn backdrop_picture(&self) -> Div {
         let layer = div().absolute().inset_0().overflow_hidden();
-        // The Store: the chosen item's own picture.
-        if let Some(offer) = self.shop_selected().filter(|_| self.page == Page::Shop) {
-            let banner = format!("banner_{}.png", offer.id);
-            let picture = if wisp_launcher::shop::picture(&banner).is_some() {
-                format!("shop/{banner}")
-            } else {
-                format!("shop/{}.png", offer.id)
-            };
-            return layer.child(img(picture).size_full().object_fit(ObjectFit::Cover));
+        // The Store: a dark stage, the player's figure stands in front of it.
+        if self.page == Page::Shop {
+            return layer.bg(gpui::linear_gradient(
+                180.,
+                gpui::linear_color_stop(rgb(0x1a1b20), 0.),
+                gpui::linear_color_stop(rgb(0x0b0b0d), 1.),
+            ));
         }
         let shot = self.art.background().or_else(|| {
             self.settings

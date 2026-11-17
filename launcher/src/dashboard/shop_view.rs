@@ -4,13 +4,26 @@
 //! backdrop), with its button and price, the coins and the creator code under it; every item
 //! stacked on the right, with search and the kinds there are.
 use super::friends_view::FriendCmd;
+use super::locker_view::{stand_in_skin, to_render};
 use super::*;
+use std::cell::RefCell;
+use std::hash::{Hash, Hasher};
+use wisp_cosmetics::{
+    preview::{self, Draw},
+    Item, Texture,
+};
 use wisp_launcher::{
     catalog,
     shop::{self, Kind, Offer},
 };
 
-#[derive(Default)]
+/// The figure's picture in pixels (drawn on the CPU, then scaled to fit), and the step its
+/// turning is drawn in (finer steps would only be drawn more often).
+const FIGURE: u32 = 640;
+const FIGURE_STEP: f32 = 3.0;
+/// Where the figure starts: its back, a little turned, so a cape shows.
+const FIGURE_START: f32 = 200.0;
+
 pub(super) struct ShopUi {
     /// The kind the list shows; None: every kind.
     pub tab: Option<Kind>,
@@ -20,6 +33,26 @@ pub(super) struct ShopUi {
     pub notice: Option<(String, bool)>,
     /// A purchase or change is with the Wisp server: the buttons wait for its answer.
     pub busy: bool,
+    /// The figure turned this many degrees from the front.
+    pub yaw: f32,
+    /// Where a drag that turns the figure was at the last move (window x, pixels).
+    pub drag: Option<f32>,
+    /// The last picture of the figure and what it showed.
+    figure: RefCell<Option<(u64, Arc<gpui::RenderImage>)>>,
+}
+
+impl Default for ShopUi {
+    fn default() -> Self {
+        Self {
+            tab: None,
+            selected: None,
+            notice: None,
+            busy: false,
+            yaw: FIGURE_START,
+            drag: None,
+            figure: RefCell::new(None),
+        }
+    }
 }
 
 const GOLD: u32 = 0xf2c14e;
@@ -572,6 +605,171 @@ impl Launcher {
             .child(list)
     }
 
+    /// The player's own skin (a stand-in before signing in) wearing `offer`, turned to the
+    /// figure's angle; drawn again only when the angle, the skin or the item changes.
+    fn shop_picture(&self, offer: &'static Offer) -> Arc<gpui::RenderImage> {
+        let yaw = (self.shop.yaw / FIGURE_STEP).round() * FIGURE_STEP;
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        self.avatar_key.hash(&mut hasher);
+        self.skin.is_some().hash(&mut hasher);
+        yaw.to_bits().hash(&mut hasher);
+        offer.id.hash(&mut hasher);
+        let key = hasher.finish();
+        if let Some((k, picture)) = self.shop.figure.borrow().as_ref() {
+            if *k == key {
+                return picture.clone();
+            }
+        }
+        let (texture, slim) = match &self.skin {
+            Some((rgba, slim)) => (
+                Texture {
+                    width: 64,
+                    height: 64,
+                    rgba: rgba.clone(),
+                },
+                *slim,
+            ),
+            None => (stand_in_skin(), false),
+        };
+        let body = preview::player_model(slim);
+        let item = offer.item.and_then(|bytes| Item::parse(bytes).ok());
+        let mut draws = vec![Draw {
+            root: &body,
+            base: glam::Mat4::IDENTITY,
+            texture: &texture,
+            poses: Vec::new(),
+        }];
+        if let Some(item) = &item {
+            draws.extend(Draw::item(item, &body, 0.0));
+        }
+        let picture = to_render(&preview::render(&draws, FIGURE, FIGURE, yaw, 8.0));
+        *self.shop.figure.borrow_mut() = Some((key, picture.clone()));
+        picture
+    }
+
+    /// The figure in the middle of the Store: drag across it to turn it; the arrows turn it a
+    /// quarter, Front and Back face it straight.
+    fn shop_figure(&self, offer: &'static Offer, cx: &mut Context<Self>) -> Div {
+        let s = self.ui_scale;
+        let size = px(560. * s);
+        let round = |id: &'static str, glyph: &'static str| {
+            div()
+                .id(id)
+                .size(px(40. * s))
+                .rounded_full()
+                .bg(rgba(0x0b0b0d99))
+                .border_1()
+                .border_color(rgba(0xffffff26))
+                .flex()
+                .items_center()
+                .justify_center()
+                .cursor_pointer()
+                .hover(|d| d.bg(rgba(0xffffff1f)))
+                .child(icon(glyph, INK).size(px(18. * s)))
+        };
+        let face = |id: &'static str, label: &str, yaw: f32| {
+            let on = ((self.shop.yaw - yaw).rem_euclid(360.))
+                .min((yaw - self.shop.yaw).rem_euclid(360.))
+                < 1.;
+            div()
+                .id(id)
+                .h(px(40. * s))
+                .px(px(16. * s))
+                .rounded_full()
+                .flex()
+                .items_center()
+                .text_size(px(14. * s))
+                .cursor_pointer()
+                .when(on, |d| {
+                    d.bg(rgb(0xffffff))
+                        .text_color(rgb(0x0b0b0d))
+                        .font_weight(FontWeight::SEMIBOLD)
+                })
+                .when(!on, |d| {
+                    d.bg(rgba(0x0b0b0d99))
+                        .border_1()
+                        .border_color(rgba(0xffffff26))
+                        .hover(|d| d.bg(rgba(0xffffff1f)))
+                })
+                .child(tr(label))
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    this.shop.yaw = yaw;
+                    cx.notify();
+                }))
+        };
+        div()
+            .flex()
+            .flex_col()
+            .items_center()
+            .gap(px(14. * s))
+            .child(
+                div()
+                    .id("shop-figure")
+                    .relative()
+                    .size(size)
+                    .cursor_grab()
+                    .when(self.shop.drag.is_some(), |d| d.cursor_grabbing())
+                    // A soft shadow at the feet.
+                    .child(
+                        div()
+                            .absolute()
+                            .left(px(200. * s))
+                            .right(px(200. * s))
+                            .bottom(px(22. * s))
+                            .h(px(16. * s))
+                            .rounded_full()
+                            .bg(rgba(0x00000066)),
+                    )
+                    .child(
+                        img(self.shop_picture(offer))
+                            .absolute()
+                            .inset_0()
+                            .size_full(),
+                    )
+                    .on_mouse_down(
+                        gpui::MouseButton::Left,
+                        cx.listener(|this, event: &gpui::MouseDownEvent, _, cx| {
+                            this.shop.drag = Some(f32::from(event.position.x));
+                            cx.notify();
+                        }),
+                    ),
+            )
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap(px(8. * s))
+                    .child(
+                        round("shop-turn-left", "chevron-left").on_click(cx.listener(
+                            |this, _, _, cx| {
+                                this.shop.yaw = (this.shop.yaw + 90.).rem_euclid(360.);
+                                cx.notify();
+                            },
+                        )),
+                    )
+                    .child(face("shop-face-front", "Front", 0.))
+                    .child(face("shop-face-back", "Back", 180.))
+                    .child(
+                        round("shop-turn-right", "chevron-right").on_click(cx.listener(
+                            |this, _, _, cx| {
+                                this.shop.yaw = (this.shop.yaw - 90.).rem_euclid(360.);
+                                cx.notify();
+                            },
+                        )),
+                    ),
+            )
+            .child(
+                div()
+                    .text_size(px(13. * s))
+                    .text_color(rgb(0x8e9099))
+                    .child(tr(if self.skin.is_some() {
+                        "Your skin. Drag to turn it."
+                    } else {
+                        "Sign in to see it on your own skin. Drag to turn it."
+                    })),
+            )
+    }
+
     pub(super) fn shop_page(&self, cx: &mut Context<Self>) -> Div {
         let s = self.ui_scale;
         let Some(offer) = self.shop_selected() else {
@@ -642,11 +840,45 @@ impl Launcher {
             });
         div()
             .size_full()
+            .relative()
             .flex()
             .gap(px(40. * s))
             .px(px(64. * s))
             .pt(px(8. * s))
             .pb(px(40. * s))
+            .on_mouse_move(cx.listener(|this, event: &gpui::MouseMoveEvent, _, cx| {
+                let Some(last) = this.shop.drag else {
+                    return;
+                };
+                if event.pressed_button != Some(gpui::MouseButton::Left) {
+                    this.shop.drag = None;
+                    cx.notify();
+                    return;
+                }
+                let x = f32::from(event.position.x);
+                this.shop.yaw = (this.shop.yaw - (x - last) * 0.6).rem_euclid(360.);
+                this.shop.drag = Some(x);
+                cx.notify();
+            }))
+            .on_mouse_up(
+                gpui::MouseButton::Left,
+                cx.listener(|this, _, _, cx| {
+                    this.shop.drag = None;
+                    cx.notify();
+                }),
+            )
+            .child(
+                div()
+                    .absolute()
+                    .top_0()
+                    .bottom(px(40. * s))
+                    .left(px(500. * s))
+                    .right(px(484. * s))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .child(self.shop_figure(offer, cx)),
+            )
             .child(
                 div()
                     .flex_1()
