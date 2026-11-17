@@ -87,6 +87,11 @@ impl Emote {
         moves::moves_at(self, 0.0).is_none()
     }
 
+    /// Whether the shop sells it: only those are offered in the wheel.
+    fn sold(self) -> bool {
+        wisp_shop::offer(self.id()).is_some()
+    }
+
     /// The Shop's id for it.
     fn id(self) -> &'static str {
         match self {
@@ -442,8 +447,9 @@ impl Wheel {
     }
 
     /// The emote in `slot` of the page shown.
+    /// The emote in `slot` of the page shown, if the shop sells it.
     fn at(&self, slot: usize) -> Option<Emote> {
-        PAGES[self.page][slot]
+        PAGES[self.page][slot].filter(|e| e.sold())
     }
 
     /// Turns `steps` pages on (back when negative), round from the last to the first.
@@ -1156,7 +1162,8 @@ impl Game<'_> {
             return false;
         }
         if self.emotes.wheel.take().is_none() {
-            if self.player.is_none() {
+            // No emote in the shop: B is an ordinary key.
+            if self.player.is_none() || !Emote::ALL.into_iter().any(Emote::sold) {
                 return false;
             }
             let wheel = Wheel::open();
@@ -3424,9 +3431,11 @@ mod tests {
     #[test]
     fn the_wheel_turns_its_pages_round() {
         let mut wheel = Wheel::default();
-        assert_eq!(wheel.at(0), Some(Emote::BlackHole));
+        assert_eq!(PAGES[wheel.page][0], Some(Emote::BlackHole));
+        // The shop sells no emote now: the wheel offers none.
+        assert_eq!(wheel.at(0), None);
         wheel.turn(1);
-        assert_eq!(wheel.at(0), Some(Emote::Sit));
+        assert_eq!(PAGES[wheel.page][0], Some(Emote::Sit));
         wheel.turn(1);
         assert_eq!(wheel.page, 0, "past the last page comes the first");
         wheel.turn(-1);

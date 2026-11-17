@@ -119,9 +119,15 @@ const NAV: [(&str, Page, &[Page]); 6] = [
 ];
 
 impl Launcher {
-    /// The artwork behind the whole window: open on Home, a dim band at the top elsewhere.
+    /// Home and the Store lay themselves out over the whole picture, without the pages' margins.
+    pub(super) fn full_bleed(&self) -> bool {
+        matches!(self.page, Page::Home | Page::Shop)
+    }
+
+    /// The artwork behind the whole window: open on Home and the Store, a dim band at the top
+    /// elsewhere.
     pub(super) fn backdrop(&self) -> Div {
-        let home = self.page == Page::Home;
+        let home = self.full_bleed();
         let page = tone(PAGE);
         let shade = |a: u32| rgba((page << 8) | a);
         div()
@@ -161,6 +167,17 @@ impl Launcher {
     /// else the title screen's panorama, its left and front sides side by side (they meet
     /// seamlessly); else the bundled banner.
     fn backdrop_picture(&self) -> Div {
+        let layer = div().absolute().inset_0().overflow_hidden();
+        // The Store: the chosen item's own picture.
+        if let Some(offer) = self.shop_selected().filter(|_| self.page == Page::Shop) {
+            let banner = format!("banner_{}.png", offer.id);
+            let picture = if wisp_launcher::shop::picture(&banner).is_some() {
+                format!("shop/{banner}")
+            } else {
+                format!("shop/{}.png", offer.id)
+            };
+            return layer.child(img(picture).size_full().object_fit(ObjectFit::Cover));
+        }
         let shot = self.art.background().or_else(|| {
             self.settings
                 .profiles
@@ -168,7 +185,6 @@ impl Launcher {
                 .position(|p| Some(&p.name) == self.settings.selected.as_ref())
                 .and_then(|i| self.art.screenshots.get(i).cloned().flatten())
         });
-        let layer = div().absolute().inset_0().overflow_hidden();
         if let Some(shot) = shot {
             return layer.child(img(shot).size_full().object_fit(ObjectFit::Cover));
         }

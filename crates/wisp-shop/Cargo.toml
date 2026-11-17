@@ -5,6 +5,10 @@ edition = "2024"
 license = "MIT"
 description = "Wisp's Shop, shared by the launcher and the game: the items, their pictures and item files, and the player's wallet (coins, owned and worn items, the creator they support)"
 
+[features]
+# Made-up items beside the real ones, for other crates' tests (never in a release).
+test-items = []
+
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1.0.151"

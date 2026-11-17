@@ -74,7 +74,7 @@ impl gpui::AssetSource for Assets {
             "icons/gear" => Some(include_bytes!("../assets/icons/gear.svg")),
             "icons/clock" => Some(include_bytes!("../assets/icons/clock.svg")),
             "artwork/zedix.png" => Some(include_bytes!(
-                "../../crates/wisp-shop/assets/zedix_cape_logo.png"
+                "../assets/artwork/zedix-logo.png"
             )),
             "icons/shield-check" => Some(include_bytes!("../assets/icons/shield-check.svg")),
             "icons/user-circle" => Some(include_bytes!("../assets/icons/user-circle.svg")),
@@ -463,14 +463,6 @@ impl Launcher {
                         cx.quit();
                     }
                     *ticks = ticks.saturating_sub(1);
-                }
-                if this.page == Page::Shop {
-                    this.shop.slide_ticks += 1;
-                    if this.shop.slide_ticks >= 40 {
-                        this.shop.slide_ticks = 0;
-                        this.shop.slide = (this.shop.slide + 1) % shop_view::SLIDES.len();
-                        changed = true;
-                    }
                 }
                 if this.page == Page::Home && this.prefs.hero_autoplay {
                     this.hero_ticks += 1;
@@ -931,19 +923,17 @@ impl Render for Launcher {
                             .min_w_0()
                             .flex()
                             .flex_col()
-                            .when(self.page != Page::Home, |d| {
-                                d.px(px(64. * s)).pt(px(8. * s))
-                            })
+                            .when(!self.full_bleed(), |d| d.px(px(64. * s)).pt(px(8. * s)))
                             .pb(px(if self.is_catalog() { 24. } else { 0. } * s))
                             .child(
                                 div()
                                     .id("page-scroll")
                                     .flex_1()
                                     .min_h_0()
-                                    .when(self.is_catalog() || self.page == Page::Home, |d| {
+                                    .when(self.is_catalog() || self.full_bleed(), |d| {
                                         d.overflow_hidden()
                                     })
-                                    .when(!self.is_catalog() && self.page != Page::Home, |d| {
+                                    .when(!self.is_catalog() && !self.full_bleed(), |d| {
                                         d.overflow_y_scroll()
                                     })
                                     .child(self.page_content(cx)),

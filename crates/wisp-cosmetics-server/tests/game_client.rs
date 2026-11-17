@@ -45,12 +45,12 @@ fn wait_for<T>(mut found: impl FnMut() -> Option<T>) -> T {
     }
 }
 
-/// The Shop's real Nebula Wings, as the launcher writes them for the game.
-fn wings() -> Value {
-    let wings = wisp_shop::offer("nebula_wings")
+/// The Shop's real Founders Cape, as the launcher writes it for the game.
+fn cape() -> Value {
+    let cape = wisp_shop::offer(wisp_shop::FOUNDERS)
         .and_then(|o| o.item)
         .unwrap();
-    serde_json::from_slice(wings).unwrap()
+    serde_json::from_slice(cape).unwrap()
 }
 
 #[test]
@@ -62,7 +62,7 @@ fn one_player_wears_and_emotes_and_another_sees_it() {
         "Steve".into(),
         Some(Box::new(|_| Ok(()))),
     );
-    steve.wear(vec![wings()]);
+    steve.wear(vec![cape()]);
     // Published once the service lists it (the game keeps an answer a minute, so Alex asks
     // after that).
     wait_for(|| {
@@ -72,13 +72,13 @@ fn one_player_wears_and_emotes_and_another_sees_it() {
             .ok()?
             .into_string()
             .ok()?;
-        answer.contains("nebula_wings").then_some(())
+        answer.contains(wisp_shop::FOUNDERS).then_some(())
     });
 
     // Alex's game: sees Steve in view, asks what he wears and what he plays.
     let alex = Cosmetics::new(Http::new(&base, "Wisp/test"), None);
     let worn = wait_for(|| alex.frame().worn(STEVE).filter(|w| !w.is_empty()));
-    assert_eq!(worn[0].id, "nebula_wings");
+    assert_eq!(worn[0].id, wisp_shop::FOUNDERS);
     assert!(
         worn[0].frames.len() > 1,
         "the animated texture made the trip"

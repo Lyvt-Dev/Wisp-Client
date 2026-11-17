@@ -35,6 +35,8 @@ ureq = { version = "2.12", features = ["json"] }
 base64 = "0.22"
 
 [dev-dependencies]
+# Made-up items with prices, to test buying while the shop sells little.
+wisp-shop = { path = "../wisp-shop", features = ["test-items"] }
 tower = { version = "0.5", features = ["util"] }
 http-body-util = "0.1"
 png = "0.18"

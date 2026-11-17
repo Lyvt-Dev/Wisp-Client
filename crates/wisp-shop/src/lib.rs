@@ -54,9 +54,6 @@ impl Kind {
     ];
 }
 
-/// Wisp's badge before the name: every player wears it, so it isn't sold and can't be taken off.
-pub const WISP_BADGE: &[u8] = include_bytes!("../assets/wisp_badge.json");
-
 /// The file in the worn folder that lists the emotes in the wheel, one id a line.
 pub const EMOTES_FILE: &str = "emotes.txt";
 
@@ -118,271 +115,56 @@ macro_rules! offer {
     };
 }
 
+/// The Wisp Founders Cape: Wisp's feather in HD (8× Minecraft's cape), animated.
+const FOUNDERS_CAPE: Offer = offer!(
+    "founders_cape",
+    "Wisp Founders Cape",
+    "Wisp's feather in HD on a night sky, a gold hem and light that never stops moving. Free for Wisp's first players.",
+    Cape,
+    0,
+    item
+);
+
+/// What the shop sells.
+#[cfg(not(any(test, feature = "test-items")))]
+pub const OFFERS: &[Offer] = &[FOUNDERS_CAPE];
+
+/// With `test-items` (and in this crate's tests), made-up items beside the real ones, so the
+/// rules (prices, discounts, one item per kind, emotes) can be tested while the shop sells
+/// little. Never in a build players get.
+#[cfg(any(test, feature = "test-items"))]
 pub const OFFERS: &[Offer] = &[
-    offer!(
-        "founders_cape",
-        "Founders Cape",
-        "A night-sky cape with the Wisp star. Free for Wisp's first players.",
-        Cape,
-        0,
-        item
-    ),
-    offer!(
-        "nebula_cape",
-        "Nebula Cape",
-        "A rose-violet nebula drifting across a dark cape.",
-        Cape,
-        1_200,
-        item
-    ),
-    offer!(
-        "aurora_cape",
-        "Aurora Cape",
-        "Northern lights in teal and ice blue.",
-        Cape,
-        900,
-        item
-    ),
-    offer!(
-        "zedix_cape",
-        "Zedix Cape",
-        "A neon purple Z that pulses with light and sparks on a dark violet cape.",
-        Cape,
-        400,
-        item
-    ),
-    offer!(
-        "wisp_original_cape",
-        "Wisp Original Cape",
-        "The original: Wisp's folded-A star glowing on a deep violet night, a sheen of light sweeping across it.",
-        Cape,
-        1_000,
-        item
-    ),
-    offer!(
-        "stray_head",
-        "Stray Head",
-        "A wide conical straw hat, woven strip by strip and bound with a copper rim.",
-        Head,
-        600,
-        item
-    ),
-    offer!(
-        "party_hat",
-        "Party Hat",
-        "A striped party cone with polka dots, worn at a jaunty angle, a gold foil fringe and a pom-pom on top.",
-        Head,
-        500,
-        item
-    ),
-    offer!(
-        "nova_owl",
-        "Nova the Star Owl",
-        "A small star owl that rides on your shoulder and glows in the dark.",
-        Pet,
-        1_000,
-        item
-    ),
-    offer!(
-        "cosmic_fox",
-        "Astra the Cosmic Fox",
-        "A fox spun from deep space, with starlit fur and a tail that ends in a glowing star.",
-        Pet,
-        1_500,
-        item
-    ),
-    offer!(
-        "stardust_trail",
-        "Stardust Trail",
-        "Sparkling violet dust follows you.",
-        Trail,
-        750,
-        item
-    ),
-    offer!(
-        "comet_trail",
-        "Comet Trail",
-        "An icy blue comet tail behind every step.",
-        Trail,
-        900,
-        item
-    ),
-    offer!(
-        "storm_aura",
-        "Storm Aura",
-        "Lightning crackles around you, bright even in the dark.",
-        Aura,
-        2_000,
-        item
-    ),
-    offer!(
-        "starlight_orbit",
-        "Starlight Orbit",
-        "A ring of golden stars circles your waist.",
-        Aura,
-        1_600,
-        item
-    ),
-    offer!(
-        "nebula_aura",
-        "Nebula Aura",
-        "Pink and violet stardust spirals up around you.",
-        Aura,
-        1_400,
-        item
-    ),
-    offer!(
-        "nebula_wings",
-        "Nebula Wings",
-        "Wings of drifting violet and pink nebula that beat slowly and shed stardust.",
-        Wings,
-        1_500,
-        item
-    ),
-    offer!(
-        "daylight",
-        "Daylight",
-        "A pale sword with a dark star guard, worn across your back.",
-        Weapon,
-        800,
-        item,
-        by "@gold3nz"
-    ),
-    offer!(
-        "celestial_wings",
-        "Celestial Wings",
-        "Two great wings of starlight unfurl behind you, beat slowly and lift you off the ground, then scatter into stardust.",
-        Emote,
-        1_800
-    ),
-    offer!(
-        "dark_ascension",
-        "Dark Ascension",
-        "Rise wrapped in dark energy, eyes burning violet, as it spirals round you, gathers in and bursts outward.",
-        Emote,
-        1_400
-    ),
-    offer!(
-        "sit",
-        "Sit",
-        "Sit down on the ground, arms on your knees, for as long as you like. Move to stand up; the mouse turns the camera round you.",
-        Emote,
-        300
-    ),
-    offer!(
-        "cry_about_it",
-        "Cry About It",
-        "Rub your eyes with both fists and fake-sob big tears, then give them a little wave bye-bye.",
-        Emote,
-        500
-    ),
-    offer!(
-        "point_and_laugh",
-        "Point and Laugh",
-        "Point straight at them and double over laughing, \"HA\" after \"HA\", tears of joy and all.",
-        Emote,
-        450
-    ),
-    offer!(
-        "too_easy",
-        "Too Easy",
-        "Check your watch, then let out a long, bored yawn while the z's float up.",
-        Emote,
-        400
-    ),
-    offer!(
-        "skill_issue",
-        "Skill Issue",
-        "A slow shrug, palms up, under a big gold question mark, to a sad trombone.",
-        Emote,
-        350
-    ),
-    offer!(
-        "crouch_spam",
-        "Crouch Spam",
-        "Crouch on and off as fast as you can, right where they fell.",
-        Emote,
-        250
-    ),
-    offer!(
-        "l_dance",
-        "L Dance",
-        "Hold an L to your forehead and bounce to a note-block beat, then swap hands.",
-        Emote,
-        450
-    ),
-    offer!(
-        "bruh",
-        "Bruh",
-        "Clap a hand to your face, shake your head and sigh.",
-        Emote,
-        300
-    ),
-    offer!(
-        "the_rook",
-        "The Rook",
-        "Call a giant chess rook down from the sky: it slams down, earns its Brilliant !!, and explodes forward.",
-        Emote,
-        700
-    ),
-    offer!(
-        "false_dreams",
-        "False Dreams",
-        "Rise off the ground as if possessed while its song plays, watched by eyes that drift around you.",
-        Emote,
-        500
-    ),
-    offer!(
-        "purple_hollow",
-        "Purple Hollow",
-        "Gather a blue orb and a red one, bring them together and fire the purple sphere they become.",
-        Emote,
-        1200
-    ),
-    offer!(
-        "supernova_crown",
-        "Supernova Crown",
-        "A star gathers over your head and bursts, then settles into a crown of light.",
-        Emote,
-        800
-    ),
-    offer!(
-        "black_hole",
-        "Black Hole",
-        "Tear open a black hole and orbit it as the world bends, then watch it collapse.",
-        Emote,
-        600
-    ),
+    FOUNDERS_CAPE,
+    test_offer("test_cape", Kind::Cape, 1_200),
+    test_offer("test_wings", Kind::Wings, 900),
+    test_offer("test_hat", Kind::Head, 1_000),
+    test_offer("test_trail", Kind::Trail, 500),
+    test_offer("test_emote", Kind::Emote, 600),
 ];
+
+#[cfg(any(test, feature = "test-items"))]
+const fn test_offer(id: &'static str, kind: Kind, price: u32) -> Offer {
+    Offer {
+        id,
+        name: id,
+        blurb: "",
+        kind,
+        price,
+        item: None,
+        art: FOUNDERS_CAPE.art,
+        creator: None,
+    }
+}
 
 pub fn offer(id: &str) -> Option<&'static Offer> {
     OFFERS.iter().find(|o| o.id == id)
 }
 
 /// Pictures beside the items' own: the banner's slides and the Featured tab's highlight card.
-pub const PICTURES: &[(&str, &[u8])] = &[
-    (
-        "banner_founders_cape.png",
-        include_bytes!("../assets/banner_founders_cape.png"),
-    ),
-    (
-        "banner_nebula_cape.png",
-        include_bytes!("../assets/banner_nebula_cape.png"),
-    ),
-    (
-        "banner_cosmic_fox.png",
-        include_bytes!("../assets/banner_cosmic_fox.png"),
-    ),
-    (
-        "banner_storm_aura.png",
-        include_bytes!("../assets/banner_storm_aura.png"),
-    ),
-    (
-        "banner_stardust_trail.png",
-        include_bytes!("../assets/banner_stardust_trail.png"),
-    ),
-    ("highlight.png", include_bytes!("../assets/highlight.png")),
-];
+pub const PICTURES: &[(&str, &[u8])] = &[(
+    "banner_founders_cape.png",
+    include_bytes!("../assets/banner_founders_cape.png"),
+)];
 
 /// A shop picture by file name: an item's card (`<id>.png`) or one of `PICTURES`.
 pub fn picture(name: &str) -> Option<&'static [u8]> {
@@ -575,8 +357,7 @@ impl Wallet {
                 fs::remove_file(path)?;
             }
         }
-        fs::write(dir.join("wisp_badge.json"), WISP_BADGE)?;
-        let mut written = 1;
+        let mut written = 0;
         let mut emotes = String::new();
         for id in &self.equipped {
             match offer(id) {
@@ -625,48 +406,51 @@ pub fn worn_dir(home: &Path) -> PathBuf {
 mod tests {
     use super::*;
 
+    /// The items players can get (the made-up test items left out).
+    fn real() -> impl Iterator<Item = &'static Offer> {
+        OFFERS.iter().filter(|o| !o.id.starts_with("test_"))
+    }
+
     #[test]
-    fn every_item_file_is_one_the_game_reads() {
-        for offer in OFFERS {
+    fn every_real_item_has_a_file_the_game_reads() {
+        for offer in real() {
             assert!(!offer.art.is_empty(), "{}", offer.id);
-            if offer.kind == Kind::Emote {
-                // The game plays emotes itself: the wheel lists them by id.
-                assert!(offer.item.is_none(), "{}", offer.id);
-                continue;
-            }
             let bytes = offer
                 .item
                 .unwrap_or_else(|| panic!("{} has no item file", offer.id));
             let v: serde_json::Value = serde_json::from_slice(bytes).unwrap();
             assert_eq!(v["id"], offer.id);
-            let slot = match offer.kind {
-                Kind::Cape | Kind::Wings => "back",
-                Kind::Weapon => "weapon",
-                Kind::Head => "head",
-                Kind::Pet => "shoulder",
-                Kind::Trail => "trail",
-                Kind::Aura => "aura",
-                Kind::Emote => unreachable!(),
-            };
-            assert_eq!(v["slot"], slot, "{}", offer.id);
+            assert_eq!(v["slot"], "back", "{}", offer.id);
         }
     }
 
     #[test]
+    fn the_shop_sells_the_founders_cape() {
+        let ids: Vec<_> = real().map(|o| o.id).collect();
+        assert_eq!(ids, [FOUNDERS]);
+        let cape = offer(FOUNDERS).unwrap();
+        assert!(cape.founders() && cape.price == 0 && cape.kind == Kind::Cape);
+        // HD and animated: an 8× cape's 176×136 frames, more than one of them.
+        let v: serde_json::Value = serde_json::from_slice(cape.item.unwrap()).unwrap();
+        assert!(v["texture"]["frames"].as_u64().unwrap() > 1);
+        assert_eq!(v["attach"]["scale"], 0.125);
+    }
+
+    #[test]
     fn wings_and_a_cape_take_each_other_off() {
-        let dir = std::env::temp_dir().join(format!("wisp-shop-wings-{}", std::process::id()));
-        let mut w = Wallet::load(&dir);
-        w.coins = 10_000;
-        w.buy("nebula_wings").unwrap();
-        w.buy("nebula_cape").unwrap();
-        w.buy("daylight").unwrap();
-        w.equip("nebula_cape").unwrap();
-        w.equip("daylight").unwrap();
-        w.equip("nebula_wings").unwrap();
-        assert!(w.wears("nebula_wings") && w.wears("daylight") && !w.wears("nebula_cape"));
-        w.equip("nebula_cape").unwrap();
-        assert!(!w.wears("nebula_wings") && w.wears("nebula_cape"));
-        let _ = std::fs::remove_dir_all(&dir);
+        let mut w = Wallet {
+            coins: 10_000,
+            ..Wallet::default()
+        };
+        w.buy("test_wings").unwrap();
+        w.buy("test_cape").unwrap();
+        w.buy("test_hat").unwrap();
+        w.equip("test_cape").unwrap();
+        w.equip("test_hat").unwrap();
+        w.equip("test_wings").unwrap();
+        assert!(w.wears("test_wings") && w.wears("test_hat") && !w.wears("test_cape"));
+        w.equip("test_cape").unwrap();
+        assert!(!w.wears("test_wings") && w.wears("test_cape"));
     }
 
     #[test]
@@ -699,14 +483,14 @@ mod tests {
             coins: 1_000,
             ..Wallet::default()
         };
-        assert_eq!(w.buy("nebula_cape"), Err(Refused::Short(200)));
-        assert_eq!(w.buy("nova_owl"), Ok(()));
+        assert_eq!(w.buy("test_cape"), Err(Refused::Short(200)));
+        assert_eq!(w.buy("test_hat"), Ok(()));
         assert_eq!(w.coins, 0);
-        assert_eq!(w.buy("nova_owl"), Err(Refused::Owned));
-        assert_eq!(w.buy("founders_cape"), Ok(()));
+        assert_eq!(w.buy("test_hat"), Err(Refused::Owned));
+        assert_eq!(w.buy(FOUNDERS), Ok(()));
         assert_eq!(w.coins, 0);
-        assert_eq!(w.claim("founders_cape"), Err(Refused::Owned));
-        assert_eq!(w.claim("stray_head"), Err(Refused::NotClaimable));
+        assert_eq!(w.claim(FOUNDERS), Err(Refused::Owned));
+        assert_eq!(w.claim("test_trail"), Err(Refused::NotClaimable));
         assert_eq!(w.buy("nothing"), Err(Refused::Unknown));
     }
 
@@ -716,43 +500,29 @@ mod tests {
             coins: 5_000,
             ..Wallet::default()
         };
-        for id in [
-            "founders_cape",
-            "aurora_cape",
-            "stray_head",
-            "stardust_trail",
-        ] {
+        for id in [FOUNDERS, "test_cape", "test_hat", "test_trail"] {
             w.buy(id).unwrap();
         }
-        assert_eq!(w.equip("nova_owl"), Err(Refused::NotOwned));
-        w.equip("founders_cape").unwrap();
-        w.equip("aurora_cape").unwrap();
-        w.equip("stray_head").unwrap();
-        w.equip("stardust_trail").unwrap();
-        assert!(!w.wears("founders_cape"));
-        assert_eq!(w.equipped, ["aurora_cape", "stray_head", "stardust_trail"]);
+        assert_eq!(w.equip("test_wings"), Err(Refused::NotOwned));
+        w.equip("test_cape").unwrap();
+        w.equip("test_hat").unwrap();
+        w.equip("test_trail").unwrap();
+        w.equip(FOUNDERS).unwrap();
+        assert!(!w.wears("test_cape"));
+        assert_eq!(w.equipped, ["test_hat", "test_trail", FOUNDERS]);
 
         let dir = std::env::temp_dir().join(format!("wisp-shop-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         fs::write(dir.join("old_item.json"), b"{}").unwrap();
-        // Wisp's badge is always worn.
-        assert_eq!(w.dress(&dir).unwrap(), 4);
-        let mut names: Vec<_> = fs::read_dir(&dir)
+        // Only items with a file are written (the test items have none); old files go.
+        assert_eq!(w.dress(&dir).unwrap(), 1);
+        let names: Vec<_> = fs::read_dir(&dir)
             .unwrap()
             .map(|e| e.unwrap().file_name().into_string().unwrap())
             .collect();
-        names.sort();
-        assert_eq!(
-            names,
-            [
-                "aurora_cape.json",
-                "stardust_trail.json",
-                "stray_head.json",
-                "wisp_badge.json"
-            ]
-        );
-        w.unequip("aurora_cape");
+        assert_eq!(names, ["founders_cape.json"]);
+        w.unequip(FOUNDERS);
         w.save(&dir).unwrap();
         assert_eq!(Wallet::load(&dir), w);
         let _ = fs::remove_dir_all(&dir);
@@ -764,20 +534,20 @@ mod tests {
             coins: 1_200,
             ..Wallet::default()
         };
-        w.buy("black_hole").unwrap();
+        w.buy("test_emote").unwrap();
         assert_eq!(w.coins, 600);
-        w.equip("black_hole").unwrap();
-        w.buy("stray_head").unwrap();
-        w.equip("stray_head").unwrap();
-        assert!(w.wears("black_hole") && w.wears("stray_head"));
+        w.equip("test_emote").unwrap();
+        w.buy(FOUNDERS).unwrap();
+        w.equip(FOUNDERS).unwrap();
+        assert!(w.wears("test_emote") && w.wears(FOUNDERS));
         let dir = std::env::temp_dir().join(format!("wisp-emotes-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
-        assert_eq!(w.dress(&dir).unwrap(), 3);
+        assert_eq!(w.dress(&dir).unwrap(), 2);
         assert_eq!(
             fs::read_to_string(dir.join(EMOTES_FILE)).unwrap(),
-            "black_hole\n"
+            "test_emote\n"
         );
-        w.unequip("black_hole");
+        w.unequip("test_emote");
         w.dress(&dir).unwrap();
         assert!(!dir.join(EMOTES_FILE).exists());
         let _ = fs::remove_dir_all(&dir);
