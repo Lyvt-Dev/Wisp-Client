@@ -1,7 +1,7 @@
 //! The Locker: the player's own skin wearing the items they own, drawn by
 //! `wisp_cosmetics::preview` from any side. Picking items tries them on in the picture; "Equip
 //! these" makes them what the player wears in game.
-use super::reference_views::{glow, luminous};
+use super::reference_views::glow;
 use super::*;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -216,9 +216,9 @@ impl Launcher {
             .text_size(px(14. * s))
             .cursor_pointer()
             .when(bright, |d| {
-                d.bg(luminous())
+                d.bg(rgb(0xffffff))
+                    .text_color(rgb(0x0b0b0d))
                     .font_weight(FontWeight::SEMIBOLD)
-                    .shadow(glow(s * 0.6))
                     .hover(|d| d.opacity(0.9))
             })
             .when(!bright, |d| {
@@ -226,7 +226,7 @@ impl Launcher {
                     .border_color(rgb(tone(0x2e3035)))
                     .hover(|d| d.bg(rgb(tone(0x202125))))
             })
-            .child(icon(glyph, if bright { INK } else { MUTED }).size(px(15. * s)))
+            .child(icon(glyph, if bright { 0x0b0b0d } else { MUTED }).size(px(15. * s)))
             .child(tr(label))
     }
 
@@ -265,11 +265,24 @@ impl Launcher {
                 )
             })
             .child(
-                self.locker_button("locker-equip", if changed { "Equip these" } else { "Equipped" }, "check-circle", changed)
-                    .when(!changed, |d| d.opacity(0.6))
-                    .when(changed, |d| d.on_click(cx.listener(|this, _, _, cx| this.locker_equip(cx)))),
+                self.locker_button(
+                    "locker-equip",
+                    if changed { "Equip these" } else { "Equipped" },
+                    "check-circle",
+                    changed,
+                )
+                .when(!changed, |d| d.opacity(0.6))
+                .when(changed, |d| {
+                    d.on_click(cx.listener(|this, _, _, cx| this.locker_equip(cx)))
+                }),
             );
-        let header = self.page_head(("Back to Home", Page::Home), "Cosmetics", &summary, Some(actions), cx);
+        let header = self.page_head(
+            ("Back to Home", Page::Home),
+            "Cosmetics",
+            &summary,
+            Some(actions),
+            cx,
+        );
         if owned.is_empty() {
             return div()
                 .flex()
@@ -510,11 +523,14 @@ impl Launcher {
                                         .right(px(6. * s))
                                         .size(px(22. * s))
                                         .rounded_full()
-                                        .bg(luminous())
+                                        .bg(rgb(0xffffff))
+                                        .text_color(rgb(0x0b0b0d))
                                         .flex()
                                         .items_center()
                                         .justify_center()
-                                        .child(icon("checkmark-circle-01", INK).size(px(14. * s))),
+                                        .child(
+                                            icon("checkmark-circle-01", 0x0b0b0d).size(px(14. * s)),
+                                        ),
                                 )
                             })
                             .when(worn, |d| {

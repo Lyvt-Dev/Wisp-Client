@@ -1,6 +1,5 @@
 //! Shaders: the active pack as a showcase (preview, features, quality, off) and the instance's
 //! packs as a grid with an "Off" tile, search and feature filters (`wisp_launcher::shaders`).
-use super::reference_views::{glow, luminous};
 use super::*;
 use gpui::AnyElement;
 use wisp_launcher::{catalog, shaders};
@@ -84,7 +83,8 @@ impl Launcher {
             .text_size(px(14. * s))
             .cursor_pointer()
             .when(bright, |d| {
-                d.bg(luminous())
+                d.bg(rgb(0xffffff))
+                    .text_color(rgb(0x0b0b0d))
                     .font_weight(FontWeight::SEMIBOLD)
                     .hover(|d| d.opacity(0.9))
             })
@@ -93,7 +93,7 @@ impl Launcher {
                     .border_color(rgb(tone(0x2e3035)))
                     .hover(|d| d.bg(rgb(tone(0x202125))))
             })
-            .child(icon(glyph, if bright { INK } else { MUTED }).size(px(15. * s)))
+            .child(icon(glyph, if bright { 0x0b0b0d } else { MUTED }).size(px(15. * s)))
             .child(tr(label))
     }
 
@@ -169,13 +169,13 @@ impl Launcher {
                             .px(px(10. * s))
                             .py(px(4. * s))
                             .rounded(px(6. * s))
-                            .bg(luminous())
+                            .bg(rgb(0xffffff)).text_color(rgb(0x0b0b0d))
                             .flex()
                             .items_center()
                             .gap(px(6. * s))
                             .text_size(px(12. * s))
                             .font_weight(FontWeight::SEMIBOLD)
-                            .child(icon("check-circle", INK).size(px(13. * s)))
+                            .child(icon("check-circle", 0x0b0b0d).size(px(13. * s)))
                             .child(tr("ACTIVE")),
                     )
                     .when(!aurora, |d| {
@@ -258,7 +258,7 @@ impl Launcher {
                                         .justify_center()
                                         .text_size(px(14. * s))
                                         .cursor_pointer()
-                                        .when(on, |d| d.bg(luminous()).font_weight(FontWeight::SEMIBOLD).shadow(glow(s * 0.5)))
+                                        .when(on, |d| d.bg(rgb(0xffffff)).text_color(rgb(0x0b0b0d)).font_weight(FontWeight::SEMIBOLD))
                                         .when(!on, |d| d.text_color(rgb(0xc4c6cc)).hover(|d| d.bg(rgb(tone(0x202125)))))
                                         .when(locked, |d| d.opacity(0.5))
                                         .child(tr(label))
@@ -624,30 +624,36 @@ impl Launcher {
             .flex_col()
             .gap(px(16. * s))
             .pb(px(20. * s))
-            .child(self.page_head(
-                ("Back to Instances", Page::Instances),
-                "Browse Shaders",
-                &summary,
-                Some(
-                    div()
-                        .flex()
-                        .gap(px(10. * s))
-                        .child(
-                            self.quiet_button("open-shaders-folder", "Shader folder", "folder")
-                                .on_click(cx.listener(|this, _, _, cx| {
-                                    this.open_game_folder("shaderpacks", cx)
-                                })),
-                        )
-                        .child(
-                            self.primary_button("import-native-shader", "Import .hshader", "download")
+            .child(
+                self.page_head(
+                    ("Back to Instances", Page::Instances),
+                    "Browse Shaders",
+                    &summary,
+                    Some(
+                        div()
+                            .flex()
+                            .gap(px(10. * s))
+                            .child(
+                                self.quiet_button("open-shaders-folder", "Shader folder", "folder")
+                                    .on_click(cx.listener(|this, _, _, cx| {
+                                        this.open_game_folder("shaderpacks", cx)
+                                    })),
+                            )
+                            .child(
+                                self.primary_button(
+                                    "import-native-shader",
+                                    "Import .hshader",
+                                    "download",
+                                )
                                 .when(locked, |d| d.opacity(0.45))
                                 .when(!locked, |d| {
                                     d.on_click(cx.listener(|this, _, _, cx| this.import_shader(cx)))
                                 }),
-                        ),
+                            ),
+                    ),
+                    cx,
                 ),
-                cx,
-            ))
+            )
             .child(
                 div()
                     .flex()

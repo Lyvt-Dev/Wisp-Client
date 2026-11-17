@@ -50,7 +50,9 @@ impl Art {
             .map(|p| p.resources.clone())
             .unwrap_or_else(|| home.join("resources").join(engine::version()));
         let dir = resources.join("assets/minecraft/textures/gui/title/background");
-        let sides: Vec<PathBuf> = (0..6).map(|i| dir.join(format!("panorama_{i}.png"))).collect();
+        let sides: Vec<PathBuf> = (0..6)
+            .map(|i| dir.join(format!("panorama_{i}.png")))
+            .collect();
         self.panorama = sides.iter().all(|p| p.is_file()).then_some(sides);
     }
 
@@ -59,9 +61,9 @@ impl Art {
         if self.backgrounds.is_empty() {
             return None;
         }
-        let turns = self
-            .started
-            .map_or(0, |t| (t.elapsed().as_secs() / BACKGROUND_TURN.as_secs()) as usize);
+        let turns = self.started.map_or(0, |t| {
+            (t.elapsed().as_secs() / BACKGROUND_TURN.as_secs()) as usize
+        });
         Some(self.backgrounds[turns % self.backgrounds.len()].clone())
     }
 
@@ -69,7 +71,11 @@ impl Art {
     /// panorama side.
     pub(super) fn card(&self, index: usize) -> Option<gpui::ImageSource> {
         if !self.backgrounds.is_empty() {
-            return Some(self.backgrounds[index % self.backgrounds.len()].clone().into());
+            return Some(
+                self.backgrounds[index % self.backgrounds.len()]
+                    .clone()
+                    .into(),
+            );
         }
         if let Some(Some(shot)) = self.screenshots.get(index) {
             return Some(shot.clone().into());
@@ -88,9 +94,12 @@ fn pictures(dir: &std::path::Path) -> Vec<PathBuf> {
         .filter_map(Result::ok)
         .map(|e| e.path())
         .filter(|p| {
-            p.extension()
-                .and_then(|x| x.to_str())
-                .is_some_and(|x| matches!(x.to_ascii_lowercase().as_str(), "png" | "jpg" | "jpeg" | "webp"))
+            p.extension().and_then(|x| x.to_str()).is_some_and(|x| {
+                matches!(
+                    x.to_ascii_lowercase().as_str(),
+                    "png" | "jpg" | "jpeg" | "webp"
+                )
+            })
         })
         .collect();
     found.sort();
@@ -102,7 +111,11 @@ fn newest_png(dir: &std::path::Path) -> Option<PathBuf> {
     std::fs::read_dir(dir)
         .ok()?
         .filter_map(Result::ok)
-        .filter(|e| e.path().extension().is_some_and(|x| x.eq_ignore_ascii_case("png")))
+        .filter(|e| {
+            e.path()
+                .extension()
+                .is_some_and(|x| x.eq_ignore_ascii_case("png"))
+        })
         .filter_map(|e| Some((e.metadata().ok()?.modified().ok()?, e.path())))
         .max_by_key(|(t, _)| *t)
         .map(|(_, p)| p)
@@ -111,8 +124,16 @@ fn newest_png(dir: &std::path::Path) -> Option<PathBuf> {
 /// Where the top navigation leads, and which pages light each entry.
 const NAV: [(&str, Page, &[Page]); 6] = [
     ("Home", Page::Home, &[Page::Home]),
-    ("Instances", Page::Instances, &[Page::Instances, Page::Setup]),
-    ("Browse", Page::Mods, &[Page::Mods, Page::Shaders, Page::Packs]),
+    (
+        "Instances",
+        Page::Instances,
+        &[Page::Instances, Page::Setup],
+    ),
+    (
+        "Browse",
+        Page::Mods,
+        &[Page::Mods, Page::Shaders, Page::Packs],
+    ),
     ("Servers", Page::Servers, &[Page::Servers]),
     ("Cosmetics", Page::Locker, &[Page::Locker]),
     ("Store", Page::Shop, &[Page::Shop]),
@@ -550,16 +571,17 @@ impl Launcher {
                             cx.notify();
                         },
                     )))
-                    .child(round("home-instance-settings", "settings").on_click(cx.listener(
-                        |this, _, _, cx| {
-                            this.page = Page::Instances;
-                            cx.notify();
-                        },
-                    )))
+                    .child(
+                        round("home-instance-settings", "settings").on_click(cx.listener(
+                            |this, _, _, cx| {
+                                this.page = Page::Instances;
+                                cx.notify();
+                            },
+                        )),
+                    )
                     .when(self.instance_menu, |d| {
                         d.child(
-                            gpui::deferred(self.instance_menu(cx).w(px(360. * s)))
-                                .with_priority(1),
+                            gpui::deferred(self.instance_menu(cx).w(px(360. * s))).with_priority(1),
                         )
                     }),
             )
@@ -690,9 +712,7 @@ impl Launcher {
                     ),
             )
             .child(icon("arrow", 0x8e9099).size(px(15. * s)))
-            .on_click(cx.listener(|this, _, _, cx| {
-                this.set_prefs(|p| p.side_panel = true, cx)
-            }))
+            .on_click(cx.listener(|this, _, _, cx| this.set_prefs(|p| p.side_panel = true, cx)))
     }
 
     /// The instances stacked on the right of Home: a picture, the name and when it was played;
@@ -705,7 +725,11 @@ impl Launcher {
                 .card(i)
                 .unwrap_or_else(|| CARD_ART[i % CARD_ART.len()].into())
         };
-        let row = |id: ElementId, picture: gpui::ImageSource, label: String, line: String, chosen: bool| {
+        let row = |id: ElementId,
+                   picture: gpui::ImageSource,
+                   label: String,
+                   line: String,
+                   chosen: bool| {
             div()
                 .id(id)
                 .h(px(96. * s))
@@ -720,9 +744,7 @@ impl Launcher {
                 .items_center()
                 .gap(px(14. * s))
                 .cursor_pointer()
-                .hover(move |d| {
-                    d.border_color(rgba(if chosen { 0xffffffd9 } else { 0xffffff4d }))
-                })
+                .hover(move |d| d.border_color(rgba(if chosen { 0xffffffd9 } else { 0xffffff4d })))
                 .child(
                     img(picture)
                         .w(px(132. * s))
@@ -814,12 +836,17 @@ impl Launcher {
                 .map(|t| trf("Played {when}", &[("when", &content::ago(*t))]))
                 .unwrap_or_else(|| trf("Minecraft {version}", &[("version", engine::version())]));
             shelf = shelf.child(
-                row(("home-card", i).into(), art(i), p.name.clone(), line, chosen).on_click(
-                    cx.listener(move |this, _, _, cx| {
-                        this.instance_menu = false;
-                        this.select(i, cx);
-                    }),
-                ),
+                row(
+                    ("home-card", i).into(),
+                    art(i),
+                    p.name.clone(),
+                    line,
+                    chosen,
+                )
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    this.instance_menu = false;
+                    this.select(i, cx);
+                })),
             );
         }
         shelf.child(
@@ -1025,7 +1052,12 @@ impl Launcher {
     }
 
     /// A white button with dark type: a page's main action.
-    pub(super) fn primary_button(&self, id: &'static str, label: &str, glyph: &'static str) -> Stateful<Div> {
+    pub(super) fn primary_button(
+        &self,
+        id: &'static str,
+        label: &str,
+        glyph: &'static str,
+    ) -> Stateful<Div> {
         let s = self.ui_scale;
         div()
             .id(id)
@@ -1047,7 +1079,12 @@ impl Launcher {
     }
 
     /// A quiet button: a dark glass plate with a light rim.
-    pub(super) fn quiet_button(&self, id: impl Into<ElementId>, label: &str, glyph: &'static str) -> Stateful<Div> {
+    pub(super) fn quiet_button(
+        &self,
+        id: impl Into<ElementId>,
+        label: &str,
+        glyph: &'static str,
+    ) -> Stateful<Div> {
         let s = self.ui_scale;
         div()
             .id(id)

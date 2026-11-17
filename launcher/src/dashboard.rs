@@ -30,8 +30,8 @@ mod profile_view;
 mod reference_views;
 mod search_input;
 mod settings_view;
-mod shell;
 mod shaders_view;
+mod shell;
 mod shop_view;
 mod theme;
 mod update_view;
@@ -73,9 +73,7 @@ impl gpui::AssetSource for Assets {
             "icons/rocket" => Some(include_bytes!("../assets/icons/rocket.svg")),
             "icons/gear" => Some(include_bytes!("../assets/icons/gear.svg")),
             "icons/clock" => Some(include_bytes!("../assets/icons/clock.svg")),
-            "artwork/zedix.png" => Some(include_bytes!(
-                "../assets/artwork/zedix-logo.png"
-            )),
+            "artwork/zedix.png" => Some(include_bytes!("../assets/artwork/zedix-logo.png")),
             "icons/shield-check" => Some(include_bytes!("../assets/icons/shield-check.svg")),
             "icons/user-circle" => Some(include_bytes!("../assets/icons/user-circle.svg")),
             "icons/refresh" => Some(include_bytes!("../assets/icons/refresh.svg")),
@@ -145,12 +143,13 @@ fn icon(name: &'static str, color: u32) -> Svg {
         .flex_none()
         .text_color(rgb(color))
 }
+/// A glass plate over the backdrop, as the shell's cards.
 fn panel() -> Div {
     div()
-        .rounded_xl()
+        .rounded(px(16.))
         .border_1()
-        .border_color(rgb(tone(RULE)))
-        .bg(rgb(tone(SURFACE)))
+        .border_color(rgba(0xffffff1a))
+        .bg(rgba(0x0b0b0dc4))
 }
 fn button(id: impl Into<ElementId>, label: &str, glyph: &'static str) -> Stateful<Div> {
     div()
@@ -161,14 +160,14 @@ fn button(id: impl Into<ElementId>, label: &str, glyph: &'static str) -> Statefu
         .gap_2()
         .px_4()
         .py_3()
-        .rounded_lg()
-        .bg(rgb(tone(RAISED)))
+        .rounded_full()
+        .bg(rgba(0xffffff14))
         .border_1()
-        .border_color(rgb(tone(RULE)))
+        .border_color(rgba(0xffffff2e))
         .text_color(rgb(INK))
         .cursor_pointer()
-        .hover(|s| s.bg(rgb(0x2b2438)))
-        .child(icon(glyph, MUTED))
+        .hover(|s| s.bg(rgba(0xffffff26)))
+        .child(icon(glyph, INK))
         .child(tr(label))
 }
 fn quiet(message: &str) -> Div {
@@ -534,6 +533,7 @@ impl Launcher {
                 Some("settings") => Page::Settings,
                 Some("account" | "profile") => Page::Account,
                 Some("locker") => Page::Locker,
+                Some("about") => Page::About,
                 _ => start,
             },
             slide: 0,
@@ -913,45 +913,41 @@ impl Render for Launcher {
             .child(self.backdrop())
             .child(self.topbar(cx))
             .child(
-                div()
-                    .flex_1()
-                    .min_h_0()
-                    .flex()
-                    .child(
-                        div()
-                            .flex_1()
-                            .min_w_0()
-                            .flex()
-                            .flex_col()
-                            .when(!self.full_bleed(), |d| d.px(px(64. * s)).pt(px(8. * s)))
-                            .pb(px(if self.is_catalog() { 24. } else { 0. } * s))
-                            .child(
-                                div()
-                                    .id("page-scroll")
-                                    .flex_1()
-                                    .min_h_0()
-                                    .when(self.is_catalog() || self.full_bleed(), |d| {
-                                        d.overflow_hidden()
-                                    })
-                                    .when(!self.is_catalog() && !self.full_bleed(), |d| {
-                                        d.overflow_y_scroll()
-                                    })
-                                    .child(self.page_content(cx)),
+                div().flex_1().min_h_0().flex().child(
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .flex()
+                        .flex_col()
+                        .when(!self.full_bleed(), |d| d.px(px(64. * s)).pt(px(8. * s)))
+                        .pb(px(if self.is_catalog() { 24. } else { 0. } * s))
+                        .child(
+                            div()
+                                .id("page-scroll")
+                                .flex_1()
+                                .min_h_0()
+                                .when(self.is_catalog() || self.full_bleed(), |d| {
+                                    d.overflow_hidden()
+                                })
+                                .when(!self.is_catalog() && !self.full_bleed(), |d| {
+                                    d.overflow_y_scroll()
+                                })
+                                .child(self.page_content(cx)),
+                        )
+                        .when(self.failed && self.page != Page::Home, |s| {
+                            s.child(
+                                panel()
+                                    .id("error-message")
+                                    .flex_none()
+                                    .max_h(px(100.))
+                                    .overflow_y_scroll()
+                                    .my_2()
+                                    .p_3()
+                                    .border_color(rgb(0x6a2f3a))
+                                    .child(quiet(&self.status)),
                             )
-                            .when(self.failed && self.page != Page::Home, |s| {
-                                s.child(
-                                    panel()
-                                        .id("error-message")
-                                        .flex_none()
-                                        .max_h(px(100.))
-                                        .overflow_y_scroll()
-                                        .my_2()
-                                        .p_3()
-                                        .border_color(rgb(0x6a2f3a))
-                                        .child(quiet(&self.status)),
-                                )
-                            }),
-                    )
+                        }),
+                ),
             )
             .when(self.prefs.side_panel, |d| {
                 d.child(

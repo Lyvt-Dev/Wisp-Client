@@ -557,7 +557,11 @@ fn main() {
     let file = serde_json::to_vec_pretty(&cape_item(id, &frames)).unwrap();
     let item = Item::parse(&file).unwrap_or_else(|e| panic!("{id}: {e}"));
     write(dir, &format!("{id}.json"), &file);
-    write(dir, &format!("{id}.png"), &cape_card(&item, texture, cw, ch, glow).png());
+    write(
+        dir,
+        &format!("{id}.png"),
+        &cape_card(&item, texture, cw, ch, glow).png(),
+    );
     // The Store's backdrop: the wearer's back in the middle, between the item's name on the
     // left and the list on the right.
     let banner = framed_card(&item, bw, bh, 160.0, 0.82, 0.04, 0.55, glow);

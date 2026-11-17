@@ -66,7 +66,6 @@ impl Launcher {
             )
     }
 
-
     /// An instance as a picture card: its type in a pill, a star, its name over the picture.
     fn instance_card(
         &self,
@@ -144,14 +143,12 @@ impl Launcher {
                     .cursor_pointer()
                     .hover(|d| d.bg(rgba(0x2a2b30e0)))
                     .child(
-                        icon("star", if favorite { 0xf1c473 } else { 0xc4c6cc })
-                            .size(px(17. * s)),
+                        icon("star", if favorite { 0xf1c473 } else { 0xc4c6cc }).size(px(17. * s)),
                     )
                     .on_click(cx.listener(move |this, _, _, cx| {
                         cx.stop_propagation();
                         let name = this.settings.profiles[index].name.clone();
-                        if let Err(e) = catalog::Preferences::toggle_favorite(&this.home, &name)
-                        {
+                        if let Err(e) = catalog::Preferences::toggle_favorite(&this.home, &name) {
                             this.error(e);
                         }
                         cx.notify();
@@ -488,11 +485,16 @@ impl Launcher {
                     })),
             )
             .child(
-                self.chip("instances-local", "Files present", self.catalog.local_only, local)
-                    .on_click(cx.listener(|this, _, _, cx| {
-                        this.catalog.local_only = !this.catalog.local_only;
-                        cx.notify();
-                    })),
+                self.chip(
+                    "instances-local",
+                    "Files present",
+                    self.catalog.local_only,
+                    local,
+                )
+                .on_click(cx.listener(|this, _, _, cx| {
+                    this.catalog.local_only = !this.catalog.local_only;
+                    cx.notify();
+                })),
             )
             .child(
                 self.chip(

@@ -2,7 +2,6 @@
 //! Storage, About) and the chosen section's settings on the right, each a row with its name,
 //! what it does and its control. Changes save at once (`wisp_launcher::prefs`).
 use super::catalog_views::*;
-use super::reference_views::{glow, luminous};
 use super::*;
 use wisp_launcher::prefs::{
     self, Accent, AfterLaunch, Backdrop, Banner, Others, Prefs, StartPage, RENDER_DISTANCES,
@@ -106,13 +105,13 @@ fn heading(label: &str, s: f32) -> Div {
 fn row(title: &str, description: &str, control: impl IntoElement, s: f32) -> Div {
     div()
         .w_full()
-        .mb(px(8. * s))
-        .px(px(18. * s))
-        .py(px(14. * s))
-        .rounded(px(10. * s))
+        .mb(px(10. * s))
+        .px(px(20. * s))
+        .py(px(16. * s))
+        .rounded(px(16. * s))
         .border_1()
-        .border_color(rgb(tone(0x2a2b30)))
-        .bg(rgb(tone(0x17181b)))
+        .border_color(rgba(0xffffff1a))
+        .bg(rgba(0x0b0b0dc4))
         .flex()
         .items_center()
         .gap(px(24. * s))
@@ -150,16 +149,16 @@ fn switch(id: impl Into<ElementId>, on: bool, s: f32) -> Stateful<Div> {
         .p(px(3. * s))
         .cursor_pointer()
         .border_1()
-        .border_color(rgb(if on { 0xd6d7da } else { tone(0x53555f) }))
-        .when(on, |d| d.bg(luminous()).shadow(glow(s * 0.6)))
-        .when(!on, |d| d.bg(rgb(tone(0x212226))))
+        .border_color(rgba(if on { 0xffffffff } else { 0xffffff2e }))
+        .when(on, |d| d.bg(rgb(0xffffff)))
+        .when(!on, |d| d.bg(rgba(0xffffff0f)))
         .flex()
         .when(on, |d| d.justify_end())
         .child(
             div()
                 .size(px(19. * s))
                 .rounded_full()
-                .bg(rgb(if on { 0xffffff } else { 0x7d818e })),
+                .bg(rgb(if on { 0x0b0b0d } else { 0x7d818e })),
         )
 }
 
@@ -168,16 +167,20 @@ fn segment(id: impl Into<ElementId>, label: &str, on: bool, s: f32) -> Stateful<
     div()
         .id(id)
         .h(px(34. * s))
-        .px(px(13. * s))
-        .rounded(px(9. * s))
+        .px(px(14. * s))
+        .rounded_full()
         .flex()
         .items_center()
         .text_size(px(14. * s))
         .cursor_pointer()
-        .when(on, |d| d.bg(luminous()).shadow(glow(s * 0.5)))
+        .when(on, |d| {
+            d.bg(rgb(0xffffff))
+                .text_color(rgb(0x0b0b0d))
+                .font_weight(FontWeight::SEMIBOLD)
+        })
         .when(!on, |d| {
-            d.text_color(rgb(MUTED))
-                .hover(|d| d.bg(rgb(tone(0x2b2c31))))
+            d.text_color(rgb(0xb4b6bd))
+                .hover(|d| d.bg(rgba(0xffffff14)))
         })
         .child(tr(label))
 }
@@ -187,12 +190,12 @@ fn segments(s: f32) -> Div {
         .flex()
         .flex_wrap()
         .justify_end()
-        .gap(px(4. * s))
+        .gap(px(2. * s))
         .p(px(4. * s))
-        .rounded(px(12. * s))
-        .bg(rgb(tone(0x191a1d)))
+        .rounded(px(22. * s))
+        .bg(rgba(0x0b0b0d8c))
         .border_1()
-        .border_color(rgb(tone(0x35373e)))
+        .border_color(rgba(0xffffff1a))
 }
 
 fn mono(value: impl Into<SharedString>, s: f32) -> Div {
@@ -284,6 +287,11 @@ impl Launcher {
         let mut nav = div()
             .w(px(240. * s))
             .flex_none()
+            .p(px(6. * s))
+            .rounded(px(26. * s))
+            .bg(rgba(0x0b0b0d8c))
+            .border_1()
+            .border_color(rgba(0xffffff1a))
             .flex()
             .flex_col()
             .gap(px(2. * s));
@@ -293,35 +301,22 @@ impl Launcher {
                 div()
                     .id(("settings-section", index))
                     .relative()
-                    .h(px(42. * s))
-                    .px(px(14. * s))
-                    .rounded(px(9. * s))
+                    .h(px(44. * s))
+                    .px(px(16. * s))
+                    .rounded_full()
                     .flex()
                     .items_center()
                     .gap(px(12. * s))
                     .cursor_pointer()
-                    .when(on, |d| d.bg(rgb(tone(0x1f2024))))
-                    .when(!on, |d| d.hover(|d| d.bg(rgb(tone(0x18191d)))))
-                    .when(on, |d| {
-                        d.child(
-                            div()
-                                .absolute()
-                                .left_0()
-                                .top(px(11. * s))
-                                .w(px(3. * s))
-                                .h(px(20. * s))
-                                .rounded_r(px(3. * s))
-                                .bg(rgb(accent_tone(ACCENT))),
-                        )
-                    })
+                    .when(on, |d| d.bg(rgb(0xffffff)))
+                    .when(!on, |d| d.hover(|d| d.bg(rgba(0xffffff14))))
                     .child(
-                        icon(item.glyph(), if on { accent_tone(ACCENT) } else { MUTED })
-                            .size(px(18. * s)),
+                        icon(item.glyph(), if on { 0x0b0b0d } else { 0xb4b6bd }).size(px(18. * s)),
                     )
                     .child(
                         div()
                             .text_size(px(15. * s))
-                            .text_color(rgb(if on { INK } else { 0xc4c6cc }))
+                            .text_color(rgb(if on { 0x0b0b0d } else { 0xc4c6cc }))
                             .when(on, |d| d.font_weight(FontWeight::SEMIBOLD))
                             .child(tr(item.label())),
                     )
@@ -349,24 +344,16 @@ impl Launcher {
             .flex_col()
             .gap(px(18. * s))
             .pb(px(20. * s))
-            .child(
-                div()
-                    .child(
-                        div()
-                            .text_size(px(30. * s))
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .child(tr("Settings")),
-                    )
-                    .child(
-                        div()
-                            .text_size(px(15. * s))
-                            .text_color(rgb(MUTED))
-                            .child(trf(
-                                "Wisp {version}. Changes save as you make them.",
-                                &[("version", env!("CARGO_PKG_VERSION"))],
-                            )),
-                    ),
-            )
+            .child(self.page_head(
+                ("Back to Home", Page::Home),
+                "Settings",
+                &trf(
+                    "Wisp {version}. Changes save as you make them.",
+                    &[("version", env!("CARGO_PKG_VERSION"))],
+                ),
+                None,
+                cx,
+            ))
             .child(
                 div()
                     .flex()
@@ -384,13 +371,10 @@ impl Launcher {
                                     .flex()
                                     .items_center()
                                     .gap(px(10. * s))
-                                    .child(
-                                        icon(section.glyph(), accent_tone(ACCENT))
-                                            .size(px(22. * s)),
-                                    )
+                                    .child(icon(section.glyph(), INK).size(px(24. * s)))
                                     .child(
                                         div()
-                                            .text_size(px(22. * s))
+                                            .text_size(px(26. * s))
                                             .font_weight(FontWeight::SEMIBOLD)
                                             .child(tr(section.label())),
                                     ),

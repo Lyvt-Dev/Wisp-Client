@@ -346,23 +346,26 @@ impl Launcher {
                             .to_string(),
                     ),
             });
-        div().relative().flex_none().child(face).when_some(presence, |d, on| {
-            d.child(
-                div()
-                    .absolute()
-                    .right(px(-3. * s))
-                    .bottom(px(-3. * s))
-                    .p(px(2.5 * s))
-                    .rounded_full()
-                    .bg(rgb(0x121316))
-                    .child(
-                        div()
-                            .size(px(10. * s))
-                            .rounded_full()
-                            .bg(rgb(if on { LIVE } else { 0x5b5d65 })),
-                    ),
-            )
-        })
+        div()
+            .relative()
+            .flex_none()
+            .child(face)
+            .when_some(presence, |d, on| {
+                d.child(
+                    div()
+                        .absolute()
+                        .right(px(-3. * s))
+                        .bottom(px(-3. * s))
+                        .p(px(2.5 * s))
+                        .rounded_full()
+                        .bg(rgb(0x121316))
+                        .child(div().size(px(10. * s)).rounded_full().bg(rgb(if on {
+                            LIVE
+                        } else {
+                            0x5b5d65
+                        }))),
+                )
+            })
     }
 
     /// A small square button: white for the action that counts, dark glass otherwise.
@@ -395,7 +398,12 @@ impl Launcher {
     }
 
     /// A small white pill with a word: Join, Accept.
-    fn pill_button(&self, id: impl Into<ElementId>, label: &str, glyph: &'static str) -> Stateful<Div> {
+    fn pill_button(
+        &self,
+        id: impl Into<ElementId>,
+        label: &str,
+        glyph: &'static str,
+    ) -> Stateful<Div> {
         let s = self.ui_scale;
         div()
             .id(id)
@@ -622,7 +630,9 @@ impl Launcher {
                             .text_size(px(13. * s))
                             .line_height(px(19. * s))
                             .text_color(rgb(0xa9abb3))
-                            .child(tr("No friends yet. Add someone by their Minecraft name above.")),
+                            .child(tr(
+                                "No friends yet. Add someone by their Minecraft name above.",
+                            )),
                     );
                 }
                 let mut order: Vec<_> = list.friends.iter().enumerate().collect();

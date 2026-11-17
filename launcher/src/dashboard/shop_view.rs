@@ -560,10 +560,12 @@ impl Launcher {
                                 tr(kind_label(kind)),
                                 self.shop.tab == Some(kind),
                             )
-                            .on_click(cx.listener(move |this, _, _, cx| {
-                                this.shop.tab = Some(kind);
-                                cx.notify();
-                            }))
+                            .on_click(cx.listener(
+                                move |this, _, _, cx| {
+                                    this.shop.tab = Some(kind);
+                                    cx.notify();
+                                },
+                            ))
                         })),
                 )
             })

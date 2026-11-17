@@ -1,6 +1,5 @@
 //! Resource packs (which are on in the game, in their order, and what else is in the folder) and
 //! Servers (the multiplayer list with live status and one-click Join).
-use super::reference_views::{glow, luminous};
 use super::*;
 use gpui::AnyElement;
 use std::time::Instant;
@@ -18,14 +17,14 @@ fn switch(on: bool, s: f32) -> Div {
         .flex_none()
         .rounded_full()
         .p(px(3. * s))
-        .when(on, |d| d.bg(luminous()).justify_end())
+        .when(on, |d| d.bg(rgb(0xffffff)).justify_end())
         .when(!on, |d| d.bg(rgb(tone(0x2c2e33))))
         .flex()
         .child(
             div()
                 .size(px(16. * s))
                 .rounded_full()
-                .bg(rgb(if on { 0xffffff } else { 0x80838c })),
+                .bg(rgb(if on { 0x0b0b0d } else { 0x80838c })),
         )
 }
 
@@ -46,7 +45,11 @@ impl Launcher {
         } else {
             ("Back to Home", Page::Home)
         };
-        let title = if browse { "Browse Resource packs" } else { title };
+        let title = if browse {
+            "Browse Resource packs"
+        } else {
+            title
+        };
         div()
             .flex()
             .flex_col()
@@ -370,7 +373,8 @@ impl Launcher {
                             .h(px(32. * s))
                             .px(px(14. * s))
                             .rounded(px(8. * s))
-                            .bg(luminous())
+                            .bg(rgb(0xffffff))
+                            .text_color(rgb(0x0b0b0d))
                             .flex()
                             .items_center()
                             .text_size(px(13. * s))
@@ -645,13 +649,14 @@ impl Launcher {
                             .h(px(40. * s))
                             .px(px(20. * s))
                             .rounded(px(9. * s))
-                            .bg(luminous())
+                            .bg(rgb(0xffffff))
+                            .text_color(rgb(0x0b0b0d))
                             .flex()
                             .items_center()
                             .gap(px(7. * s))
                             .text_size(px(14. * s))
                             .font_weight(FontWeight::SEMIBOLD)
-                            .when(!busy && i == 0, |d| d.shadow(glow(s * 0.6)))
+                            .when(!busy && i == 0, |d| d)
                             .when(busy, |d| d.opacity(0.4))
                             .when(!busy, |d| {
                                 d.cursor_pointer()
@@ -663,7 +668,7 @@ impl Launcher {
                                         )
                                     }))
                             })
-                            .child(icon("play", INK).size(px(14. * s)))
+                            .child(icon("play", 0x0b0b0d).size(px(14. * s)))
                             .child(tr("Join")),
                     )
                     .into_any_element()

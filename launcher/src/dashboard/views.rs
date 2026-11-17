@@ -70,25 +70,13 @@ impl Launcher {
             Page::Mods => self.mods_page(cx),
             _ => self.about(),
         };
+        let _ = glyph;
         div()
             .flex()
             .flex_col()
-            .gap_5()
+            .gap(px(22. * self.ui_scale))
             .pb_4()
-            .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .gap_3()
-                    .child(icon(glyph, accent_tone(ACCENT)).size(px(26.)))
-                    .child(
-                        div()
-                            .text_size(px(27.))
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .child(tr(title)),
-                    ),
-            )
-            .child(quiet(description))
+            .child(self.page_head(("Back to Home", Page::Home), title, description, None, cx))
             .child(content)
     }
 
@@ -281,15 +269,24 @@ impl Launcher {
             div()
                 .flex_1()
                 .min_w_0()
-                .p(px(16. * s))
-                .rounded(px(12. * s))
+                .p(px(20. * s))
+                .rounded(px(18. * s))
                 .border_1()
-                .border_color(rgb(tone(RULE)))
-                .bg(rgb(tone(SURFACE)))
+                .border_color(rgba(0xffffff1a))
+                .bg(rgba(0x0b0b0dc4))
                 .flex()
                 .flex_col()
-                .gap(px(8. * s))
-                .child(icon(glyph, accent_tone(ACCENT)).size(px(26. * s)))
+                .gap(px(10. * s))
+                .child(
+                    div()
+                        .size(px(46. * s))
+                        .rounded_full()
+                        .bg(rgba(0xffffff14))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .child(icon(glyph, INK).size(px(22. * s))),
+                )
                 .child(
                     div()
                         .text_size(px(16. * s))
@@ -310,17 +307,30 @@ impl Launcher {
             .gap(px(14. * s))
             .pb(px(20. * s))
             .child(
-                panel().p(px(20. * s)).flex().items_center().gap(px(16. * s))
-                    .child(img("artwork/logo.png").size(px(56. * s)))
+                panel()
+                    .rounded(px(20. * s))
+                    .p(px(28. * s))
+                    .flex()
+                    .items_center()
+                    .gap(px(24. * s))
+                    .child(img("artwork/logo.png").size(px(84. * s)))
                     .child(
                         div()
+                            .flex()
+                            .flex_col()
+                            .gap(px(6. * s))
                             .child(
                                 div()
-                                    .text_size(px(24. * s))
+                                    .text_size(px(40. * s))
                                     .font_weight(FontWeight::SEMIBOLD)
                                     .child(trf("Wisp {version}", &[("version", env!("CARGO_PKG_VERSION"))])),
                             )
-                            .child(quiet("Minecraft Java Edition rebuilt in Rust, with its own launcher.")),
+                            .child(
+                                div()
+                                    .text_size(px(16. * s))
+                                    .text_color(rgb(0xc9cbd1))
+                                    .child(tr("Minecraft Java Edition rebuilt in Rust, with its own launcher.")),
+                            ),
                     ),
             )
             .child(
@@ -335,9 +345,9 @@ impl Launcher {
                 div()
                     .flex()
                     .gap(px(14. * s))
-                    .child(fact("cart", "Shop", "Capes, wings, pets, trails, auras and emotes for coins you earn by playing."))
+                    .child(fact("cart", "Store", "Cosmetics for the coins you earn by playing. The Wisp Founders Cape is free for Wisp's first players."))
                     .child(fact("user", "Microsoft sign-in", "Sign in with the account that owns Minecraft; switch between several."))
-                    .child(fact("gear", "Make it yours", "Pick the accent colour, background and banner in Settings, Appearance.")),
+                    .child(fact("gear", "Make it yours", "Your own background pictures and the interface size in Settings, Appearance.")),
             )
             .child(quiet("Original licenses and contributor notices are included with the installer."))
     }

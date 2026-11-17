@@ -1,6 +1,5 @@
 //! The profile: the signed-in player's skin, name and what they have (coins, items, instances),
 //! their equipped cosmetics, every saved account, and the Microsoft sign-in flows.
-use super::reference_views::{glow, luminous};
 use super::*;
 use wisp_launcher::shop;
 
@@ -26,7 +25,8 @@ impl Launcher {
             .text_size(px(14. * s))
             .cursor_pointer()
             .when(bright, |d| {
-                d.bg(luminous())
+                d.bg(rgb(0xffffff))
+                    .text_color(rgb(0x0b0b0d))
                     .font_weight(FontWeight::SEMIBOLD)
                     .hover(|d| d.opacity(0.9))
             })
@@ -36,7 +36,7 @@ impl Launcher {
                     .border_color(rgba(0xffffff26))
                     .hover(|d| d.bg(rgba(tone_a(0x232429e0))))
             })
-            .child(icon(glyph, if bright { INK } else { 0xd9dadd }).size(px(15. * s)))
+            .child(icon(glyph, if bright { 0x0b0b0d } else { 0xd9dadd }).size(px(15. * s)))
             .child(tr(label))
     }
 
@@ -111,8 +111,7 @@ impl Launcher {
                     .w(px(120. * s))
                     .h(px(14. * s))
                     .rounded_full()
-                    .bg(rgba(accent_tone_a(0x3ccf6a40)))
-                    .shadow(glow(s)),
+                    .bg(rgba(0xffffff26)),
             );
         let details = match signed {
             Some(a) => {
@@ -133,11 +132,11 @@ impl Launcher {
                             .flex()
                             .items_center()
                             .gap(px(8. * s))
-                            .child(div().size(px(9. * s)).rounded_full().bg(rgb(accent_tone(ACCENT))))
+                            .child(div().size(px(9. * s)).rounded_full().bg(rgb(0x4ade80)))
                             .child(
                                 div()
                                     .text_size(px(13. * s))
-                                    .text_color(rgb(accent_tone(0x6fe792)))
+                                    .text_color(rgb(0x4ade80))
                                     .child(tr(if self.child.is_some() { "Playing Wisp" } else { "Online in launcher" })),
                             ),
                     )
@@ -183,13 +182,13 @@ impl Launcher {
                                     .h(px(28. * s))
                                     .px(px(10. * s))
                                     .rounded(px(7. * s))
-                                    .bg(rgba(accent_tone_a(0x3ccf6a26)))
+                                    .bg(rgba(0x4ade8026))
                                     .flex()
                                     .items_center()
                                     .gap(px(6. * s))
                                     .text_size(px(12. * s))
-                                    .text_color(rgb(accent_tone(0x6fe792)))
-                                    .child(icon("shield-check", accent_tone(0x6fe792)).size(px(13. * s)))
+                                    .text_color(rgb(0x4ade80))
+                                    .child(icon("shield-check", 0x4ade80).size(px(13. * s)))
                                     .child(tr("Owns Minecraft: Java Edition")),
                             )
                             .when_some(model, |d, m| {
@@ -280,21 +279,11 @@ impl Launcher {
             .relative()
             .h(px(330. * s))
             .flex_none()
-            .rounded(px(14. * s))
+            .rounded(px(20. * s))
             .overflow_hidden()
             .border_1()
-            .border_color(rgb(tone(RULE)))
-            .child(
-                img(self.prefs.banner.asset())
-                    .absolute()
-                    .size_full()
-                    .object_fit(ObjectFit::Cover),
-            )
-            .child(div().absolute().size_full().bg(gpui::linear_gradient(
-                90.,
-                gpui::linear_color_stop(rgba(tone_a(0x0e0f11d8)), 0.),
-                gpui::linear_color_stop(rgba(tone_a(0x0e0f11f5)), 0.55),
-            )))
+            .border_color(rgba(0xffffff1a))
+            .bg(rgba(0x0b0b0dc4))
             .child(
                 div()
                     .relative()
@@ -325,7 +314,18 @@ impl Launcher {
                         .on_click(|_, _, cx| cx.open_url(GUIDE)),
                 );
         }
-        let mut page = div().flex().flex_col().gap(px(16. * s)).pb(px(20. * s));
+        let mut page = div()
+            .flex()
+            .flex_col()
+            .gap(px(16. * s))
+            .pb(px(20. * s))
+            .child(self.page_head(
+                ("Back to Home", Page::Home),
+                "Account",
+                "Your Microsoft account, your skin and the Wisp items you wear.",
+                None,
+                cx,
+            ));
         if self.install_after_sign_in {
             page = page.child(quiet("Sign in to install Minecraft. Wisp downloads the files and opens the game right after."));
         }
@@ -333,14 +333,14 @@ impl Launcher {
             page = page.child(
                 div()
                     .p(px(18. * s))
-                    .rounded(px(12. * s))
+                    .rounded(px(16. * s))
                     .border_1()
-                    .border_color(rgb(accent_tone(0x2f9e52)))
-                    .bg(rgb(tone(0x17181b)))
+                    .border_color(rgba(0xffffff40))
+                    .bg(rgba(0x0b0b0dc4))
                     .flex()
                     .items_center()
                     .gap(px(16. * s))
-                    .child(icon("shield-check", accent_tone(ACCENT)).size(px(30. * s)))
+                    .child(icon("shield-check", INK).size(px(30. * s)))
                     .child(
                         div()
                             .flex_1()
@@ -359,10 +359,10 @@ impl Launcher {
             page = page.child(
                 div()
                     .p(px(20. * s))
-                    .rounded(px(12. * s))
+                    .rounded(px(16. * s))
                     .border_1()
-                    .border_color(rgb(accent_tone(0x2f9e52)))
-                    .bg(rgb(tone(0x17181b)))
+                    .border_color(rgba(0xffffff40))
+                    .bg(rgba(0x0b0b0dc4))
                     .flex()
                     .items_center()
                     .gap(px(20. * s))
@@ -409,7 +409,7 @@ impl Launcher {
                 .flex()
                 .items_center()
                 .gap(px(10. * s))
-                .child(icon(glyph, accent_tone(ACCENT)).size(px(18. * s)))
+                .child(icon(glyph, INK).size(px(18. * s)))
                 .child(
                     div()
                         .text_size(px(19. * s))
@@ -433,7 +433,7 @@ impl Launcher {
         page = page.child(section("cape", "Equipped", equipped.len().to_string()));
         if equipped.is_empty() {
             page = page.child(quiet(
-                "Nothing equipped. Pick a cape, pet or trail in the shop.",
+                "Nothing equipped yet. Claim the Wisp Founders Cape in the Store.",
             ));
         } else {
             let mut cards: Vec<gpui::AnyElement> = equipped
@@ -448,7 +448,7 @@ impl Launcher {
                         .overflow_hidden()
                         .border_1()
                         .border_color(rgb(tone(0x2a2b30)))
-                        .bg(rgb(tone(0x17181b)))
+                        .bg(rgba(0x0b0b0dc4))
                         .cursor_pointer()
                         .hover(|d| d.border_color(rgb(tone(0x4a4c54))))
                         .child(
@@ -530,12 +530,8 @@ impl Launcher {
                     .p(px(12. * s))
                     .rounded(px(12. * s))
                     .border_1()
-                    .border_color(rgb(if on {
-                        accent_tone(0x2f9e52)
-                    } else {
-                        tone(0x2a2b30)
-                    }))
-                    .bg(rgb(tone(0x17181b)))
+                    .border_color(rgba(if on { 0xffffffcc } else { 0xffffff1a }))
+                    .bg(rgba(0x0b0b0dc4))
                     .flex()
                     .items_center()
                     .gap(px(14. * s))
@@ -582,10 +578,10 @@ impl Launcher {
                                 .px(px(10. * s))
                                 .py(px(4. * s))
                                 .rounded(px(6. * s))
-                                .bg(rgba(accent_tone_a(0x3ccf6a26)))
+                                .bg(rgba(0x4ade8026))
                                 .text_size(px(12. * s))
                                 .font_weight(FontWeight::SEMIBOLD)
-                                .text_color(rgb(accent_tone(0x6fe792)))
+                                .text_color(rgb(0x4ade80))
                                 .child(tr("Playing")),
                         )
                     })

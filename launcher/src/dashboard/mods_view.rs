@@ -1,6 +1,5 @@
 //! Mods: the built-in client features as a grid of switch tiles grouped by category (shared with
 //! the game's Options > Wisp > Extras), and the instance's Wisp `.amod` modules below them.
-use super::reference_views::luminous;
 use super::*;
 use gpui::AnyElement;
 use wisp_launcher::{catalog, client_features, mods};
@@ -155,14 +154,16 @@ impl Launcher {
             .text_size(px(14. * s))
             .cursor_pointer()
             .when(bright, |d| {
-                d.bg(luminous()).font_weight(FontWeight::SEMIBOLD)
+                d.bg(rgb(0xffffff))
+                    .text_color(rgb(0x0b0b0d))
+                    .font_weight(FontWeight::SEMIBOLD)
             })
             .when(!bright, |d| {
                 d.border_1()
                     .border_color(rgb(tone(0x2e3035)))
                     .hover(|d| d.bg(rgb(tone(0x202125))))
             })
-            .child(icon(glyph, if bright { INK } else { MUTED }).size(px(15. * s)))
+            .child(icon(glyph, if bright { 0x0b0b0d } else { MUTED }).size(px(15. * s)))
             .child(tr(label))
     }
 
@@ -613,32 +614,37 @@ impl Launcher {
             .bg(rgba(0x16171acc))
             .border_1()
             .border_color(rgba(0xffffff1a))
-            .children(kinds.into_iter().enumerate().map(|(i, (label, page, glyph))| {
-                let on = self.page == page;
-                div()
-                    .id(("browse-kind", i))
-                    .h(px(38. * s))
-                    .px(px(16. * s))
-                    .rounded(px(9. * s))
-                    .flex()
-                    .items_center()
-                    .gap(px(8. * s))
-                    .text_size(px(15. * s))
-                    .cursor_pointer()
-                    .when(on, |d| {
-                        d.bg(rgba(0xffffff1f)).font_weight(FontWeight::SEMIBOLD)
-                    })
-                    .when(!on, |d| {
-                        d.text_color(rgb(0xb4b6bd))
-                            .hover(|d| d.bg(rgba(0xffffff12)))
-                    })
-                    .child(icon(glyph, if on { INK } else { 0xb4b6bd }).size(px(17. * s)))
-                    .child(tr(label))
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        this.page = page;
-                        cx.notify();
-                    }))
-            }))
+            .children(
+                kinds
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, (label, page, glyph))| {
+                        let on = self.page == page;
+                        div()
+                            .id(("browse-kind", i))
+                            .h(px(38. * s))
+                            .px(px(16. * s))
+                            .rounded(px(9. * s))
+                            .flex()
+                            .items_center()
+                            .gap(px(8. * s))
+                            .text_size(px(15. * s))
+                            .cursor_pointer()
+                            .when(on, |d| {
+                                d.bg(rgba(0xffffff1f)).font_weight(FontWeight::SEMIBOLD)
+                            })
+                            .when(!on, |d| {
+                                d.text_color(rgb(0xb4b6bd))
+                                    .hover(|d| d.bg(rgba(0xffffff12)))
+                            })
+                            .child(icon(glyph, if on { INK } else { 0xb4b6bd }).size(px(17. * s)))
+                            .child(tr(label))
+                            .on_click(cx.listener(move |this, _, _, cx| {
+                                this.page = page;
+                                cx.notify();
+                            }))
+                    }),
+            )
     }
 
     /// "for <instance>": the instance Browse changes, with the list to pick another.
@@ -688,8 +694,10 @@ impl Launcher {
                     )
                     .when(self.instance_menu, |d| {
                         d.child(
-                            gpui::deferred(self.instance_menu(cx).top(px(48. * s)).min_w(px(300. * s)))
-                                .with_priority(1),
+                            gpui::deferred(
+                                self.instance_menu(cx).top(px(48. * s)).min_w(px(300. * s)),
+                            )
+                            .with_priority(1),
                         )
                     }),
             )
@@ -854,7 +862,12 @@ impl Launcher {
             .child(self.browse_for(cx))
             .child(div().flex_1())
             .child(self.browse_kinds(cx))
-            .child(div().w(px(320. * s)).flex_none().child(self.mod_search.clone()));
+            .child(
+                div()
+                    .w(px(320. * s))
+                    .flex_none()
+                    .child(self.mod_search.clone()),
+            );
 
         div()
             .size_full()
@@ -889,7 +902,9 @@ impl Launcher {
                         .gap(px(10. * s))
                         .text_size(px(14. * s))
                         .child(icon("info", 0xf2c14e).size(px(16. * s)))
-                        .child(tr("Minecraft is running. Close it to change mods for this instance.")),
+                        .child(tr(
+                            "Minecraft is running. Close it to change mods for this instance.",
+                        )),
                 )
             })
             .when_some(values.as_ref().err(), |d, error| d.child(quiet(error)))

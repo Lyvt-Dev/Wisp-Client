@@ -1,5 +1,5 @@
 //! Reference catalog layouts, backed by actual local instances and package metadata.
-use super::reference_views::{glow, luminous, surface};
+use super::reference_views::surface;
 use super::*;
 
 #[derive(Clone, Copy, PartialEq, Eq, Default)]
@@ -55,12 +55,8 @@ pub(super) fn cat_button(
         .rounded(px(12. * s))
         .border_1()
         .border_color(rgb(if bright { 0xd6d7da } else { tone(RULE) }))
-        .bg(if bright {
-            luminous()
-        } else {
-            rgb(tone(0x27292d)).into()
-        })
-        .when(bright, |d| d.shadow(glow(s)))
+        .when(bright, |d| d.bg(rgb(0xffffff)).text_color(rgb(0x0b0b0d)))
+        .when(!bright, |d| d.bg(rgba(0x16171acc)))
         .flex()
         .items_center()
         .justify_center()
@@ -68,7 +64,7 @@ pub(super) fn cat_button(
         .text_size(px(16. * s))
         .cursor_pointer()
         .hover(|d| d.opacity(0.86))
-        .child(icon(glyph, INK).size(px(22. * s)))
+        .child(icon(glyph, if bright { 0x0b0b0d } else { INK }).size(px(22. * s)))
         .child(tr(label))
 }
 impl Launcher {

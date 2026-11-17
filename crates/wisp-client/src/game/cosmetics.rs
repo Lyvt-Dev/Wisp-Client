@@ -744,9 +744,7 @@ impl Game<'_> {
     pub(super) fn cosmetics_tag(&self, m: &Mob, own: bool) -> Option<super::names::TagStyle> {
         let shown = self.cosmetics_shown(own);
         let worn = self.worn_by(m, own)?;
-        let item = worn
-            .iter()
-            .find(|i| shown && i.slot == Slot::NameTag)?;
+        let item = worn.iter().find(|i| shown && i.slot == Slot::NameTag)?;
         let [r, g, b] = item.tag?.line;
         let frame = self.cosmetics.frame.get();
         let mut baked = self.cosmetics.baked.borrow_mut();

@@ -19,14 +19,6 @@ pub(super) fn surface(s: f32) -> Div {
         .border_color(rgb(tone(RULE)))
         .bg(rgb(tone(SURFACE)))
 }
-/// The green of primary actions.
-pub(super) fn luminous() -> gpui::Background {
-    gpui::linear_gradient(
-        180.,
-        gpui::linear_color_stop(rgb(accent_tone(0x46d36f)), 0.),
-        gpui::linear_color_stop(rgb(accent_tone(0x23a04a)), 1.),
-    )
-}
 fn dot(on: bool, s: f32) -> Div {
     div()
         .size(px(9. * s))
@@ -126,12 +118,11 @@ impl Launcher {
                             .gap(px(6. * s))
                             .text_size(px(12. * s))
                             .text_color(rgb(0xd9dadd))
-                            .child(
-                                div()
-                                    .size(px(7. * s))
-                                    .rounded_full()
-                                    .bg(rgb(if online > 0 { 0x4ade80 } else { 0x5b5d65 })),
-                            )
+                            .child(div().size(px(7. * s)).rounded_full().bg(rgb(if online > 0 {
+                                0x4ade80
+                            } else {
+                                0x5b5d65
+                            })))
                             .child(trf("{count} online", &[("count", &online.to_string())])),
                     )
                     .child(div().flex_1())
@@ -175,15 +166,13 @@ impl Launcher {
                                 .p(px(2.5 * s))
                                 .rounded_full()
                                 .bg(rgb(0x121316))
-                                .child(
-                                    div().size(px(10. * s)).rounded_full().bg(rgb(
-                                        if self.account.is_some() {
-                                            0x4ade80
-                                        } else {
-                                            0x5b5d65
-                                        },
-                                    )),
-                                ),
+                                .child(div().size(px(10. * s)).rounded_full().bg(rgb(
+                                    if self.account.is_some() {
+                                        0x4ade80
+                                    } else {
+                                        0x5b5d65
+                                    },
+                                ))),
                         ),
                     )
                     .child(
