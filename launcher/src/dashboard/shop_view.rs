@@ -19,10 +19,17 @@ use wisp_launcher::{
 
 /// The figure's picture in pixels (drawn on the CPU, then scaled to fit), and the step its
 /// turning is drawn in (finer steps would only be drawn more often).
-const FIGURE: u32 = 640;
+const FIGURE: u32 = 560;
 const FIGURE_STEP: f32 = 3.0;
-/// Where the figure starts: its back, a little turned, so a cape shows.
+/// Where the figure starts: its back, a little turned, so a cape shows; looked at a little
+/// from above.
 const FIGURE_START: f32 = 200.0;
+const PITCH_START: f32 = 8.0;
+/// How far the figure tilts (degrees, down is positive) and zooms.
+const PITCH: (f32, f32) = (-30.0, 60.0);
+const ZOOM: (f32, f32) = (0.7, 1.7);
+/// Pictures kept of the figure (angles and animation frames) before they are drawn again.
+const FIGURES_KEPT: usize = 24;
 
 pub(super) struct ShopUi {
     /// The kind the list shows; None: every kind.
@@ -33,12 +40,16 @@ pub(super) struct ShopUi {
     pub notice: Option<(String, bool)>,
     /// A purchase or change is with the Wisp server: the buttons wait for its answer.
     pub busy: bool,
-    /// The figure turned this many degrees from the front.
+    /// The figure turned this many degrees from the front, tilted this many down, this large.
     pub yaw: f32,
-    /// Where a drag that turns the figure was at the last move (window x, pixels).
-    pub drag: Option<f32>,
-    /// The last picture of the figure and what it showed.
-    figure: RefCell<Option<(u64, Arc<gpui::RenderImage>)>>,
+    pub pitch: f32,
+    pub zoom: f32,
+    /// Where a drag that turns the figure was at the last move (window position, pixels).
+    pub drag: Option<(f32, f32)>,
+    /// When the Store's animations started: the item's texture frames and swing run from here.
+    started: std::time::Instant,
+    /// Pictures of the figure by what they show (angle, frame, skin, item).
+    figure: RefCell<std::collections::HashMap<u64, Arc<gpui::RenderImage>>>,
 }
 
 impl Default for ShopUi {
@@ -49,8 +60,11 @@ impl Default for ShopUi {
             notice: None,
             busy: false,
             yaw: FIGURE_START,
+            pitch: PITCH_START,
+            zoom: 1.0,
             drag: None,
-            figure: RefCell::new(None),
+            started: std::time::Instant::now(),
+            figure: RefCell::new(std::collections::HashMap::new()),
         }
     }
 }
@@ -609,16 +623,26 @@ impl Launcher {
     /// figure's angle; drawn again only when the angle, the skin or the item changes.
     fn shop_picture(&self, offer: &'static Offer) -> Arc<gpui::RenderImage> {
         let yaw = (self.shop.yaw / FIGURE_STEP).round() * FIGURE_STEP;
+        let pitch = (self.shop.pitch / FIGURE_STEP).round() * FIGURE_STEP;
+        let item = offer.item.and_then(|bytes| Item::parse(bytes).ok());
+        // The moment of its animations, in game ticks, held to its texture's frame time: the
+        // frame due now, and the swing at that moment.
+        let step = item.as_ref().map_or(2, |i| i.frametime.max(1)) as f32;
+        let ticks = (self.shop.started.elapsed().as_secs_f32() * 20.0 / step).floor() * step;
+        let frame = item
+            .as_ref()
+            .map_or(0, |i| (ticks / step) as usize % i.frames.len().max(1));
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
         self.avatar_key.hash(&mut hasher);
         self.skin.is_some().hash(&mut hasher);
         yaw.to_bits().hash(&mut hasher);
+        pitch.to_bits().hash(&mut hasher);
+        // The swing repeats every 70 ticks; frames repeat with the texture.
+        (ticks as u32 % 1680).hash(&mut hasher);
         offer.id.hash(&mut hasher);
         let key = hasher.finish();
-        if let Some((k, picture)) = self.shop.figure.borrow().as_ref() {
-            if *k == key {
-                return picture.clone();
-            }
+        if let Some(picture) = self.shop.figure.borrow().get(&key) {
+            return picture.clone();
         }
         let (texture, slim) = match &self.skin {
             Some((rgba, slim)) => (
@@ -632,7 +656,6 @@ impl Launcher {
             None => (stand_in_skin(), false),
         };
         let body = preview::player_model(slim);
-        let item = offer.item.and_then(|bytes| Item::parse(bytes).ok());
         let mut draws = vec![Draw {
             root: &body,
             base: glam::Mat4::IDENTITY,
@@ -640,10 +663,18 @@ impl Launcher {
             poses: Vec::new(),
         }];
         if let Some(item) = &item {
-            draws.extend(Draw::item(item, &body, 0.0));
+            let texture = item.frames.get(frame).unwrap_or(&item.texture);
+            draws.extend(Draw::item(item, &body, ticks).into_iter().map(|mut d| {
+                d.texture = texture;
+                d
+            }));
         }
-        let picture = to_render(&preview::render(&draws, FIGURE, FIGURE, yaw, 8.0));
-        *self.shop.figure.borrow_mut() = Some((key, picture.clone()));
+        let picture = to_render(&preview::render(&draws, FIGURE, FIGURE, yaw, pitch));
+        let mut kept = self.shop.figure.borrow_mut();
+        if kept.len() >= FIGURES_KEPT {
+            kept.clear();
+        }
+        kept.insert(key, picture.clone());
         picture
     }
 
@@ -694,6 +725,8 @@ impl Launcher {
                 .child(tr(label))
                 .on_click(cx.listener(move |this, _, _, cx| {
                     this.shop.yaw = yaw;
+                    this.shop.pitch = PITCH_START;
+                    this.shop.zoom = 1.0;
                     cx.notify();
                 }))
         };
@@ -707,6 +740,7 @@ impl Launcher {
                     .id("shop-figure")
                     .relative()
                     .size(size)
+                    .overflow_hidden()
                     .cursor_grab()
                     .when(self.shop.drag.is_some(), |d| d.cursor_grabbing())
                     // A soft shadow at the feet.
@@ -721,18 +755,34 @@ impl Launcher {
                             .bg(rgba(0x00000066)),
                     )
                     .child(
-                        img(self.shop_picture(offer))
+                        div()
                             .absolute()
                             .inset_0()
-                            .size_full(),
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .child(
+                                img(self.shop_picture(offer))
+                                    .flex_none()
+                                    .size(px(560. * s * self.shop.zoom)),
+                            ),
                     )
                     .on_mouse_down(
                         gpui::MouseButton::Left,
                         cx.listener(|this, event: &gpui::MouseDownEvent, _, cx| {
-                            this.shop.drag = Some(f32::from(event.position.x));
+                            this.shop.drag =
+                                Some((f32::from(event.position.x), f32::from(event.position.y)));
                             cx.notify();
                         }),
-                    ),
+                    )
+                    .on_scroll(cx.listener(|this, event: &gpui::ScrollEvent, _, cx| {
+                        let lines = match event.delta {
+                            gpui::ScrollDelta::Lines(l) => l.y,
+                            gpui::ScrollDelta::Pixels(p) => f32::from(p.y) / 40.0,
+                        };
+                        this.shop.zoom = (this.shop.zoom * (1.0 + lines * 0.1)).clamp(ZOOM.0, ZOOM.1);
+                        cx.notify();
+                    })),
             )
             .child(
                 div()
@@ -763,9 +813,9 @@ impl Launcher {
                     .text_size(px(13. * s))
                     .text_color(rgb(0x8e9099))
                     .child(tr(if self.skin.is_some() {
-                        "Your skin. Drag to turn it."
+                        "Your skin. Drag to turn and tilt it, scroll to zoom."
                     } else {
-                        "Sign in to see it on your own skin. Drag to turn it."
+                        "Sign in to see it on your own skin. Drag to turn and tilt it, scroll to zoom."
                     })),
             )
     }
@@ -855,9 +905,10 @@ impl Launcher {
                     cx.notify();
                     return;
                 }
-                let x = f32::from(event.position.x);
-                this.shop.yaw = (this.shop.yaw - (x - last) * 0.6).rem_euclid(360.);
-                this.shop.drag = Some(x);
+                let (x, y) = (f32::from(event.position.x), f32::from(event.position.y));
+                this.shop.yaw = (this.shop.yaw - (x - last.0) * 0.6).rem_euclid(360.);
+                this.shop.pitch = (this.shop.pitch + (y - last.1) * 0.4).clamp(PITCH.0, PITCH.1);
+                this.shop.drag = Some((x, y));
                 cx.notify();
             }))
             .on_mouse_up(

@@ -876,6 +876,10 @@ impl Render for Launcher {
         }
         theme::apply(&self.prefs);
         self.viewport = (f32::from(viewport.width), f32::from(viewport.height));
+        // The Store's figure is animated: draw the next frame too.
+        if self.page == Page::Shop {
+            window.request_animation_frame();
+        }
         self.art.refresh(&self.home, &self.settings);
         self.content.refresh(
             &self.home,
