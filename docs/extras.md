@@ -370,9 +370,37 @@ title menu and panorama back, for a run that compares the title with vanilla.
 **Wisp Menu** (Right Shift): a sidebar with the wordmark, Edit HUD and the pages in sections
 (Mods & options, Social, Shop), the player at its foot; the page's title with Back on a module's
 page, the search and Close in its head; the categories as chips over the grid; a module is a tile
-with its item, and its name on a bar that is white when it is on and turns it on or off. A
-module's page shows Enabled with its description first, then each setting on its own card. The
-world behind the menu is blurred.
+with its item on a soft disc, and its name and switch at the foot (an enabled tile is lighter, with
+a clear edge). A module's page shows Enabled with its description first; a HUD widget's then has a
+live preview (the game draws the widget as it looks now, an example when it has nothing to show,
+into `Menu::preview`), then each setting on its own card, in sections. A setting that only matters
+with another one on (`Setting::needs`: a toggle on, or a choice past its first name) is greyed out
+and takes no clicks while it doesn't. The world behind the menu is blurred.
+
+**HUD widgets' look** (`hud_widgets.rs`, settings in `features::WIDGET_GROUPS`, each
+`opt.<widget>.<key>` in `wisp-extras.txt`). Every widget can be styled on its own:
+- Text: its own label (`label`, typed, up to 24 characters; empty: the widget's), the format
+  (`text_format`: `FPS 144`, `144 FPS`, `FPS: 144`, `[FPS: 144]`, value only), the font (Wisp,
+  Wisp Bold, Mono, Minecraft's own at whole pixels), the value and label colours (`text`,
+  `accent`), chroma (rainbow text moving with time, its speed), an uppercase label, text shadow.
+- Background: on or off, its colour (`bg`), opacity, a drop shadow.
+- Border and shape: none, subtle, solid, a bar on the left or a line under it, its colour, the
+  corner radius.
+- Layout: size (0.5 to 3), padding, text alignment, steady width (the plate keeps its widest width
+  for 1.5 s so changing numbers don't shake it).
+
+A colour setting has twelve swatches (neutrals, then a hue each), a hue strip to drag along, and a
+hex code to type (`RRGGBB` or `RGB`). Typing a label or hex: Enter or Tab keeps it, Escape drops it,
+a click elsewhere keeps it.
+
+Widgets' own settings, beyond the look: FPS (1% low, colour by frame rate, updates every 0.5, 1 or
+2 s), CPS (the separator), Keystrokes (arrows instead of letters, key size, gap, release fade),
+Ping (colour by latency), Coordinates (decimals, the place in the Nether or the Overworld too),
+Direction (point and degrees, point, degrees, full name), Speed (decimals, including vertical),
+Clock (date), World time (12-hour), Effects (blink when ending), Armor Status (boots first), Arrows
+(hide with none), Hit Info (reach decimals). Combat modules: Health Indicators (show the maximum,
+colour by health, decimals), Damage Numbers (healing colour, decimals, range), TNT Timer (colour by
+time left, a seconds sign).
 
 ## Shared rules
 

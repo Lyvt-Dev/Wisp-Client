@@ -57,8 +57,8 @@ impl Game<'_> {
             let (w, h) = (ui.w, ui.h);
             // The snapping lines while a widget moves: the screen's centre.
             if dragging.is_some() {
-                ui.rounded(w / 2.0 - 0.5, 0.0, 1.0, h, 0.0, hex(0x8B6BFF, 70));
-                ui.rounded(0.0, h / 2.0 - 0.5, w, 1.0, 0.0, hex(0x8B6BFF, 70));
+                ui.rounded(w / 2.0 - 0.5, 0.0, 1.0, h, 0.0, hex(0xFFFFFF, 60));
+                ui.rounded(0.0, h / 2.0 - 0.5, w, 1.0, 0.0, hex(0xFFFFFF, 60));
             }
             for (key, [gx, gy, gw, gh]) in &rects {
                 let (x, y, rw, rh) = (gx * per, gy * per, gw * per, gh * per);
@@ -124,7 +124,7 @@ impl Game<'_> {
                     .max(ui.measure(Face::Regular, 12.0, &hint));
             let bar_w = 20.0 + text_w + 20.0 + widths.iter().sum::<f32>() + 8.0 * 2.0 + 14.0;
             let (bx, by, bh) = (((w - bar_w) / 2.0).round(), 14.0, 56.0);
-            ui.rounded(bx, by, bar_w, bh, 16.0, hex(0x15112E, 242));
+            ui.rounded(bx, by, bar_w, bh, 16.0, hex(0x111217, 242));
             ui.border(bx, by, bar_w, bh, 16.0, hex(0xFFFFFF, 22));
             ui.text(
                 Face::Heading,

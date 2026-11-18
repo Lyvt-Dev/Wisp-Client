@@ -474,6 +474,9 @@ impl Game<'_> {
             let range = f64::from(e.opt_f32("health_indicators", "range"));
             let players_only = e.opt_bool("health_indicators", "players");
             let hearts = e.opt_choice("health_indicators", "style") == 1;
+            let show_max = e.opt_bool("health_indicators", "max");
+            let by_health = e.opt_bool("health_indicators", "colors");
+            let hp_decimals = e.opt_choice("health_indicators", "decimals");
             for m in &self.mobs {
                 let at = name_tag_at(m, alpha);
                 let player = players.contains(&m.id);
@@ -485,7 +488,11 @@ impl Game<'_> {
                     continue;
                 }
                 let max = wisp_client::mobs::finalize::max_health(m).max(m.health);
-                let colour = wisp_client::hud_widgets::durability_color(m.health / max);
+                let colour = if by_health {
+                    wisp_client::hud_widgets::durability_color(m.health / max)
+                } else {
+                    0xFFFFFF
+                };
                 // Above the name, when the mob or player has one.
                 let named = m.custom_name.is_some() || player;
                 let lift = if named { 0.3 } else { 0.0 };
@@ -496,15 +503,25 @@ impl Game<'_> {
                     coloured("\u{2764}".repeat(full), 0xFF5555)
                         .append(coloured("\u{2764}".repeat(empty), 0x555555))
                 } else {
-                    coloured("\u{2764} ".into(), 0xFF5555)
-                        .append(coloured(format!("{:.1}", m.health), colour))
-                        .append(coloured(format!("/{max:.0}"), 0xAAAAAA))
+                    let t = coloured("\u{2764} ".into(), 0xFF5555)
+                        .append(coloured(format!("{:.hp_decimals$}", m.health), colour));
+                    if show_max {
+                        t.append(coloured(format!("/{max:.0}"), 0xAAAAAA))
+                    } else {
+                        t
+                    }
                 };
                 tag(at + glam::DVec3::new(0.0, lift, 0.0), text);
             }
         }
         if e.module("tnt_timer") {
             let decimals = e.opt_choice("tnt_timer", "decimals");
+            let tnt_colors = e.opt_bool("tnt_timer", "colors");
+            let unit = if e.opt_bool("tnt_timer", "suffix") {
+                "s"
+            } else {
+                ""
+            };
             for t in self.tnts.iter() {
                 let p = glam::DVec3::new(
                     t.previous.x + (t.position.x - t.previous.x) * alpha,
@@ -516,11 +533,12 @@ impl Game<'_> {
                 }
                 let seconds = (f64::from(t.fuse) - alpha).max(0.0) / 20.0;
                 let colour = match seconds {
+                    _ if !tnt_colors => 0xFFFFFF,
                     s if s > 2.0 => 0x4ADE80,
                     s if s > 1.0 => 0xFFD43B,
                     _ => 0xFF6B6B,
                 };
-                tag(p, coloured(format!("{seconds:.decimals$}"), colour));
+                tag(p, coloured(format!("{seconds:.decimals$}{unit}"), colour));
             }
         }
         if e.module("waypoints") {
@@ -538,16 +556,19 @@ impl Game<'_> {
             use super::extras::{DAMAGE_NUMBER_RISE, DAMAGE_NUMBER_TICKS};
             let colour = e.opt_color("damage_numbers", "color");
             let healing = e.opt_bool("damage_numbers", "healing");
+            let heal_colour = e.opt_color("damage_numbers", "heal_color");
+            let dmg_decimals = e.opt_choice("damage_numbers", "decimals");
+            let reach = f64::from(e.opt_f32("damage_numbers", "range"));
             for n in &self.extras.damage_numbers {
                 let step = DAMAGE_NUMBER_RISE / f64::from(DAMAGE_NUMBER_TICKS);
                 let at = n.at + glam::DVec3::new(0.0, alpha * step, 0.0);
-                if at.distance_squared(camera) > 32.0 * 32.0 || (n.amount < 0.0 && !healing) {
+                if at.distance_squared(camera) > reach * reach || (n.amount < 0.0 && !healing) {
                     continue;
                 }
                 let text = if n.amount > 0.0 {
-                    coloured(format!("-{:.1}", n.amount), colour)
+                    coloured(format!("-{:.dmg_decimals$}", n.amount), colour)
                 } else {
-                    coloured(format!("+{:.1}", -n.amount), 0x4ADE80)
+                    coloured(format!("+{:.dmg_decimals$}", -n.amount), heal_colour)
                 };
                 tag(at, text);
             }

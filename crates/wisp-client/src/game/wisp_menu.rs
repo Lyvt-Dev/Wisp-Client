@@ -36,6 +36,7 @@ impl Game<'_> {
         m.store_confirm = None;
         m.waiting_key = None;
         m.dragging = None;
+        m.text_edit = None;
         if m.store_page.is_some() {
             self.shop_ask(ShopAsk::Refresh);
         }
@@ -78,6 +79,7 @@ impl Game<'_> {
         m.confirm_remove = None;
         m.waiting_key = None;
         m.dragging = None;
+        m.text_edit = None;
         self.screen = Screen::Playing;
         self.capture(true);
     }
@@ -124,6 +126,9 @@ impl Game<'_> {
             let [cx, cy, cw, ch] = icon.clip;
             batch.clip_since(start, cx, cy, cx + cw, cy + ch);
         }
+        if let (Some(area), Some(key)) = (self.extras.menu.preview, self.extras.menu.open) {
+            self.draw_widget_preview(batch, key, area);
+        }
     }
     /// A left press in the menu.
     pub(super) fn wisp_menu_press(&mut self) {
@@ -154,6 +159,10 @@ impl Game<'_> {
         }
         if !matches!(action, Action::Setting(_, _, Control::Key)) {
             m.waiting_key = None;
+        }
+        let typing = matches!(action, Action::Setting(_, _, Control::Text | Control::Hex));
+        if !typing && self.extras.menu.text_edit.is_some() {
+            self.finish_text_edit(true);
         }
         let click = !matches!(action, Action::Close | Action::Nothing);
         if click {
@@ -228,6 +237,31 @@ impl Game<'_> {
                     }
                     Control::Key => {
                         self.extras.menu.waiting_key = Some((f, s));
+                        return;
+                    }
+                    Control::Text | Control::Hex => {
+                        if self.extras.menu.text_edit == Some((f, s)) {
+                            return;
+                        }
+                        if self.extras.menu.text_edit.is_some() {
+                            self.finish_text_edit(true);
+                        }
+                        let e = &self.settings.extras;
+                        // A hex code is typed fresh (the chip shows the colour until then); a
+                        // text goes on from what it says.
+                        let now = if control == Control::Hex {
+                            String::new()
+                        } else {
+                            e.opt_text(f, s)
+                        };
+                        let m = &mut self.extras.menu;
+                        m.text_edit = Some((f, s));
+                        m.text_input = now;
+                        return;
+                    }
+                    Control::Hue { x0, x1 } => {
+                        self.extras.menu.dragging = Some((f, s, x0, x1));
+                        self.wisp_menu_drag();
                         return;
                     }
                 }
@@ -307,12 +341,19 @@ impl Game<'_> {
         let Some((f, s, x0, x1)) = self.extras.menu.dragging else {
             return;
         };
-        let Some(Kind::Slider { min, max, step, .. }) = setting_kind(f, s) else {
-            return;
-        };
         let t = ((self.cursor.0 - x0) / (x1 - x0).max(1.0)).clamp(0.0, 1.0);
-        let v = features::snap(min + t * (max - min), min, max, step);
-        self.settings.extras.set_opt(f, s, format!("{v}"));
+        match setting_kind(f, s) {
+            Some(Kind::Slider { min, max, step, .. }) => {
+                let v = features::snap(min + t * (max - min), min, max, step);
+                self.settings.extras.set_opt(f, s, format!("{v}"));
+            }
+            // A colour's hue strip.
+            Some(Kind::Color(_)) => {
+                let c = wisp_client::hud_widgets::hsv(t, 0.75, 1.0);
+                self.settings.extras.set_opt(f, s, format!("{c:06x}"));
+            }
+            _ => {}
+        }
     }
     pub(super) fn wisp_menu_release(&mut self) {
         if self.extras.menu.dragging.take().is_some() {
@@ -327,12 +368,32 @@ impl Game<'_> {
         let PhysicalKey::Code(code) = event.physical_key else {
             return;
         };
+        self.wisp_menu_key_code(code, event.text.as_deref());
+    }
+    /// A key in the menu by its code and the text it types (a person's keyboard or an agent's
+    /// `key`).
+    pub(super) fn wisp_menu_key_code(&mut self, code: KeyCode, typed: Option<&str>) {
         if let Some((f, s)) = self.extras.menu.waiting_key.take() {
             if code != KeyCode::Escape
                 && let Some(name) = wisp_client::keybinds::key_name(code)
             {
                 self.settings.extras.set_opt(f, s, name.to_owned());
                 self.save_menu_settings();
+            }
+            return;
+        }
+        if self.extras.menu.text_edit.is_some() {
+            match code {
+                KeyCode::Escape => self.finish_text_edit(false),
+                KeyCode::Enter | KeyCode::NumpadEnter | KeyCode::Tab => self.finish_text_edit(true),
+                KeyCode::Backspace => {
+                    self.extras.menu.text_input.pop();
+                }
+                _ => {
+                    if let Some(text) = typed {
+                        self.wisp_menu_text(text);
+                    }
+                }
             }
             return;
         }
@@ -345,7 +406,7 @@ impl Game<'_> {
                     m.store_input.pop();
                 }
                 _ => {
-                    if let Some(text) = &event.text {
+                    if let Some(text) = typed {
                         self.wisp_menu_text(text);
                     }
                 }
@@ -360,7 +421,7 @@ impl Game<'_> {
                     m.friend_input.pop();
                 }
                 _ => {
-                    if let Some(text) = &event.text {
+                    if let Some(text) = typed {
                         self.wisp_menu_text(text);
                     }
                 }
@@ -375,7 +436,7 @@ impl Game<'_> {
                     m.scroll = 0.0;
                 }
                 _ => {
-                    if let Some(text) = &event.text {
+                    if let Some(text) = typed {
                         self.wisp_menu_text(text);
                     }
                 }
@@ -395,7 +456,7 @@ impl Game<'_> {
             }
             _ => {
                 // Typing anywhere starts a search, as the launcher's lists do.
-                if let Some(text) = &event.text
+                if let Some(text) = typed
                     && text.chars().any(|c| c.is_alphanumeric())
                 {
                     let m = &mut self.extras.menu;
@@ -414,6 +475,20 @@ impl Game<'_> {
     /// Text typed into the search (keys, the input method or an agent's `type`).
     pub(super) fn wisp_menu_text(&mut self, text: &str) {
         let m = &mut self.extras.menu;
+        if let Some((f, s)) = m.text_edit {
+            let hex = matches!(setting_kind(f, s), Some(Kind::Color(_)));
+            for c in text.chars().filter(|c| !c.is_control()) {
+                let len = m.text_input.chars().count();
+                if hex {
+                    if c.is_ascii_hexdigit() && len < 6 {
+                        m.text_input.push(c.to_ascii_uppercase());
+                    }
+                } else if len < features::TEXT_MAX {
+                    m.text_input.push(c);
+                }
+            }
+            return;
+        }
         if m.store_focus.is_some() {
             // Creator codes and Minecraft names alike: letters, digits and _, at most 16.
             for c in text
@@ -449,15 +524,64 @@ impl Game<'_> {
     }
 }
 
+impl Game<'_> {
+    /// Ends typing a text or hex setting: `keep` saves what was typed (a hex code only when it
+    /// is one: 3 or 6 digits), else it is dropped.
+    fn finish_text_edit(&mut self, keep: bool) {
+        let m = &mut self.extras.menu;
+        let Some((f, s)) = m.text_edit.take() else {
+            return;
+        };
+        let typed = std::mem::take(&mut m.text_input);
+        if !keep {
+            return;
+        }
+        let value = if matches!(setting_kind(f, s), Some(Kind::Color(_))) {
+            match parse_hex(&typed) {
+                Some(c) => format!("{c:06x}"),
+                None => return,
+            }
+        } else {
+            typed.trim().to_owned()
+        };
+        self.settings.extras.set_opt(f, s, value);
+        self.save_menu_settings();
+    }
+}
+
+/// A colour typed as a hex code: `RRGGBB`, or `RGB` for `RRGGBB` with each digit doubled.
+fn parse_hex(text: &str) -> Option<u32> {
+    let t = text.trim().trim_start_matches('#');
+    match t.len() {
+        6 => u32::from_str_radix(t, 16).ok(),
+        3 => {
+            let v = u32::from_str_radix(t, 16).ok()?;
+            let [r, g, b] = [v >> 8 & 0xf, v >> 4 & 0xf, v & 0xf];
+            Some((r * 17) << 16 | (g * 17) << 8 | (b * 17))
+        }
+        _ => None,
+    }
+}
+
 fn setting_kind(feature: &str, setting: &str) -> Option<Kind> {
     let f = features::feature(feature)?;
     f.settings
         .iter()
-        .chain(if f.widget {
-            features::WIDGET_SETTINGS
-        } else {
-            &[]
-        })
+        .chain(features::widget_settings().filter(|_| f.widget))
         .find(|s| s.key == setting)
         .map(|s| s.kind)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_hex;
+
+    #[test]
+    fn hex_codes_long_and_short() {
+        assert_eq!(parse_hex("FF8800"), Some(0xFF8800));
+        assert_eq!(parse_hex("#ff8800"), Some(0xFF8800));
+        assert_eq!(parse_hex("F80"), Some(0xFF8800));
+        assert_eq!(parse_hex("FF88"), None);
+        assert_eq!(parse_hex("GG0000"), None);
+    }
 }

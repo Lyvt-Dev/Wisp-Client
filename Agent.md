@@ -316,6 +316,15 @@ Do not rewrite main or force a changed remote branch. Preserve local changes and
 - `WidgetMemory`: a plate keeps its widest width 1.5 s with the content centred, so changing
   numbers don't shake it; Keystrokes' keys fade out over 0.18 s after release.
 - Glass top highlight on plates; Ping without bars colours its value by latency.
+- 2026-11-18, owner asked for a polished in-game UI, widgets that don't look AI-made, and every
+  module fully customizable: plates are neutral (no violet, no glass streak; defaults match the
+  black-and-white brand), and each widget's look is its own (`features::WIDGET_GROUPS`: label text,
+  format, font incl. Minecraft's, colours with hue strip and hex input, chroma, background, border
+  style, radius, padding, alignment). The menu has a live preview, sections and greyed-out
+  dependent settings (`Setting::needs`). Details in docs/extras.md. The look's format key is
+  `text_format` because the Clock already used `format`. `wisp-ctl key` now reaches the Wisp
+  Menu (`wisp_menu_key_code`). The store test `coins_are_grouped_and_buttons_follow_the_wallet`
+  fails already: no founders offer is in the catalog.
 
 ## Launcher Locker
 

@@ -17,7 +17,7 @@ pub use store::{
 use crate::{
     extras::{
         Extras,
-        features::{self, Category, Feature, Kind, SWATCHES, Setting, WIDGET_SETTINGS},
+        features::{self, Category, Feature, Kind, SWATCHES, Setting, TEXT_MAX, WIDGET_GROUPS},
     },
     lang,
     ui_theme::{Face, Ui, color::hex},
@@ -53,12 +53,14 @@ const CHIPS_H: f32 = 42.0;
 const TILE_W: f32 = 168.0;
 const TILE_H: f32 = 140.0;
 /// A module tile's name bar, which turns it on or off.
-const TILE_BAR: f32 = 38.0;
+const TILE_BAR: f32 = 44.0;
 const GAP: f32 = 12.0;
 const ROW_H: f32 = 50.0;
 const RADIUS: f32 = 16.0;
 /// The menu slides up and the world darkens over this long when it opens, in seconds.
 const OPEN_ANIM: f32 = 0.16;
+/// The live preview's stage on a widget's settings page.
+const PREVIEW_H: f32 = 92.0;
 
 /// What a click does.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -104,6 +106,15 @@ pub enum Control {
     },
     /// Wait for a key.
     Key,
+    /// Type the setting's text.
+    Text,
+    /// Type a colour setting's hex code.
+    Hex,
+    /// A colour setting's hue strip from `x0` to `x1` in GUI pixels: the hue follows the cursor.
+    Hue {
+        x0: f32,
+        x1: f32,
+    },
 }
 
 /// An item to draw over the frame: its id, its top left and side in GUI pixels, and the
@@ -128,8 +139,13 @@ pub struct Menu {
     pub scroll: f32,
     /// The key setting waiting for a key.
     pub waiting_key: Option<(&'static str, &'static str)>,
-    /// The slider being dragged, and its track in GUI pixels.
+    /// The slider (or colour's hue strip) being dragged, and its track in GUI pixels.
     pub dragging: Option<(&'static str, &'static str, f32, f32)>,
+    /// The text or hex setting being typed, and what is typed so far.
+    pub text_edit: Option<(&'static str, &'static str)>,
+    pub text_input: String,
+    /// Where the open widget's live preview goes (GUI pixels), as last drawn.
+    pub preview: Option<[f32; 4]>,
     /// The Friends tab is shown instead of the modules.
     pub friends_page: bool,
     /// The name typed to add a friend, and whether that field has the keyboard.
@@ -215,6 +231,7 @@ impl Menu {
         player: &str,
     ) -> Vec<Icon> {
         self.hits.clear();
+        self.preview = None;
         let mut icons = Vec::new();
         let (w, h) = (ui.w, ui.h);
         let t = self
@@ -664,8 +681,8 @@ impl Menu {
         }
     }
 
-    /// A module's tile: its item big in the middle, its name, and the bar that turns it on or
-    /// off. A click on the tile opens its settings. Returns whether the cursor is over it.
+    /// A module's tile: its item in the middle, its name and the switch that turns it on or off
+    /// at the foot. A click on the tile opens its settings. Returns whether the cursor is over it.
     #[allow(clippy::too_many_arguments)]
     fn draw_card(
         &mut self,
@@ -678,13 +695,21 @@ impl Menu {
         icons: &mut Vec<Icon>,
     ) -> bool {
         let hovered = hover(ui, x, y, w, TILE_H);
-        let plate = if hovered { CARD_HOVER } else { CARD };
+        // On: a lighter plate and a clear edge; off: the quiet card.
+        let plate = match (card.on, hovered) {
+            (true, false) => hex(0xFFFFFF, 18),
+            (true, true) => hex(0xFFFFFF, 26),
+            (false, false) => CARD,
+            (false, true) => CARD_HOVER,
+        };
         ui.rounded(x, y, w, TILE_H, 12.0, plate);
-        ui.border(x, y, w, TILE_H, 12.0, STROKE);
+        let edge = if card.on { hex(0xFFFFFF, 70) } else { STROKE };
+        ui.border(x, y, w, TILE_H, 12.0, edge);
         self.hit(ui, x, y, w, TILE_H, Action::Open(card.feature.key));
-        // The item, big in the middle of the tile above the bar.
-        let (cx, cy) = (x + w / 2.0, y + (TILE_H - TILE_BAR) / 2.0);
-        let [gx, gy, gw, _] = ui.gui_rect(cx - 22.0, cy - 22.0, 44.0, 44.0);
+        // The item on a soft disc, in the middle above the foot.
+        let (cx, cy) = (x + w / 2.0, y + (TILE_H - TILE_BAR) / 2.0 + 2.0);
+        ui.circle(cx, cy, 32.0, hex(0xFFFFFF, if card.on { 12 } else { 6 }));
+        let [gx, gy, gw, _] = ui.gui_rect(cx - 20.0, cy - 20.0, 40.0, 40.0);
         icons.push(Icon {
             item: card.feature.icon,
             x: gx,
@@ -692,34 +717,19 @@ impl Menu {
             size: gw,
             clip,
         });
-        // A widget's tag in the corner; its settings, on hover, as three dots.
-        if card.feature.widget {
-            let tag = lang::get_or("wisp.menu.tag.widget", "HUD widget");
-            let tw = ui.measure(Face::Medium, 10.0, &tag) + 12.0;
-            ui.rounded(x + 8.0, y + 8.0, tw, 18.0, 9.0, hex(0xFFFFFF, 16));
-            ui.text_line(Face::Medium, 10.0, 18.0, x + 14.0, y + 8.0, MUTED, &tag);
-        }
+        // Its settings, on hover, as three dots.
         if hovered && (!card.feature.settings.is_empty() || card.feature.widget) {
             for i in 0..3 {
                 ui.circle(x + w - 22.0 + i as f32 * 5.0, y + 16.0, 1.6, INK_SOFT);
             }
         }
-        // The bar with the name: the accent when the module is on. A click turns it on or off.
+        // The foot: the name and the switch, which turns the module on or off.
         let (by, bh) = (y + TILE_H - TILE_BAR, TILE_BAR);
-        let over = hover(ui, x, by, w, bh);
-        let (fill, ink) = match (card.on, over) {
-            (true, false) => (ACCENT, ON_ACCENT),
-            (true, true) => (ACCENT_HOVER, ON_ACCENT),
-            (false, false) => (hex(0xFFFFFF, 16), INK_SOFT),
-            (false, true) => (hex(0xFFFFFF, 30), INK),
-        };
-        // Round at the bottom only: a taller rounded plate, cut at the bar's top.
-        let start = ui.mark();
-        ui.rounded(x, by - 12.0, w, bh + 12.0, 12.0, fill);
-        ui.clip_since(start, x, by, w, bh);
-        let name = fit(ui, Face::Medium, 14.0, &card.name, w - 24.0);
-        let nw = ui.measure(Face::Medium, 14.0, &name);
-        ui.text_line(Face::Medium, 14.0, bh, cx - nw / 2.0, by, ink, &name);
+        ui.rounded(x + 12.0, by, w - 24.0, 1.0, 0.0, hex(0xFFFFFF, 14));
+        let ink = if card.on { INK } else { INK_SOFT };
+        let name = fit(ui, Face::Medium, 14.0, &card.name, w - 24.0 - 48.0);
+        ui.text_line(Face::Medium, 14.0, bh, x + 14.0, by, ink, &name);
+        draw_switch(ui, x + w - 14.0 - 38.0, by + (bh - 22.0) / 2.0, card.on);
         self.hit(ui, x, by, w, bh, Action::Toggle(card.feature.key));
         hovered
     }
@@ -770,14 +780,53 @@ impl Menu {
         let (sx, sy) = (mx + mw - 16.0 - 38.0, hy + (hh - 22.0) / 2.0);
         draw_switch(ui, sx, sy, on);
         self.hit(ui, mx, hy, mw, hh, Action::Toggle(f.key));
+        // A widget's live preview: a stage the game draws the widget on, as it looks now.
+        let mut top = hy + hh + 8.0;
+        if f.widget {
+            let sh = PREVIEW_H;
+            ui.rounded(mx, top, mw, sh, 12.0, hex(0x07070A, 200));
+            ui.border(mx, top, mw, sh, 12.0, STROKE);
+            // A faint grid, as a design canvas has: the plate's edges read on it.
+            let step = 16.0;
+            let mut gx = mx + (mw % step) / 2.0;
+            while gx < mx + mw {
+                ui.rounded(gx, top + 1.0, 1.0, sh - 2.0, 0.0, hex(0xFFFFFF, 7));
+                gx += step;
+            }
+            let mut gy = top + (sh % step) / 2.0;
+            while gy < top + sh {
+                ui.rounded(mx + 1.0, gy, mw - 2.0, 1.0, 0.0, hex(0xFFFFFF, 7));
+                gy += step;
+            }
+            let tag = lang::get_or("wisp.menu.preview", "Preview");
+            ui.text_line(
+                Face::Medium,
+                10.0,
+                18.0,
+                mx + 12.0,
+                top + 6.0,
+                FAINT,
+                &tag.to_uppercase(),
+            );
+            self.preview = Some(ui.gui_rect(mx + 8.0, top + 8.0, mw - 16.0, sh - 16.0));
+            top += sh + 8.0;
+        }
         // The rows.
-        let top = hy + hh + 8.0;
         let foot = 44.0;
         let view = my + mh - foot - top;
-        let mut rows: Vec<Row> = f.settings.iter().map(Row::Setting).collect();
+        let mut rows: Vec<Row> = Vec::new();
+        if f.widget && !f.settings.is_empty() {
+            rows.push(Row::Heading(lang::get_or(
+                "wisp.menu.group.content",
+                "Content",
+            )));
+        }
+        rows.extend(f.settings.iter().map(Row::Setting));
         if f.widget {
-            rows.push(Row::Heading(lang::get_or("wisp.menu.look", "Look")));
-            rows.extend(WIDGET_SETTINGS.iter().map(Row::Setting));
+            for (key, name, settings) in WIDGET_GROUPS {
+                rows.push(Row::Heading(lang::get_or(key, name)));
+                rows.extend(settings.iter().map(Row::Setting));
+            }
             rows.push(Row::Position);
         }
         if rows.is_empty() {
@@ -869,14 +918,37 @@ impl Menu {
             }
             Row::Setting(s) => *s,
         };
-        // Each setting on its own card.
-        ui.rounded(x, y, w, ROW_H, 12.0, CARD);
-        ui.border(x, y, w, ROW_H, 12.0, STROKE);
+        // Each setting on its own card; one that doesn't matter now (its switch is off) greyed
+        // out and not clickable.
+        let rh = row.height() - 6.0;
+        let (card_x, card_w) = (x, w);
+        ui.rounded(x, y, w, rh, 12.0, CARD);
+        ui.border(x, y, w, rh, 12.0, STROKE);
+        let enabled = e.opt_enabled(f.key, s);
+        let hits_before = self.hits.len();
         let (x, w) = (x + 16.0, w - 32.0);
         let label = lang::get_or(&format!("wisp.menu.setting.{}.{}", f.key, s.key), s.label);
         ui.text_line(Face::Regular, 14.0, ROW_H, x, y, INK_SOFT, &label);
         let right = x + w;
         let cy = y + ROW_H / 2.0;
+        self.draw_control(ui, e, f, *s, (x, y, w, right, cy), key_name);
+        if !enabled {
+            self.hits.truncate(hits_before);
+            ui.rounded(card_x, y, card_w, rh, 12.0, hex(0x111217, 170));
+        }
+    }
+
+    /// A setting's control at the right of its card (a colour's on the line under its label).
+    #[allow(clippy::too_many_arguments)]
+    fn draw_control(
+        &mut self,
+        ui: &mut Ui,
+        e: &Extras,
+        f: &'static Feature,
+        s: Setting,
+        (x, y, w, right, cy): (f32, f32, f32, f32, f32),
+        key_name: &dyn Fn(&str) -> String,
+    ) {
         match s.kind {
             Kind::Toggle(_) => {
                 let on = e.opt_bool(f.key, s.key);
@@ -928,11 +1000,14 @@ impl Menu {
                 }
             }
             Kind::Color(_) => {
+                // Under the label: the swatches, a hue strip for any other colour, and the hex
+                // code, which a click lets the player type.
                 let current = e.opt_color(f.key, s.key);
+                let ly = y + ROW_H - 6.0;
                 let (d, gap) = (18.0, 7.0);
-                let mut sx = right - SWATCHES.len() as f32 * (d + gap) + gap;
+                let mut sx = x;
                 for c in SWATCHES {
-                    let (cx0, cy0) = (sx + d / 2.0, cy);
+                    let (cx0, cy0) = (sx + d / 2.0, ly + d / 2.0);
                     if c == current {
                         ui.border(
                             cx0 - d / 2.0 - 3.0,
@@ -944,7 +1019,7 @@ impl Menu {
                         );
                     }
                     ui.circle(cx0, cy0, d / 2.0, hex(c, 255));
-                    if c == 0x1F1B33 {
+                    if c < 0x303030 {
                         ui.border(
                             cx0 - d / 2.0,
                             cy0 - d / 2.0,
@@ -957,13 +1032,114 @@ impl Menu {
                     self.hit(
                         ui,
                         sx - 2.0,
-                        cy - d / 2.0 - 4.0,
+                        ly - 4.0,
                         d + 4.0,
                         d + 8.0,
                         Action::Setting(f.key, s.key, Control::Color(c)),
                     );
                     sx += d + gap;
                 }
+                // The hex code at the right, in a chip of the colour.
+                let editing = self.text_edit == Some((f.key, s.key));
+                let code = if editing {
+                    format!("#{}", self.text_input)
+                } else {
+                    format!("#{current:06X}")
+                };
+                let bw = 92.0;
+                let (bx, by) = (right - bw, ly - 5.0);
+                let fill = if hover(ui, bx, by, bw, 28.0) {
+                    CARD_HOVER
+                } else {
+                    FIELD
+                };
+                ui.rounded(bx, by, bw, 28.0, 8.0, fill);
+                if editing {
+                    ui.border(bx, by, bw, 28.0, 8.0, ACCENT_SOFT);
+                }
+                ui.rounded(bx + 7.0, by + 7.0, 14.0, 14.0, 4.0, hex(current, 255));
+                ui.border(bx + 7.0, by + 7.0, 14.0, 14.0, 4.0, hex(0xFFFFFF, 50));
+                let tw = ui.text_line(Face::Mono, 12.0, 28.0, bx + 28.0, by, INK, &code);
+                if editing && blink() {
+                    ui.rounded(bx + 29.0 + tw, by + 7.0, 1.0, 14.0, 0.0, INK);
+                }
+                self.hit(
+                    ui,
+                    bx,
+                    by,
+                    bw,
+                    28.0,
+                    Action::Setting(f.key, s.key, Control::Hex),
+                );
+                // The hue strip between the swatches and the code.
+                let (hx0, hx1) = (sx + 6.0, bx - 14.0);
+                if hx1 - hx0 > 40.0 {
+                    let (hy, hh) = (ly + 3.0, 12.0);
+                    // About one band per dp, so the strip reads as one smooth gradient.
+                    let n = ((hx1 - hx0) as usize).clamp(24, 400);
+                    let seg = (hx1 - hx0) / n as f32;
+                    let start = ui.mark();
+                    for i in 0..n {
+                        let c = crate::hud_widgets::hsv(i as f32 / n as f32, 0.75, 1.0);
+                        ui.rounded(hx0 + i as f32 * seg, hy, seg + 0.6, hh, 0.0, hex(c, 255));
+                    }
+                    ui.clip_since(start, hx0, hy, hx1 - hx0, hh);
+                    ui.border(hx0, hy, hx1 - hx0, hh, 4.0, hex(0xFFFFFF, 40));
+                    let [x0, _, gw, _] = ui.gui_rect(hx0, hy, hx1 - hx0, 1.0);
+                    self.hit(
+                        ui,
+                        hx0,
+                        hy - 6.0,
+                        hx1 - hx0,
+                        hh + 12.0,
+                        Action::Setting(f.key, s.key, Control::Hue { x0, x1: x0 + gw }),
+                    );
+                }
+            }
+            Kind::Text(_) => {
+                let editing = self.text_edit == Some((f.key, s.key));
+                let value = e.opt_text(f.key, s.key);
+                let (shown, ink) = if editing {
+                    (self.text_input.clone(), INK)
+                } else if value.is_empty() {
+                    (lang::get_or("wisp.menu.text_default", "Default"), FAINT)
+                } else {
+                    (value, INK)
+                };
+                let bw = 200.0_f32.min(w * 0.5);
+                let (bx, by) = (right - bw, cy - 16.0);
+                let fill = if hover(ui, bx, by, bw, 32.0) {
+                    CARD_HOVER
+                } else {
+                    FIELD
+                };
+                ui.rounded(bx, by, bw, 32.0, 10.0, fill);
+                if editing {
+                    ui.border(bx, by, bw, 32.0, 10.0, ACCENT_SOFT);
+                }
+                let text = fit(ui, Face::Medium, 13.0, &shown, bw - 28.0);
+                let tw = ui.text_line(Face::Medium, 13.0, 32.0, bx + 12.0, by, ink, &text);
+                if editing && blink() {
+                    let cx = if shown.is_empty() {
+                        bx + 12.0
+                    } else {
+                        bx + 13.0 + tw
+                    };
+                    ui.rounded(cx, by + 9.0, 1.0, 14.0, 0.0, INK);
+                }
+                if editing {
+                    let count = format!("{}/{TEXT_MAX}", self.text_input.chars().count());
+                    let cw = ui.measure(Face::Mono, 10.0, &count);
+                    ui.text_line(Face::Mono, 10.0, 32.0, bx - 10.0 - cw, by, FAINT, &count);
+                }
+                self.hit(
+                    ui,
+                    bx,
+                    by,
+                    bw,
+                    32.0,
+                    Action::Setting(f.key, s.key, Control::Text),
+                );
             }
             Kind::Slider { min, max, unit, .. } => {
                 let v = e.opt_f32(f.key, s.key);
@@ -1047,6 +1223,7 @@ impl Row {
     fn height(&self) -> f32 {
         match self {
             Row::Heading(_) => 40.0,
+            Row::Setting(s) if matches!(s.kind, Kind::Color(_)) => ROW_H + 30.0 + 6.0,
             _ => ROW_H + 6.0,
         }
     }

@@ -60,7 +60,12 @@ pub enum Kind {
     Choice(&'static [&'static str], usize),
     /// A vanilla key name (`key.keyboard.h`).
     Key(&'static str),
+    /// Free text typed by the player, at most [`TEXT_MAX`] characters (empty: the default).
+    Text(&'static str),
 }
+
+/// The longest text a [`Kind::Text`] setting takes.
+pub const TEXT_MAX: usize = 24;
 
 /// One setting of a feature.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -68,6 +73,18 @@ pub struct Setting {
     pub key: &'static str,
     pub label: &'static str,
     pub kind: Kind,
+    /// The toggle (on) or choice (not its first name) this setting only matters with: greyed
+    /// out in the menu otherwise.
+    pub needs: Option<&'static str>,
+}
+impl Setting {
+    /// The setting only matters while `parent` is on (a toggle) or not its first name (a choice).
+    pub const fn needs(self, parent: &'static str) -> Self {
+        Self {
+            needs: Some(parent),
+            ..self
+        }
+    }
 }
 
 /// One card of the menu.
@@ -78,16 +95,17 @@ pub struct Feature {
     pub category: Category,
     /// The item drawn on the card (`minecraft:clock`).
     pub icon: &'static str,
-    /// Its own settings; a HUD widget also has [`WIDGET_SETTINGS`].
+    /// Its own settings; a HUD widget also has the look's ([`WIDGET_GROUPS`]).
     pub settings: &'static [Setting],
     /// A HUD widget: placed in the HUD editor, with the widget look's settings.
     pub widget: bool,
 }
 
-/// The colours a colour setting offers (`0xRRGGBB`): Wisp's violets first.
+/// The colours a colour setting offers (`0xRRGGBB`): Wisp's neutrals, then a hue each. Any
+/// other colour is a hex code typed in or a pick on the hue strip.
 pub const SWATCHES: [u32; 12] = [
-    0x8B6BFF, 0xC4B5FD, 0xFFFFFF, 0xFF7AC6, 0xFF6B6B, 0xFFA94D, 0xFFD43B, 0x4ADE80, 0x4DD8FF,
-    0x6B8BFF, 0x9AA0B4, 0x1F1B33,
+    0xFFFFFF, 0xA1A1AA, 0x52525B, 0x000000, 0xFF5C5C, 0xFF9F43, 0xFFD43B, 0x4ADE80, 0x38D9F5,
+    0x5B8CFF, 0xA78BFA, 0xFF6EC7,
 ];
 
 const fn toggle(key: &'static str, label: &'static str, on: bool) -> Setting {
@@ -95,6 +113,7 @@ const fn toggle(key: &'static str, label: &'static str, on: bool) -> Setting {
         key,
         label,
         kind: Kind::Toggle(on),
+        needs: None,
     }
 }
 const fn choice(
@@ -107,6 +126,7 @@ const fn choice(
         key,
         label,
         kind: Kind::Choice(names, default),
+        needs: None,
     }
 }
 const fn color(key: &'static str, label: &'static str, default: u32) -> Setting {
@@ -114,6 +134,7 @@ const fn color(key: &'static str, label: &'static str, default: u32) -> Setting 
         key,
         label,
         kind: Kind::Color(default),
+        needs: None,
     }
 }
 const fn slider(
@@ -132,6 +153,7 @@ const fn slider(
             default,
             unit,
         },
+        needs: None,
     }
 }
 const fn key(key: &'static str, label: &'static str, default: &'static str) -> Setting {
@@ -139,23 +161,92 @@ const fn key(key: &'static str, label: &'static str, default: &'static str) -> S
         key,
         label,
         kind: Kind::Key(default),
+        needs: None,
+    }
+}
+const fn text(key: &'static str, label: &'static str, default: &'static str) -> Setting {
+    Setting {
+        key,
+        label,
+        kind: Kind::Text(default),
+        needs: None,
     }
 }
 
-/// Every HUD widget's look, after its own settings.
-pub const WIDGET_SETTINGS: &[Setting] = &[
-    slider("scale", "Size", (0.5, 2.0, 0.05, 1.0), "x"),
-    toggle("background", "Background", true),
-    slider(
-        "opacity",
-        "Background opacity",
-        (0.0, 100.0, 5.0, 70.0),
-        "%",
+/// A HUD widget's look, in the menu's sections after its own settings: what its text says and
+/// how it is written, the plate behind it, its edge and shape, its layout. Each section is its
+/// heading's language key, the English heading and the settings.
+pub const WIDGET_GROUPS: &[(&str, &str, &[Setting])] = &[
+    (
+        "wisp.menu.group.text",
+        "Text",
+        &[
+            text("label", "Label text", ""),
+            choice("text_format", "Format", FORMATS, 0),
+            choice("font", "Font", FONTS, 0),
+            color("text", "Value colour", 0xFFFFFF),
+            color("accent", "Label colour", 0xA1A1AA),
+            toggle("chroma", "Chroma (rainbow)", false),
+            slider("chroma_speed", "Chroma speed", (0.1, 3.0, 0.1, 1.0), "x").needs("chroma"),
+            toggle("uppercase", "Uppercase label", false),
+            toggle("shadow", "Text shadow", true),
+        ],
     ),
-    color("text", "Text colour", 0xFFFFFF),
-    color("accent", "Accent colour", 0x8B6BFF),
-    toggle("shadow", "Text shadow", true),
+    (
+        "wisp.menu.group.background",
+        "Background",
+        &[
+            toggle("background", "Background", true),
+            color("bg", "Background colour", 0x0B0B0E).needs("background"),
+            slider(
+                "opacity",
+                "Background opacity",
+                (0.0, 100.0, 5.0, 55.0),
+                "%",
+            )
+            .needs("background"),
+            toggle("plate_shadow", "Drop shadow", false).needs("background"),
+        ],
+    ),
+    (
+        "wisp.menu.group.border",
+        "Border and shape",
+        &[
+            choice("border", "Border", BORDERS, 1),
+            color("border_color", "Border colour", 0xFFFFFF).needs("border"),
+            slider("radius", "Corner radius", (0.0, 14.0, 1.0, 4.0), " px"),
+        ],
+    ),
+    (
+        "wisp.menu.group.layout",
+        "Layout",
+        &[
+            slider("scale", "Size", (0.5, 3.0, 0.05, 1.0), "x"),
+            slider("padding", "Padding", (0.0, 16.0, 1.0, 7.0), " px"),
+            choice("align", "Text alignment", ALIGNS, 1),
+            toggle("steady", "Steady width", true),
+        ],
+    ),
 ];
+/// Every widget look setting, in the menu's order.
+pub fn widget_settings() -> impl Iterator<Item = &'static Setting> {
+    WIDGET_GROUPS.iter().flat_map(|(_, _, s)| s.iter())
+}
+
+/// How a widget writes its label and value (`hud_widgets::Format`).
+pub const FORMATS: &[&str] = &[
+    "Label value",
+    "Value label",
+    "Label: value",
+    "[Label: value]",
+    "Value only",
+];
+/// The widget fonts (`hud_widgets::Font`).
+pub const FONTS: &[&str] = &["Wisp", "Wisp Bold", "Mono", "Minecraft"];
+/// The widget borders (`hud_widgets::Border`).
+pub const BORDERS: &[&str] = &["None", "Subtle", "Solid", "Left bar", "Underline"];
+/// The widget text alignments (`hud_widgets::Align`).
+pub const ALIGNS: &[&str] = &["Left", "Centre", "Right"];
 
 const DURABILITY: &[&str] = &["Bar", "Number", "Percent", "Bar and number"];
 const LAYOUT: &[&str] = &["Vertical", "Horizontal"];
@@ -177,24 +268,40 @@ pub const FEATURES: &[Feature] = &[
         Hud,
         "minecraft:redstone",
         widget,
-        [toggle("low", "Show 1% low", false)]
+        [
+            toggle("low", "Show 1% low", false),
+            toggle("colors", "Colour by frame rate", false),
+            choice(
+                "rate",
+                "Updates",
+                &["Every 0.5 s", "Every 1 s", "Every 2 s"],
+                0
+            ),
+        ]
     ),
     feature!(
         "hud_cps",
         Hud,
-        "minecraft:stone_button",
+        "minecraft:lever",
         widget,
-        [toggle("right", "Right clicks too", true)]
+        [
+            toggle("right", "Right clicks too", true),
+            choice("separator", "Separator", &["|", "/", "\u{b7}"], 0).needs("right"),
+        ]
     ),
     feature!(
         "hud_keystrokes",
         Hud,
-        "minecraft:oak_button",
+        "minecraft:piston",
         widget,
         [
             toggle("mouse", "Mouse buttons", true),
             toggle("space", "Space bar", true),
-            toggle("cps", "Clicks per second", true),
+            toggle("cps", "Clicks per second", true).needs("mouse"),
+            choice("keys", "Key labels", &["Letters", "Arrows"], 0),
+            slider("key_size", "Key size", (16.0, 40.0, 1.0, 24.0), " px"),
+            slider("key_gap", "Key gap", (0.0, 10.0, 1.0, 3.0), " px"),
+            slider("fade", "Release fade", (0.0, 600.0, 20.0, 180.0), " ms"),
         ]
     ),
     feature!(
@@ -202,7 +309,10 @@ pub const FEATURES: &[Feature] = &[
         Hud,
         "minecraft:ender_pearl",
         widget,
-        [toggle("bars", "Signal bars", true)]
+        [
+            toggle("bars", "Signal bars", true),
+            toggle("colors", "Colour by latency", true),
+        ]
     ),
     feature!(
         "hud_coords",
@@ -212,6 +322,8 @@ pub const FEATURES: &[Feature] = &[
         [
             choice("layout", "Layout", &["One line", "Stacked"], 1),
             toggle("direction", "Facing", true),
+            choice("decimals", "Decimals", &["0", "1", "2"], 0),
+            toggle("other", "Nether / Overworld too", false),
         ]
     ),
     feature!(
@@ -219,7 +331,12 @@ pub const FEATURES: &[Feature] = &[
         Hud,
         "minecraft:recovery_compass",
         widget,
-        []
+        [choice(
+            "show",
+            "Show",
+            &["Point and degrees", "Point", "Degrees", "Full name"],
+            0
+        )]
     ),
     feature!("hud_biome", Hud, "minecraft:grass_block", widget, []),
     feature!(
@@ -227,7 +344,11 @@ pub const FEATURES: &[Feature] = &[
         Hud,
         "minecraft:feather",
         widget,
-        [choice("unit", "Unit", &["Blocks/s", "km/h"], 0)]
+        [
+            choice("unit", "Unit", &["Blocks/s", "km/h"], 0),
+            choice("decimals", "Decimals", &["0", "1", "2"], 2),
+            toggle("vertical", "Include vertical", false),
+        ]
     ),
     feature!(
         "hud_clock",
@@ -237,6 +358,7 @@ pub const FEATURES: &[Feature] = &[
         [
             choice("format", "Format", &["24-hour", "12-hour"], 0),
             toggle("seconds", "Seconds", false),
+            toggle("date", "Date", false),
         ]
     ),
     feature!(
@@ -244,7 +366,10 @@ pub const FEATURES: &[Feature] = &[
         Hud,
         "minecraft:sunflower",
         widget,
-        [toggle("day", "Day number", true)]
+        [
+            toggle("day", "Day number", true),
+            choice("format", "Format", &["24-hour", "12-hour"], 0),
+        ]
     ),
     feature!("hud_weather", Hud, "minecraft:water_bucket", widget, []),
     feature!("hud_server", Hud, "minecraft:name_tag", widget, []),
@@ -256,6 +381,7 @@ pub const FEATURES: &[Feature] = &[
         [
             choice("layout", "Layout", LAYOUT, 0),
             toggle("names", "Effect names", true),
+            toggle("blink", "Blink when ending", true),
         ]
     ),
     feature!(
@@ -268,6 +394,7 @@ pub const FEATURES: &[Feature] = &[
             choice("durability", "Durability", DURABILITY, 0),
             toggle("mainhand", "Main hand", false),
             toggle("offhand", "Off hand", false),
+            choice("order", "Order", &["Helmet first", "Boots first"], 0),
         ]
     ),
     feature!(
@@ -282,7 +409,10 @@ pub const FEATURES: &[Feature] = &[
         Hud,
         "minecraft:arrow",
         widget,
-        [toggle("bow", "Only with a bow", true)]
+        [
+            toggle("bow", "Only with a bow", true),
+            toggle("hide_zero", "Hide with no arrows", false),
+        ]
     ),
     feature!(
         "hit_info",
@@ -292,6 +422,7 @@ pub const FEATURES: &[Feature] = &[
         [
             toggle("reach", "Reach", true),
             toggle("combo", "Combo", true),
+            choice("decimals", "Reach decimals", &["1", "2", "3"], 1).needs("reach"),
         ]
     ),
     // Combat.
@@ -303,6 +434,9 @@ pub const FEATURES: &[Feature] = &[
             choice("style", "Style", &["Number", "Hearts"], 0),
             toggle("players", "Players only", false),
             slider("range", "Range", (8.0, 48.0, 4.0, 24.0), " blocks"),
+            toggle("max", "Show maximum", true),
+            toggle("colors", "Colour by health", true),
+            choice("decimals", "Decimals", &["0", "1"], 1),
         ]
     ),
     feature!(
@@ -312,13 +446,20 @@ pub const FEATURES: &[Feature] = &[
         [
             color("color", "Damage colour", 0xFF6B6B),
             toggle("healing", "Healing too", true),
+            color("heal_color", "Healing colour", 0x4ADE80).needs("healing"),
+            choice("decimals", "Decimals", &["0", "1", "2"], 1),
+            slider("range", "Range", (8.0, 64.0, 4.0, 32.0), " blocks"),
         ]
     ),
     feature!(
         "tnt_timer",
         Combat,
         "minecraft:tnt",
-        [choice("decimals", "Decimals", &["0", "1", "2"], 2)]
+        [
+            choice("decimals", "Decimals", &["0", "1", "2"], 2),
+            toggle("colors", "Colour by time left", true),
+            toggle("suffix", "Seconds sign", false),
+        ]
     ),
     feature!(
         "target_crosshair",
@@ -510,7 +651,7 @@ impl Extras {
         let f = self::feature(feature)?;
         f.settings
             .iter()
-            .chain(if f.widget { WIDGET_SETTINGS } else { &[] })
+            .chain(widget_settings().filter(|_| f.widget))
             .find(|s| s.key == setting)
             .copied()
     }
@@ -580,6 +721,33 @@ impl Extras {
             .unwrap_or(default)
             .to_owned()
     }
+    /// A text setting's value: what was typed, or its default when nothing (or only spaces) was.
+    pub fn opt_text(&self, feature: &str, setting: &str) -> String {
+        let default = match Self::setting_of(feature, setting).map(|s| s.kind) {
+            Some(Kind::Text(d)) => d,
+            _ => "",
+        };
+        self.raw(feature, setting)
+            .map(str::trim)
+            .filter(|v| !v.is_empty())
+            .unwrap_or(default)
+            .chars()
+            .filter(|c| !c.is_control())
+            .take(TEXT_MAX)
+            .collect()
+    }
+    /// Whether a setting matters now: the toggle it [`Setting::needs`] is on, or the choice is
+    /// not its first name.
+    pub fn opt_enabled(&self, feature: &str, setting: &Setting) -> bool {
+        let Some(parent) = setting.needs else {
+            return true;
+        };
+        match Self::setting_of(feature, parent).map(|s| s.kind) {
+            Some(Kind::Toggle(_)) => self.opt_bool(feature, parent),
+            Some(Kind::Choice(..)) => self.opt_choice(feature, parent) != 0,
+            _ => true,
+        }
+    }
     /// A HUD widget's place: its top left as fractions of the screen (`None`: not placed yet).
     pub fn widget_pos(&self, feature: &str) -> Option<(f32, f32)> {
         self.raw(feature, "pos").and_then(super::parse_pos)
@@ -648,12 +816,62 @@ mod tests {
                 "{}",
                 f.key
             );
-            for s in f.settings {
+            let all: Vec<&Setting> = f
+                .settings
+                .iter()
+                .chain(widget_settings().filter(|_| f.widget))
+                .collect();
+            for s in &all {
                 if let Kind::Choice(names, d) = s.kind {
                     assert!(d < names.len(), "{}.{}", f.key, s.key);
                 }
+                // A widget's own setting must not hide one of the look's under the same key.
+                let same = all.iter().filter(|o| o.key == s.key).count();
+                assert_eq!(same, 1, "{}.{} listed twice", f.key, s.key);
+                if let Some(parent) = s.needs {
+                    assert!(
+                        all.iter().any(|o| o.key == parent
+                            && matches!(o.kind, Kind::Toggle(_) | Kind::Choice(..))),
+                        "{}.{} needs {parent}, no toggle or choice of it",
+                        f.key,
+                        s.key
+                    );
+                }
             }
         }
+    }
+
+    #[test]
+    fn text_settings_trim_cap_and_fall_back() {
+        let mut e = Extras::default();
+        assert_eq!(e.opt_text("hud_fps", "label"), "");
+        e.set_opt("hud_fps", "label", "  Frames  ".into());
+        assert_eq!(e.opt_text("hud_fps", "label"), "Frames");
+        e.set_opt("hud_fps", "label", "x".repeat(60));
+        assert_eq!(e.opt_text("hud_fps", "label").chars().count(), TEXT_MAX);
+        e.set_opt("hud_fps", "label", "   ".into());
+        assert_eq!(e.opt_text("hud_fps", "label"), "");
+        // Survives the file.
+        e.set_opt("hud_fps", "label", "Bilder: s".into());
+        assert_eq!(
+            Extras::parse(&e.serialize()).opt_text("hud_fps", "label"),
+            "Bilder: s"
+        );
+    }
+
+    #[test]
+    fn a_setting_is_greyed_out_while_what_it_needs_is_off() {
+        let mut e = Extras::default();
+        let f = feature("hud_fps").unwrap();
+        let look = |key: &str| *widget_settings().find(|s| s.key == key).unwrap();
+        // Background on by default: its colour matters.
+        assert!(e.opt_enabled(f.key, &look("bg")));
+        e.set_opt(f.key, "background", "false".into());
+        assert!(!e.opt_enabled(f.key, &look("bg")));
+        // A choice: the border colour only matters with a border.
+        assert!(e.opt_enabled(f.key, &look("border_color")));
+        e.set_opt(f.key, "border", "None".into());
+        assert!(!e.opt_enabled(f.key, &look("border_color")));
     }
 
     #[test]

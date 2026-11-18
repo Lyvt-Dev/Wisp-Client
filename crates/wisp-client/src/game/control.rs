@@ -277,7 +277,9 @@ impl Game<'_> {
             }
             Screen::Inventory if self.inv_search_focused() => self.inv_search_text(text),
             Screen::WispMenu => {
-                self.extras.menu.search_focused = true;
+                if self.extras.menu.text_edit.is_none() {
+                    self.extras.menu.search_focused = true;
+                }
                 self.wisp_menu_text(text)
             }
             // The anvil's rename box, while it has an input to name.
@@ -1176,6 +1178,11 @@ impl Game<'_> {
         }
         if self.screen == Screen::BlockEditor {
             self.block_editor_key_code(key, None, None);
+            return Ok(());
+        }
+        // The Wisp Menu takes every key, as from the keyboard (text comes through `type`).
+        if self.screen == Screen::WispMenu {
+            self.wisp_menu_key_code(key, None);
             return Ok(());
         }
         if self.keys.insert(key) {
