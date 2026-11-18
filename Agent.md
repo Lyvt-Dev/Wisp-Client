@@ -382,6 +382,20 @@ Do not rewrite main or force a changed remote branch. Preserve local changes and
   Bluetooth controllers are off (gilrs/hidapi); no microphone permission prompt; no system
   clipboard.
 
+## Unreleased: Demon Wings, Angel Wings, Bamboo Sword, Stray Head
+
+- The owner asked (2026-11-18) for Minecraft-looking cosmetics with realistic prices (100 coins =
+  0.80 €): Demon Wings and Angel Wings 1,000 coins (8 €), Bamboo Sword 500 (4 €), Stray Head
+  400 (3.20 €). Prices chosen by the agent; change them in `wisp-shop` `OFFERS`.
+- The owner found the first pixel-art versions too low-res and asked for "HD like 4K": they are
+  drawn at the format's maximum (256-texel textures, `HD` = 8 texels a design unit; the Bamboo
+  Sword's boxes are 8× at attach scale 0.1). 4K would need the renderer's 256×256 HD slots raised.
+- Stray Head: the owner confirmed a realistic straw hat (`cosmeticideas/strayhead.jpg`), not the
+  Stray mob's head: a smooth 32-sided cone, 16 px across on the 8 px head (the old one was 24).
+- `shop_items`: `demon_wing`, `angel_wing` (+ `feather`), `wings_item` (two double-sided panels a
+  wing), `bamboo_texture`/`bamboo_item`, `straw_texture`/`stray_item`. Checked by `Item::parse`
+  and in preview renders; not yet seen in a running game.
+
 ## Unreleased: four emotes, Wisp Original Cape and Stray Head
 
 - The owner asked (2026-11-13) for emotes Dark Ascension (dark energy envelops the player), Bruh

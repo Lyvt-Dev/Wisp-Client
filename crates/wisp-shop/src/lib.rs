@@ -125,9 +125,57 @@ const FOUNDERS_CAPE: Offer = offer!(
     item
 );
 
+// Prices: 100 coins are worth 0.80 €, so 1,000 coins are 8 €.
+
+/// Demon Wings: HD bat wings. 1,000 coins (8 €).
+const DEMON_WINGS: Offer = offer!(
+    "demon_wings",
+    "Demon Wings",
+    "Black-boned bat wings with a crimson membrane and a pale claw at each wrist, beating slowly behind you.",
+    Wings,
+    1_000,
+    item
+);
+
+/// Angel Wings: HD feathered wings that glow. 1,000 coins (8 €).
+const ANGEL_WINGS: Offer = offer!(
+    "angel_wings",
+    "Angel Wings",
+    "Three rows of white feathers on a gold-edged arm, bright even at night.",
+    Wings,
+    1_000,
+    item
+);
+
+/// The Bamboo Sword: a bamboo stalk carried on the back like a sword. 500 coins (4 €).
+const BAMBOO_SWORD: Offer = offer!(
+    "bamboo_sword",
+    "Bamboo Sword",
+    "A cut bamboo stalk with a bamboo guard and a twine grip, slung across your back like a blade.",
+    Weapon,
+    500,
+    item
+);
+
+/// The Stray Head: a smooth conical straw hat sized for Minecraft's head. 400 coins (3.20 €).
+const STRAY_HEAD: Offer = offer!(
+    "stray_head",
+    "Stray Head",
+    "A conical straw hat with a copper band, stitched in red and tied with a white knot.",
+    Head,
+    400,
+    item
+);
+
 /// What the shop sells.
 #[cfg(not(any(test, feature = "test-items")))]
-pub const OFFERS: &[Offer] = &[FOUNDERS_CAPE];
+pub const OFFERS: &[Offer] = &[
+    FOUNDERS_CAPE,
+    DEMON_WINGS,
+    ANGEL_WINGS,
+    BAMBOO_SWORD,
+    STRAY_HEAD,
+];
 
 /// With `test-items` (and in this crate's tests), made-up items beside the real ones, so the
 /// rules (prices, discounts, one item per kind, emotes) can be tested while the shop sells
@@ -135,6 +183,10 @@ pub const OFFERS: &[Offer] = &[FOUNDERS_CAPE];
 #[cfg(any(test, feature = "test-items"))]
 pub const OFFERS: &[Offer] = &[
     FOUNDERS_CAPE,
+    DEMON_WINGS,
+    ANGEL_WINGS,
+    BAMBOO_SWORD,
+    STRAY_HEAD,
     test_offer("test_cape", Kind::Cape, 1_200),
     test_offer("test_wings", Kind::Wings, 900),
     test_offer("test_hat", Kind::Head, 1_000),
@@ -420,14 +472,29 @@ mod tests {
                 .unwrap_or_else(|| panic!("{} has no item file", offer.id));
             let v: serde_json::Value = serde_json::from_slice(bytes).unwrap();
             assert_eq!(v["id"], offer.id);
-            assert_eq!(v["slot"], "back", "{}", offer.id);
+            let slot = match offer.kind {
+                Kind::Cape | Kind::Wings => "back",
+                Kind::Weapon => "weapon",
+                Kind::Head => "head",
+                other => panic!("{}: no slot for {other:?}", offer.id),
+            };
+            assert_eq!(v["slot"], slot, "{}", offer.id);
         }
     }
 
     #[test]
     fn the_shop_sells_the_founders_cape() {
         let ids: Vec<_> = real().map(|o| o.id).collect();
-        assert_eq!(ids, [FOUNDERS]);
+        assert_eq!(
+            ids,
+            [
+                FOUNDERS,
+                "demon_wings",
+                "angel_wings",
+                "bamboo_sword",
+                "stray_head"
+            ]
+        );
         let cape = offer(FOUNDERS).unwrap();
         assert!(cape.founders() && cape.price == 0 && cape.kind == Kind::Cape);
         // HD and animated: a 12× cape (at a twelfth of the scale), more than one frame.
