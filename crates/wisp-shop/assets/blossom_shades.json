@@ -1,0 +1,151 @@
+{
+  "attach": {
+    "offset": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "rotation": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "scale": 0.5
+  },
+  "bone": "head",
+  "format": 1,
+  "id": "blossom_shades",
+  "parts": [
+    {
+      "cubes": [
+        {
+          "origin": [
+            -12.5,
+            -13.0,
+            -10.5
+          ],
+          "size": [
+            12,
+            12,
+            1
+          ],
+          "uv": [
+            0,
+            0
+          ]
+        },
+        {
+          "origin": [
+            0.5,
+            -13.0,
+            -10.5
+          ],
+          "size": [
+            12,
+            12,
+            1
+          ],
+          "uv": [
+            27,
+            0
+          ]
+        },
+        {
+          "origin": [
+            -1.0,
+            -8.0,
+            -10.5
+          ],
+          "size": [
+            2,
+            1,
+            1
+          ],
+          "uv": [
+            54,
+            0
+          ]
+        },
+        {
+          "origin": [
+            9.5,
+            -10.0,
+            -9.5
+          ],
+          "size": [
+            1,
+            1,
+            17
+          ],
+          "uv": [
+            0,
+            14
+          ]
+        },
+        {
+          "origin": [
+            -10.5,
+            -10.0,
+            -9.5
+          ],
+          "size": [
+            1,
+            1,
+            17
+          ],
+          "uv": [
+            0,
+            33
+          ]
+        },
+        {
+          "origin": [
+            9.5,
+            -9.0,
+            6.5
+          ],
+          "size": [
+            1,
+            3,
+            1
+          ],
+          "uv": [
+            37,
+            33
+          ]
+        },
+        {
+          "origin": [
+            -10.5,
+            -9.0,
+            6.5
+          ],
+          "size": [
+            1,
+            3,
+            1
+          ],
+          "uv": [
+            42,
+            33
+          ]
+        }
+      ],
+      "name": "glasses",
+      "pivot": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    }
+  ],
+  "slot": "head",
+  "texture": {
+    "png": "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAACVUlEQVR42u2aMUvDQBiGL9JZsKNDKSIOpRTpUhARZ+noIA5ubp37ExyCg0MHZ6fi4CClv0ALLkVK6Vw6OLZ/QIj5Qi8kl0ubuxySNO+7NL3kvev33Jdw9zUltsNyhlOHPj9fht73837XEq+xNplX0zkrd9uWyoCqHs+3WDps+sOsq7plyrO0B46sXfxtJZYFuYGY9iSdBGtT6vgXJZgZHU8waw7qVaWxVD1bAYgBfPV63mer02Fxgel4fF/90J/FxGMpepJoTxYIuzhmrden0EBi0Dqe0DFPYYmPZlc6loJHOwOow2qjyeaTsddOx++DN3ZvPzLxAafj8XzrBxj/8UGvN6vPD0x8wOl4EmcATx1OMdgxHTcqVWkgOh7PVyn7PtE7WczZqj+KBKLjUQLAdXLZDn2nzsU2Ex6Zj3R91zHuUQJAT9bf/SOlznU8soCSQNP1xCmyDqA0qzVr7lEtEmScdDyz8WztiQZB50x5lAGQxPs2blWVxsMDkfm8c30znm3SXkDsivYAwIBoPfBxYzssh0IGAAAAAAAAFFlGSmK0FB7NvnMJwEgG0Jr/rHZaXAB5lhkAbq2Ob1TyJjNlcbcUpbsd3Y0MKPwtAAAAAAB5lbWpdhcsQsaJFkHBen3aflT/WU4NgBVcmS2JUWbajVtnW1smAJgWwaTbhvYXHKyszYSwGzTRSZ53g9l4RUaQ7GUmWVtmMiDPAgAAAAAAAAAAAAAASCeUxVEWz61CJTFZ6YqXqvg58RpZSSxNPyiJ4RYAAAAAAAAAAAAAAAAAAAAAgH/QHyQRqmT6ybZ7AAAAAElFTkSuQmCC"
+  }
+}

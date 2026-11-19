@@ -1,0 +1,267 @@
+{
+  "animations": [
+    {
+      "amplitude": 1.5,
+      "axis": "y",
+      "motion": "bob",
+      "part": "buddy",
+      "period": 50
+    },
+    {
+      "amplitude": 6.0,
+      "axis": "z",
+      "motion": "swing",
+      "part": "buddy",
+      "period": 80
+    },
+    {
+      "amplitude": 20.0,
+      "axis": "z",
+      "motion": "swing",
+      "part": "arm_l",
+      "period": 30
+    },
+    {
+      "amplitude": 25.0,
+      "axis": "x",
+      "motion": "swing",
+      "part": "arm_r",
+      "period": 26,
+      "phase": 0.5
+    }
+  ],
+  "attach": {
+    "offset": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "rotation": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "scale": 0.5
+  },
+  "bone": "body",
+  "format": 1,
+  "id": "astro_buddy",
+  "parts": [
+    {
+      "children": [
+        {
+          "cubes": [
+            {
+              "origin": [
+                -1.0,
+                0.0,
+                -1.0
+              ],
+              "size": [
+                2,
+                5,
+                2
+              ],
+              "uv": [
+                27,
+                36
+              ]
+            }
+          ],
+          "name": "arm_l",
+          "pivot": [
+            4.5,
+            -4.0,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "cubes": [
+            {
+              "origin": [
+                -1.0,
+                0.0,
+                -1.0
+              ],
+              "size": [
+                2,
+                5,
+                2
+              ],
+              "uv": [
+                36,
+                36
+              ]
+            }
+          ],
+          "name": "arm_r",
+          "pivot": [
+            -4.5,
+            -4.0,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        }
+      ],
+      "cubes": [
+        {
+          "origin": [
+            -6.0,
+            -16.0,
+            -6.0
+          ],
+          "size": [
+            12,
+            11,
+            12
+          ],
+          "uv": [
+            0,
+            0
+          ]
+        },
+        {
+          "origin": [
+            -3.5,
+            -5.0,
+            -2.5
+          ],
+          "size": [
+            7,
+            6,
+            5
+          ],
+          "uv": [
+            0,
+            24
+          ]
+        },
+        {
+          "origin": [
+            -3.0,
+            1.0,
+            -1.0
+          ],
+          "size": [
+            2,
+            4,
+            2
+          ],
+          "uv": [
+            25,
+            24
+          ]
+        },
+        {
+          "origin": [
+            1.0,
+            1.0,
+            -1.0
+          ],
+          "size": [
+            2,
+            4,
+            2
+          ],
+          "uv": [
+            34,
+            24
+          ]
+        },
+        {
+          "origin": [
+            -3.0,
+            -5.0,
+            2.5
+          ],
+          "size": [
+            6,
+            6,
+            3
+          ],
+          "uv": [
+            43,
+            24
+          ]
+        },
+        {
+          "origin": [
+            -2.0,
+            1.0,
+            3.0
+          ],
+          "size": [
+            4,
+            3,
+            2
+          ],
+          "uv": [
+            0,
+            36
+          ]
+        },
+        {
+          "origin": [
+            -0.5,
+            -19.0,
+            -0.5
+          ],
+          "size": [
+            1,
+            3,
+            1
+          ],
+          "uv": [
+            13,
+            36
+          ]
+        },
+        {
+          "origin": [
+            -1.0,
+            -21.0,
+            -1.0
+          ],
+          "size": [
+            2,
+            2,
+            2
+          ],
+          "uv": [
+            18,
+            36
+          ]
+        }
+      ],
+      "name": "buddy",
+      "pivot": [
+        -24.0,
+        -10.0,
+        2.0
+      ],
+      "rotation": [
+        0.0,
+        20.0,
+        0.0
+      ]
+    }
+  ],
+  "slot": "shoulder",
+  "sparkles": [
+    "#ffb040",
+    "#ff6a20",
+    "#fff0a0"
+  ],
+  "texture": {
+    "png": "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAADw0lEQVR42u1aMWsUURB+G64RAjkkWAU9wnEcVlek8gcEC0nESoxIqiApLC0s5LCwsLBOmUKDWIimCoeFCF5lcZUch4RTUkmQKwTB5nQ2zDo7N2/37e7b213yPghv7u3c3JuZ783OvmxNJcTu7qOpNH9y8t0fV1Yuh+YHg8+incnkpz/W6xdD8/1+z1NzxIJNY9x5xPLyJXGeO18ErAVA5zzg9PRHrPO6IOWNmioJpCBVigFVhfUAYDHEkYNSHWQshjhWfgtgLdDVBEp1kLEWFFUQrTKAZh3lqOJGs14UAzIHgDpNs44yzTilPM96ZRmgo7pUAyjlKTAwRdwKc9sCUX0BOsrZUMStMHURlFrfKKfR2WazHTiKbCiqBwB4Gxt3xd4eF2VKy6L0Dw9fZHp2WIjKnG5xZdPPhQHSopD27578iv9C46bavPfeeCHUfhL9rAwwrgF8cb/r3Uj9C2O4vqjS2retH7kF0qJ57ZbRXJmxIFGLylh8eKUGR7/234QcpnPfhkMtdU3sp9VPCuMaQAE1IHYLTLpq8/GiyhuZ7wKmBxkoR+lTIANs2pf0M28B3r3x3p3LqP/n9UBrFK5dabdD+kntm+pbrQHw45JhXAjNztL6W5/m0t/SzhkDeDaT2E+jn6oGjF+1Z2oAZA8cGAwmqtOpB591KFK/cXuYqQbM9Qi6jBAbId3ZP9IS6AfUpP05yHFn+mgX/1cg6ZvoALpPnwdrHI1GqtVq+XLv6Ej87f5H2U7iRki6D5tWZCxwtk9/0HlrDNAtXld0wKGoEx3aa4AdeCSm83AvR5kfpVEdapNm3foWkMCdp1sg7jiLbhlpNMWd7ftTHgTA+PhYNVZXfRnHWaxP8drB/p6XegtQp8oCvdNKvbx6VhM+3RiFPgcMgKKD9OanunQO5U5nTXsNbdE5oC5mWTeagmaaylE6W+q6L299oeNeoJ/qWSAJsvbqfAvAvkfqU5kiTifVFkhK+by2CHWGypDtJDozAZAqPJ3jdE2qP486IDkYpyO2wlYXlrFVzRu1Bwdr4nkcn5OKnpn+sMz+u2eBoBGajrcjt4LX2A8FC2550K/zXn36rBGy4z0cp+r3UQefPfJ6d+h/J9j7YPwluHXiszrINm91HHk3XF5c5iUm8N4BAsAzP/O9f0yI6znADm/M+Gg72KV5RwjB3zCJe+MkewASUJ9mSsqwqiBq3k41F24LpXtLDA87daNtnPs+wL0n6ALgAuAC4ALgAuAC4ALgAuAC4ALgAuAC4ALgAuAC4ALgAuACcL7wF6nng8WZi7b0AAAAAElFTkSuQmCC"
+  }
+}

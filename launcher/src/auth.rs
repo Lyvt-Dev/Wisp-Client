@@ -379,16 +379,39 @@ fn minecraft_token(ep: &Endpoints, xtoken: &str) -> Result<(String, u64), String
         Some(Body::Json(json!({ "identityToken": xtoken }))),
         "the Minecraft services",
     )?;
+    // What both answered, for the message: a 403 is not always an unapproved app (a block or a
+    // changed rule answers it too), and the wording names which.
+    let first = match &launcher {
+        Ok((code, v)) => format!("launcher/login {code}{}", reply_note(v)),
+        Err(e) => format!("launcher/login: {e}"),
+    };
+    let second = format!("login_with_xbox {status}{}", reply_note(&mc));
+    if status != 200 {
+        eprintln!("Wisp launcher: Minecraft sign-in refused ({first}; {second})");
+    }
     match (status, str_field(&mc, "access_token")) {
         (200, Some(token)) => Ok((token, lifetime(&mc))),
-        // New Azure apps are refused until Mojang approves them (Minecraft API access).
-        (403, _) => Err(
-            "The Minecraft services refused this launcher: its app is not approved by Mojang yet."
-                .into(),
-        ),
         (429, _) => Err("Too many sign-ins in a short time. Wait a minute and try again.".into()),
-        _ => Err("The Minecraft services refused the sign-in.".into()),
+        // New Azure apps are refused until Mojang approves them (Minecraft API access).
+        (403, _) if reply_note(&mc).contains("Invalid app registration") => Err(format!(
+            "The Minecraft services refused this launcher: its app is not approved by Mojang yet. ({first}; {second})"
+        )),
+        _ => Err(format!(
+            "The Minecraft services refused the sign-in. ({first}; {second})"
+        )),
     }
+}
+
+/// What a Minecraft services reply says about itself: its message, or that it was no JSON
+/// (something in between answered, not the service).
+fn reply_note(v: &Value) -> String {
+    if v.is_null() {
+        return ", no JSON reply".into();
+    }
+    ["errorMessage", "developerMessage", "error", "path"]
+        .iter()
+        .find_map(|key| str_field(v, key))
+        .map_or_else(String::new, |m| format!(": {m}"))
 }
 
 fn bearer(request: ureq::Request, token: &str) -> ureq::Request {

@@ -1,0 +1,135 @@
+{
+  "attach": {
+    "offset": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "rotation": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "scale": 0.5
+  },
+  "bone": "head",
+  "format": 1,
+  "id": "gearwork_topper",
+  "parts": [
+    {
+      "cubes": [
+        {
+          "origin": [
+            -15.0,
+            -19.0,
+            -15.0
+          ],
+          "size": [
+            30,
+            2,
+            30
+          ],
+          "uv": [
+            0,
+            0
+          ]
+        },
+        {
+          "origin": [
+            -10.0,
+            -33.0,
+            -10.0
+          ],
+          "size": [
+            20,
+            14,
+            20
+          ],
+          "uv": [
+            121,
+            0
+          ]
+        },
+        {
+          "origin": [
+            -10.5,
+            -23.0,
+            -10.5
+          ],
+          "size": [
+            21,
+            3,
+            21
+          ],
+          "uv": [
+            0,
+            35
+          ]
+        },
+        {
+          "origin": [
+            -8.0,
+            -28.0,
+            -12.5
+          ],
+          "size": [
+            6,
+            6,
+            2
+          ],
+          "uv": [
+            85,
+            35
+          ]
+        },
+        {
+          "origin": [
+            2.0,
+            -28.0,
+            -12.5
+          ],
+          "size": [
+            6,
+            6,
+            2
+          ],
+          "uv": [
+            102,
+            35
+          ]
+        },
+        {
+          "origin": [
+            -2.0,
+            -26.0,
+            -11.5
+          ],
+          "size": [
+            4,
+            2,
+            1
+          ],
+          "uv": [
+            119,
+            35
+          ]
+        }
+      ],
+      "name": "hat",
+      "pivot": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    }
+  ],
+  "slot": "head",
+  "texture": {
+    "png": "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ACCMAACEEQCAMAIAEEYAAMIIAEAYAQAIIwAAYQQAIIwAAIQRAIAwAgAQRgAAwggAQBgBAAgjAABhBAAgjAAAhBEAgDACABBGAADCCABAGAEACCMAAGEEACCMAACEEQCAMAIAEEYAAMIIAEAYAQAIIwAAYQQAIIwAAIQRAIAwAgAQRgAAwggAQBgBAAgjAABhBAAgjAAAhBEAgDACABBGAADCCABAGAEACCMAAGEEACCMAACEEQCAMAIAEEYAAMIIAEAYAQAIIwAAYQQAIIwAAIQRAIAwAgAQRgAAwggAQBgBAAgjAABhBAAgjAAAhBEAgDACABBGAADCCABAGAEACCMAAGEEACCMAACEEQCAMAIAEEYAAMIIAEAYAQAIIwAAYQQAIIwAAIQRAIAwAgAQRgAAwggAQBgBAAgjAABhBAAgjAAAhBEAgDACABBGAADCCABAGAEACCMAAGEEACCMAACEEQCAMAIAEEYAAMIIAEAYAQAIIwAAYQQAIIwAAIQRAIAwAgAQRgAAwggAQBgBAAgjAABhBAAgjAAAhBEAgDACABBGAADCCABAGAEACCMAAGEEACCMAACEfQ7wTGpeo6XIvAAAAABJRU5ErkJggg=="
+  }
+}

@@ -1021,6 +1021,22 @@ pub fn run(home: PathBuf, settings: Settings) {
                 KeyBinding::new("ctrl-2", ShowSetup, Some("Wisp")),
             ]);
             SearchInput::init(cx);
+            // The beta testers' build opens only during the beta test.
+            #[cfg(feature = "beta")]
+            {
+                if crate::beta::gate() != crate::beta::Gate::Open {
+                    crate::beta::open_notice(cx);
+                    cx.on_window_closed(|cx, _| {
+                        if cx.windows().is_empty() {
+                            cx.quit();
+                        }
+                    })
+                    .detach();
+                    cx.activate(true);
+                    return;
+                }
+                crate::beta::close_at_end(cx);
+            }
             let mut viewport = size(px(1340.), px(754.));
             if let Some(display) = cx.primary_display() {
                 let available = display.bounds().size;

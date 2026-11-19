@@ -38,6 +38,8 @@ pub fn enabled(auto_update: bool) -> bool {
     auto_update
         && cfg!(windows)
         && !cfg!(debug_assertions)
+        // A beta build stays a beta build: an update would be the published launcher.
+        && !cfg!(feature = "beta")
         && wisp_compat::var_os("WISP_LAUNCHER_NO_SELF_UPDATE").is_none()
 }
 

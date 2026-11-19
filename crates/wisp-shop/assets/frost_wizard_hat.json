@@ -1,0 +1,277 @@
+{
+  "animations": [
+    {
+      "amplitude": 6.0,
+      "axis": "z",
+      "motion": "swing",
+      "part": "cone_4",
+      "period": 40
+    }
+  ],
+  "attach": {
+    "offset": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "rotation": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "scale": 0.5
+  },
+  "bone": "head",
+  "format": 1,
+  "id": "frost_wizard_hat",
+  "parts": [
+    {
+      "children": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "cubes": [
+                            {
+                              "origin": [
+                                -2.5,
+                                -5.0,
+                                -2.5
+                              ],
+                              "size": [
+                                5,
+                                5,
+                                5
+                              ],
+                              "uv": [
+                                228,
+                                37
+                              ]
+                            },
+                            {
+                              "origin": [
+                                -1.5,
+                                -7.0,
+                                -1.5
+                              ],
+                              "size": [
+                                3,
+                                3,
+                                3
+                              ],
+                              "uv": [
+                                0,
+                                64
+                              ]
+                            }
+                          ],
+                          "name": "cone_4",
+                          "pivot": [
+                            0.0,
+                            -5.0,
+                            0.0
+                          ],
+                          "rotation": [
+                            -26.0,
+                            0.0,
+                            10.0
+                          ]
+                        }
+                      ],
+                      "cubes": [
+                        {
+                          "origin": [
+                            -4.0,
+                            -6.0,
+                            -4.0
+                          ],
+                          "size": [
+                            8,
+                            6,
+                            8
+                          ],
+                          "uv": [
+                            195,
+                            37
+                          ]
+                        }
+                      ],
+                      "name": "cone_3",
+                      "pivot": [
+                        0.0,
+                        -5.0,
+                        0.0
+                      ],
+                      "rotation": [
+                        -18.0,
+                        0.0,
+                        6.0
+                      ]
+                    }
+                  ],
+                  "cubes": [
+                    {
+                      "origin": [
+                        -6.0,
+                        -6.0,
+                        -6.0
+                      ],
+                      "size": [
+                        12,
+                        6,
+                        12
+                      ],
+                      "uv": [
+                        146,
+                        37
+                      ]
+                    }
+                  ],
+                  "name": "cone_2",
+                  "pivot": [
+                    0.0,
+                    -5.0,
+                    0.0
+                  ],
+                  "rotation": [
+                    -10.0,
+                    0.0,
+                    4.0
+                  ]
+                }
+              ],
+              "cubes": [
+                {
+                  "origin": [
+                    -8.0,
+                    -6.0,
+                    -8.0
+                  ],
+                  "size": [
+                    16,
+                    6,
+                    16
+                  ],
+                  "uv": [
+                    81,
+                    37
+                  ]
+                }
+              ],
+              "name": "cone_1",
+              "pivot": [
+                0.0,
+                -5.0,
+                0.0
+              ],
+              "rotation": [
+                -6.0,
+                0.0,
+                0.0
+              ]
+            }
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -10.0,
+                -6.0,
+                -10.0
+              ],
+              "size": [
+                20,
+                6,
+                20
+              ],
+              "uv": [
+                0,
+                37
+              ]
+            }
+          ],
+          "name": "cone_0",
+          "pivot": [
+            0.0,
+            -18.5,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        }
+      ],
+      "cubes": [
+        {
+          "origin": [
+            -17.0,
+            -19.0,
+            -17.0
+          ],
+          "size": [
+            34,
+            2,
+            34
+          ],
+          "uv": [
+            0,
+            0
+          ]
+        },
+        {
+          "origin": [
+            -10.5,
+            -22.5,
+            -10.5
+          ],
+          "size": [
+            21,
+            3,
+            21
+          ],
+          "uv": [
+            137,
+            0
+          ]
+        },
+        {
+          "origin": [
+            -2.0,
+            -23.0,
+            -11.5
+          ],
+          "size": [
+            4,
+            4,
+            1
+          ],
+          "uv": [
+            222,
+            0
+          ]
+        }
+      ],
+      "name": "hat",
+      "pivot": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    }
+  ],
+  "slot": "head",
+  "texture": {
+    "png": "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EEYAAMIIAEAYAQAIIwAAYQQAIIwAAIQRAIAwAgAQRgAAwggAQBgBAAgjAABhBAAgjAAAhBEAgDACABBGAADCCABAGAEACCMAAGEEACCMAACEEQCAMAIAEEYAAMIIAEAYAQAIIwAAYQQAIIwAAIQRAIAwAgAQRgAAwggAQBgBAAgjAABhBAAgjAAAhBEAgDACABBGAADCCABAGAEACCMAAGEEACCMAACEEQCAMAIAEEYAAMIIAEAYAQAIIwAAYQQAIIwAAIQRAIAwAgAQRgAAwggAQBgBAAgjAABhBAAgjAAAhBEAgDACABBGAADCCABAGAEACCMAAGEEACCMAACEEQCAMAIAEEYAAMIIAEAYAQAIIwAAYQQAIIwAAIQRAIAwAgAQRgAAwggAQBgBAAgjAABhBAAgjAAAhBEAgDACABBGAADCCABAGAEACCMAAGEEACCMAACEEQCAMAIAEEYAAMIIAEAYAQAIIwAAYQQAIIwAAIQRAIAwAgAQRgAAwggAQBgBAAgjAABhBAAgjAAAhBEAgDACABBGAADCCABAGAEACCMAAGEEACCMAACEEQCAMAIAEEYAAMIIAEAYAQAIIwAAYQQAIIwAAIQRAIAwAgAQRgAAwggAQBgBAAgjAABhBAAgjAAAhBEAgDACABBGAADCCABAGAEACCMAAGEEACCMAACEEQCAMAIAEEYAAMIIAEAYAQAIIwAAYQQAIIwAAIQRAIAwAgAQRgAAwggAQBgBAAgjAABhBAAgjAAAhBEAgDACABBGAADCCABAGAEACCMAAGEEACCMAACEEQCAMAIAEEYAAMIIAEDYfwCqomY4HYZY6gAAAABJRU5ErkJggg=="
+  }
+}

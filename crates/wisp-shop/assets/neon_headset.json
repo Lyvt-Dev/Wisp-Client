@@ -1,0 +1,296 @@
+{
+  "animations": [
+    {
+      "amplitude": 5.0,
+      "axis": "z",
+      "motion": "swing",
+      "part": "aerial_l",
+      "period": 36
+    },
+    {
+      "amplitude": -5.0,
+      "axis": "z",
+      "motion": "swing",
+      "part": "aerial_r",
+      "period": 36,
+      "phase": 0.5
+    }
+  ],
+  "attach": {
+    "offset": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "rotation": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "scale": 0.5
+  },
+  "bone": "head",
+  "format": 1,
+  "id": "neon_headset",
+  "parts": [
+    {
+      "children": [
+        {
+          "cubes": [
+            {
+              "origin": [
+                -0.5,
+                -6.0,
+                -0.5
+              ],
+              "size": [
+                1,
+                6,
+                1
+              ],
+              "uv": [
+                77,
+                26
+              ]
+            },
+            {
+              "origin": [
+                -1.0,
+                -8.0,
+                -1.0
+              ],
+              "size": [
+                2,
+                2,
+                2
+              ],
+              "uv": [
+                82,
+                26
+              ]
+            }
+          ],
+          "name": "aerial_l",
+          "pivot": [
+            6.0,
+            -19.0,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            18.0
+          ]
+        },
+        {
+          "cubes": [
+            {
+              "origin": [
+                -0.5,
+                -6.0,
+                -0.5
+              ],
+              "size": [
+                1,
+                6,
+                1
+              ],
+              "uv": [
+                91,
+                26
+              ]
+            },
+            {
+              "origin": [
+                -1.0,
+                -8.0,
+                -1.0
+              ],
+              "size": [
+                2,
+                2,
+                2
+              ],
+              "uv": [
+                96,
+                26
+              ]
+            }
+          ],
+          "name": "aerial_r",
+          "pivot": [
+            -6.0,
+            -19.0,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            -18.0
+          ]
+        }
+      ],
+      "cubes": [
+        {
+          "origin": [
+            -11.5,
+            -12.0,
+            -11.5
+          ],
+          "size": [
+            23,
+            6,
+            2
+          ],
+          "uv": [
+            0,
+            0
+          ]
+        },
+        {
+          "origin": [
+            -11.5,
+            -12.0,
+            9.5
+          ],
+          "size": [
+            23,
+            6,
+            2
+          ],
+          "uv": [
+            51,
+            0
+          ]
+        },
+        {
+          "origin": [
+            9.5,
+            -12.0,
+            -9.5
+          ],
+          "size": [
+            2,
+            6,
+            19
+          ],
+          "uv": [
+            102,
+            0
+          ]
+        },
+        {
+          "origin": [
+            -11.5,
+            -12.0,
+            -9.5
+          ],
+          "size": [
+            2,
+            6,
+            19
+          ],
+          "uv": [
+            145,
+            0
+          ]
+        },
+        {
+          "origin": [
+            11.5,
+            -13.0,
+            -4.0
+          ],
+          "size": [
+            3,
+            8,
+            8
+          ],
+          "uv": [
+            188,
+            0
+          ]
+        },
+        {
+          "origin": [
+            -14.5,
+            -13.0,
+            -4.0
+          ],
+          "size": [
+            3,
+            8,
+            8
+          ],
+          "uv": [
+            211,
+            0
+          ]
+        },
+        {
+          "origin": [
+            -12.0,
+            -20.0,
+            -1.5
+          ],
+          "size": [
+            24,
+            2,
+            3
+          ],
+          "uv": [
+            0,
+            26
+          ]
+        },
+        {
+          "origin": [
+            10.0,
+            -18.0,
+            -1.5
+          ],
+          "size": [
+            2,
+            5,
+            3
+          ],
+          "uv": [
+            55,
+            26
+          ]
+        },
+        {
+          "origin": [
+            -12.0,
+            -18.0,
+            -1.5
+          ],
+          "size": [
+            2,
+            5,
+            3
+          ],
+          "uv": [
+            66,
+            26
+          ]
+        }
+      ],
+      "name": "hat",
+      "pivot": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    }
+  ],
+  "slot": "head",
+  "texture": {
+    "png": "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AEAwAQDBBAAEEwAQTABAMAEAwQQABBMAEEwAQDABAMEEAAQTABBMAEAwAQDBBAAEEwAQTABAMAEAwQQABBMAEEwAQDABAMEEAAQTABBMAEAwAQDBBAAEEwAQTABAMAEAwQQABBMAEEwAQDABAMEEAAQTABBMAEAwAQDBBAAEEwAQTABAMAEAwQQABBMAEEwAQDABAMEEAAQTABBMAEAwAQDBBAAEEwAQTABAMAEAwQQABBMAEEwAQDABAMEEAAQTABBMAEAwAQDBBAAEEwAQTABAMAEAwQQABBMAEEwAQDABAMEEAAQTABBMAEAwAQDBBAAEEwAQTABAMAEAwQQABBMAEEwAQDABAMEEAAQTABBMAEAwAQDBBAAEEwAQTABAMAEAwQQABBMAEEwAQDABAMEEAAQTABBMAEAwAQDBBAAEEwAQTABAMAEAwQQABBMAEEwAQDABAMEEAAQTABBMAEAwAQDBBAAEEwAQTABAMAEAwQQABBMAEEwAQDABAMEEAAQTABBMAEAwAQDBBAAEEwAQTABAMAEAwQQABBMAEEwAQDABAMEEAAQTABBMAEAwAQDBBAAEEwAQTABAMAEAwQQABBMAEEwAQDABAMEEAAQTABBMAEAwAQDBBAAEEwAQTABAMAEAwQQABBMAEEwAQDABAMEEAAQTABBMAEAwAQDBBAAEEwAQTABAMAEAwQQABBMAEEwAQDABAMEEAAQTABBMAEAwAQDBBAAEEwAQTABAMAEAwQQABBMAEEwAQDABAMEEAAQTABBMAEAwAQDBBAAEEwAQTABAMAEAwQQABBMAEEwAQDABAMEEAAQTABBMAEAwAQDBBAAEEwAQTABAMAEAwQQABBMAEEwAQDABAMEEAAQTABBMAEAwAQDBBAAEEwAQTABAMAEAwQQABBMAEEwAQDABAMEEAAQTABBMAEAwAQDBBAAE+x8TWhCOvGPpqgAAAABJRU5ErkJggg=="
+  }
+}

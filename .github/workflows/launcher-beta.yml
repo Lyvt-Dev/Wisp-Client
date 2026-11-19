@@ -1,0 +1,36 @@
+name: beta-launcher
+# The beta testers' installer (the launcher's `beta` feature: it opens only during the beta test
+# and never updates itself). Run by hand from the Actions tab; it is kept as this run's artifact
+# and never published as a release, so players' launchers never update to it.
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows-beta-installer:
+    runs-on: windows-latest
+    env:
+      RUSTFLAGS: '-C target-feature=+crt-static'
+      CARGO_BUILD_JOBS: '2'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target/installer-game
+            launcher -> target/installer-beta
+          cache-on-failure: true
+      - run: cargo test --manifest-path launcher/Cargo.toml --locked --release --target x86_64-pc-windows-msvc --features beta beta::
+      - name: Build the beta setup
+        shell: pwsh
+        env:
+          WISP_MSA_CLIENT_ID: ${{ vars.WISP_MSA_CLIENT_ID }}
+        run: ./packaging/windows/build-installer.ps1 -Beta
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Wisp-Client-Beta-Installer
+          path: |
+            dist/Wisp-Client-*-Beta-Setup-x64.exe
+            dist/Wisp-Client-*-Beta-Setup-x64.exe.sha256
+          if-no-files-found: error

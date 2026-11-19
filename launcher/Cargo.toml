@@ -10,6 +10,9 @@ description = "Wisp launcher for the Rust Minecraft engine"
 [features]
 default = ["gui"]
 gui = ["dep:gpui", "dep:gpui_platform", "dep:wisp-theme", "dep:image", "dep:objc2-app-kit", "dep:wry", "dep:tao"]
+# The beta testers' build (`build-installer.ps1 -Beta`): opens only during the beta test
+# (`beta.rs`) and never updates itself. Never in the published launcher.
+beta = ["gui"]
 
 [dependencies]
 wisp-compat = { path = "../crates/wisp-compat" }

@@ -80,6 +80,7 @@ pub fn kind_name(kind: Kind) -> String {
         Kind::Weapon => ("weapons", "Weapons"),
         Kind::Bag => ("bags", "Bags"),
         Kind::Head => ("hats", "Hats"),
+        Kind::Glasses => ("glasses", "Glasses"),
         Kind::Pet => ("pets", "Pets"),
         Kind::Trail => ("trails", "Trails"),
         Kind::Aura => ("auras", "Auras"),

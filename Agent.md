@@ -421,6 +421,15 @@ Do not rewrite main or force a changed remote branch. Preserve local changes and
   (five tapering box segments a horn, each its own part), `halo_item` (twelve gold bars in a ring,
   spinning and bobbing, glowing). Head items' cards and Store figure are lowered a quarter block
   so horns aren't cut off at the picture's top.
+- Beta testers' build (owner, 2026-11-19): a launcher that opens only on 22.11.2026 12:00-22:00
+  German time; before, "wait for the beta test" with a countdown; after, thanks and a request for
+  feedback, all in German. Only that build: the `beta` Cargo feature (off by default, so the
+  owner's own launcher and the published one never have it), `launcher/src/beta.rs`
+  (`START`/`END` in Unix seconds, CET = UTC+1), checked in `dashboard::run`; at 22:00 an open
+  launcher gives way to the thanks. A beta build never updates itself (`updater::enabled`).
+  `build-installer.ps1 -Beta` makes `Wisp-Client-<v>-Beta-Setup-x64.exe`; the manual
+  `beta-launcher` workflow builds it as an artifact, never a release. `WISP_BETA_NOW` fakes the
+  clock in development builds only.
 
 ## Unreleased: four emotes, Wisp Original Cape and Stray Head
 

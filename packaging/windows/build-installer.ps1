@@ -2,7 +2,10 @@
 param(
     [string]$OutputDirectory,
     [string]$IsccPath,
-    [string]$EngineBuildDirectory
+    [string]$EngineBuildDirectory,
+    # The beta testers' build: the launcher's `beta` feature (it opens only in the beta test's
+    # hours and never updates itself), as Wisp-Client-<version>-Beta-Setup-x64.exe. Never published.
+    [switch]$Beta
 )
 
 $ErrorActionPreference = 'Stop'
@@ -48,7 +51,8 @@ $originalEncodedRustflags = $env:CARGO_ENCODED_RUSTFLAGS
 $originalTargetDir = $env:CARGO_TARGET_DIR
 $originalDeveloperCommand = $env:WISP_VSDEVCMD
 $originalManifestPath = $env:WISP_MANIFEST_PATH
-$buildTarget = Join-Path $repository 'launcher/target/installer'
+$buildTarget = Join-Path $repository $(if ($Beta) { 'launcher/target/installer-beta' } else { 'launcher/target/installer' })
+$originalLauncherFeatures = $env:WISP_LAUNCHER_FEATURES
 try {
     $env:WISP_VERSION = $version
     # Keep the installer self-contained: the launcher statically links the MSVC runtime.
@@ -62,8 +66,9 @@ try {
     $env:CARGO_TARGET_DIR = $buildTarget
     $env:WISP_VSDEVCMD = $developerCommand
     $env:WISP_MANIFEST_PATH = $manifest
+    $env:WISP_LAUNCHER_FEATURES = $(if ($Beta) { 'beta' } else { 'gui' })
     # Initialize MSVC in a child shell so an unrelated link.exe on PATH cannot win.
-    & $env:ComSpec /d /c 'call "%WISP_VSDEVCMD%" -no_logo -arch=x64 -host_arch=x64 && cargo build --manifest-path "%WISP_MANIFEST_PATH%" --locked --release --target x86_64-pc-windows-msvc'
+    & $env:ComSpec /d /c 'call "%WISP_VSDEVCMD%" -no_logo -arch=x64 -host_arch=x64 && cargo build --manifest-path "%WISP_MANIFEST_PATH%" --locked --release --target x86_64-pc-windows-msvc --features "%WISP_LAUNCHER_FEATURES%"'
     if ($LASTEXITCODE -ne 0) { throw 'Launcher release build failed.' }
 }
 finally {
@@ -73,6 +78,7 @@ finally {
     $env:CARGO_TARGET_DIR = $originalTargetDir
     $env:WISP_VSDEVCMD = $originalDeveloperCommand
     $env:WISP_MANIFEST_PATH = $originalManifestPath
+    $env:WISP_LAUNCHER_FEATURES = $originalLauncherFeatures
 }
 
 $shaderSource = Join-Path $repository 'shaders/wisp/aurora'
@@ -112,6 +118,11 @@ if ($LASTEXITCODE -ne 0) { throw 'Installer compilation failed.' }
 
 $installer = Join-Path $OutputDirectory "Wisp-Client-$version-Setup-x64.exe"
 if (-not (Test-Path -LiteralPath $installer)) { throw 'The installer was not created.' }
+if ($Beta) {
+    $betaInstaller = Join-Path $OutputDirectory "Wisp-Client-$version-Beta-Setup-x64.exe"
+    Move-Item -Force -LiteralPath $installer -Destination $betaInstaller
+    $installer = $betaInstaller
+}
 $digest = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
 "$digest  $([IO.Path]::GetFileName($installer))" | Set-Content -Encoding ascii -LiteralPath "$installer.sha256"
 Write-Host "Installer: $installer"

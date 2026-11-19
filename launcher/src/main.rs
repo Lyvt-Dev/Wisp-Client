@@ -13,6 +13,8 @@ use wisp_launcher::{launcher_home, Profile, Result, Settings};
 
 #[cfg(feature = "gui")]
 mod account_art;
+#[cfg(feature = "beta")]
+mod beta;
 #[cfg(feature = "gui")]
 mod dashboard;
 

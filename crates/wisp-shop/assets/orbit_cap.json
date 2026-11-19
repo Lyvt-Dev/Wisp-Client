@@ -1,0 +1,176 @@
+{
+  "animations": [
+    {
+      "amplitude": 0,
+      "axis": "y",
+      "motion": "spin",
+      "part": "orbit",
+      "period": 160
+    }
+  ],
+  "attach": {
+    "offset": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "rotation": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "scale": 0.5
+  },
+  "bone": "head",
+  "format": 1,
+  "id": "orbit_cap",
+  "parts": [
+    {
+      "children": [
+        {
+          "cubes": [
+            {
+              "origin": [
+                -17.0,
+                -0.5,
+                -17.0
+              ],
+              "size": [
+                34,
+                1,
+                34
+              ],
+              "uv": [
+                0,
+                29
+              ]
+            }
+          ],
+          "name": "ring",
+          "pivot": [
+            0.0,
+            -20.0,
+            0.0
+          ],
+          "rotation": [
+            6.0,
+            0.0,
+            -8.0
+          ]
+        },
+        {
+          "cubes": [
+            {
+              "origin": [
+                12.0,
+                -2.0,
+                -2.0
+              ],
+              "size": [
+                4,
+                4,
+                4
+              ],
+              "uv": [
+                137,
+                29
+              ]
+            },
+            {
+              "origin": [
+                -12.0,
+                -1.5,
+                7.0
+              ],
+              "size": [
+                3,
+                3,
+                3
+              ],
+              "uv": [
+                154,
+                29
+              ]
+            },
+            {
+              "origin": [
+                -9.0,
+                -2.5,
+                -14.0
+              ],
+              "size": [
+                5,
+                5,
+                5
+              ],
+              "uv": [
+                167,
+                29
+              ]
+            }
+          ],
+          "name": "orbit",
+          "pivot": [
+            0.0,
+            -21.0,
+            0.0
+          ],
+          "rotation": [
+            6.0,
+            0.0,
+            -8.0
+          ]
+        }
+      ],
+      "cubes": [
+        {
+          "origin": [
+            -10.0,
+            -24.0,
+            -10.0
+          ],
+          "size": [
+            20,
+            8,
+            20
+          ],
+          "uv": [
+            0,
+            0
+          ]
+        },
+        {
+          "origin": [
+            -7.0,
+            -26.0,
+            -7.0
+          ],
+          "size": [
+            14,
+            2,
+            14
+          ],
+          "uv": [
+            81,
+            0
+          ]
+        }
+      ],
+      "name": "hat",
+      "pivot": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    }
+  ],
+  "slot": "head",
+  "texture": {
+    "png": "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"
+  }
+}

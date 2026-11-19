@@ -38,13 +38,36 @@ Minecraft assets. 100 coins are worth 0.80 €:
 - `angel_halo` (Head, 400 coins / 3.20 €): twelve gold bars in a ring over the head, tilted a
   little, turning slowly and bobbing; it glows.
 
-Christmas items, 4 units a model pixel (drawn at a quarter scale) like the Stray Head:
+Christmas items:
 
-- `santa_hat` (Head, 500 coins / 4 €): a rolled white fur brim round the head, a red velvet cone
-  of six segments rising and then flopping over to one side, a white pompom at its tip; the tip
-  swings as you move.
-- `santa_sack` (Bag, 700 coins / 5.60 €): a lumpy brown burlap sack slung over the back beside a
-  cape (a bag takes a weapon's place), gathered at the neck and tied with gold rope, a green
-  present with a red ribbon and a candy cane poking out of the top; it sways.
+- `santa_hat` (Head, 500 coins / 4 €), 4 units a model pixel: a rolled white fur brim round the
+  head (wider than the skin's hat layer and above it, so the two never flicker), a red velvet
+  cone of six segments rising and then flopping over to one side, a white pompom at its tip; the
+  tip swings as you move.
+- `santa_sack` (Bag, 700 coins / 5.60 €), at Minecraft's own scale (one texel a pixel, pixel
+  art): a brown sack with a seam and a stitched patch slung over the back beside a cape (a bag
+  takes a weapon's place), gathered at the neck and tied with gold rope, a green present with a
+  red ribbon and a candy cane poking out of the top; it sways.
+
+After the cosmetic reference pictures. The wings reuse the Demon and Angel Wings'
+builds in new colours; the rest are boxes in pixel art 2 units a model pixel
+(`examples/shop_items/blocky.rs`), clear of the skin's hat layer:
+
+- `void_dragon_wings` (Wings, 1,000 coins / 8 €): bat wings of near-black bone, a violet skin
+  glowing lilac at the edge.
+- `sakura_wings` (Wings, 1,000 coins / 8 €): pink feathered wings dotted with cherry blossoms on
+  a dark cherry-wood arm.
+- `crimson_katana` (Weapon, 600 coins / 4.80 €): a red lacquered scabbard with gold bands, a gold
+  guard, a grip wound in black over red, across the back.
+- Hats (Head): `gearwork_topper` (500, top hat with goggles), `spelunker_helmet` (400, hard hat
+  with a lamp), `frost_wizard_hat` (500, its tip bends back and swings), `tangerine_topper` (400,
+  leaning orange crown), `panda_cap` (400), `buccaneer_tricorn` (500, brim turned up all round),
+  `orbit_cap` (600, planets circling), `propeller_cap` (400, the propeller spins),
+  `neon_headset` (500, antennas sway).
+- `blossom_shades` (Glasses, 400 coins / 3.20 €): flower-shaped pink frames, worn beside a hat.
+- `butterfly_swarm` (Aura, 800 coins / 6.40 €): a shoulder item, six butterflies flapping round
+  the body on three spinning rings.
+- `astro_buddy` (Pet, 900 coins / 7.20 €): a shoulder item, a little astronaut bobbing by the
+  right shoulder, its arms waving, its jetpack shedding sparks.
 
 Each has `<id>.json` (the item) and `<id>.png` (its card).

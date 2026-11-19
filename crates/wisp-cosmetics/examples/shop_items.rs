@@ -14,6 +14,9 @@ use wisp_cosmetics::{
     preview::{self, Draw},
 };
 
+#[path = "shop_items/blocky.rs"]
+mod blocky;
+
 type Rgba = [u8; 4];
 
 const fn hex(c: u32) -> Rgba {
@@ -791,16 +794,13 @@ fn paint_bone(c: &mut Canvas, uv: [i32; 2], w: i32, t: i32, shades: &[u32]) {
 }
 
 /// A horn-like claw (box UV, pointing along -y): pale at the root, dark at the point.
-fn paint_claw(c: &mut Canvas, uv: [i32; 2], size: [i32; 3]) {
+fn paint_claw(c: &mut Canvas, uv: [i32; 2], size: [i32; 3], shades: &[u32; 5]) {
     let [w, h, d] = size;
     paint_box(c, uv[0], uv[1], w, h, d, |face, i, j, fw, fh| {
         let along = 1.0 - (j as f32 + 0.5) / fh as f32;
         let across = (i as f32 + 0.5) / fw as f32;
         let side = if face == 3 || face == 5 { 0.15 } else { 0.0 };
-        ramp(
-            &[0x2a2018, 0x5e4c36, 0x9c8a68, 0xcfc1a0, 0xece2c6],
-            0.95 - along * 0.75 + side - across * 0.15,
-        )
+        ramp(shades, 0.95 - along * 0.75 + side - across * 0.15)
     });
 }
 
@@ -861,11 +861,45 @@ fn demon_inner_poly() -> (Vec<[f32; 2]>, Vec<Vec<[f32; 2]>>) {
 /// Demon Wings' texture: two leathery skins, dark by the bones and glowing ember-red where they
 /// thin towards the scalloped edge, veined from the wrist; black bones; ivory claws.
 fn demon_texture() -> Canvas {
+    bat_wing_texture(&DEMON_COLOURS)
+}
+
+/// A bat wing's colours: the skin dark to bright, its outline, the bones, the claws.
+struct BatColours {
+    skin: [u32; 8],
+    edge: u32,
+    bone: [u32; 7],
+    claw: [u32; 5],
+}
+
+const DEMON_COLOURS: BatColours = BatColours {
+    skin: [
+        0x14030a, 0x2b0710, 0x470b16, 0x6a1019, 0x8f1a1f, 0xb82a24, 0xe2482c, 0xff8a3c,
+    ],
+    edge: 0x0c0205,
+    bone: [
+        0x07050a, 0x120d14, 0x1e1620, 0x2c2230, 0x3c3040, 0x544458, 0x74627a,
+    ],
+    claw: [0x2a2018, 0x5e4c36, 0x9c8a68, 0xcfc1a0, 0xece2c6],
+};
+
+/// The Void Dragon Wings' colours: a violet skin glowing lilac at the edge, near-black bones.
+const DRAGON_COLOURS: BatColours = BatColours {
+    skin: [
+        0x0a0610, 0x160b22, 0x231236, 0x331a4e, 0x452468, 0x5a3286, 0x7446a6, 0xa274dc,
+    ],
+    edge: 0x06030a,
+    bone: [
+        0x050407, 0x0d0a12, 0x17121e, 0x221a2c, 0x2e243a, 0x3e3250, 0x544468,
+    ],
+    claw: [0x2a2234, 0x524664, 0x8c80a0, 0xc4bcd4, 0xe8e2f2],
+};
+
+/// The bat wings' texture in `colours`: two leathery skins, black bones, claws.
+fn bat_wing_texture(colours: &BatColours) -> Canvas {
     let mut c = Canvas::new(DEMON_TEX.0, DEMON_TEX.1);
     let tex = [DEMON_TEX.0 as f32, DEMON_TEX.1 as f32];
-    let skin = [
-        0x14030a, 0x2b0710, 0x470b16, 0x6a1019, 0x8f1a1f, 0xb82a24, 0xe2482c, 0xff8a3c,
-    ];
+    let skin = colours.skin;
     let paint = |c: &mut Canvas,
                  poly: &[[f32; 2]],
                  edges: &[Vec<[f32; 2]>],
@@ -873,7 +907,7 @@ fn demon_texture() -> Canvas {
                  wrist: [f32; 2],
                  veins: &[[f32; 2]]| {
         let (_, bbox) = skin_quads(1.0, poly, at, tex);
-        paint_skin(c, poly, at, bbox, hex(0x0c0205), |p| {
+        paint_skin(c, poly, at, bbox, hex(colours.edge), |p| {
             // Chunky shading: worked out per 2×2 texels, like a 4-texel-a-pixel painting.
             let q = [
                 (p[0] / 2.0).floor() * 2.0 + 1.0,
@@ -907,9 +941,7 @@ fn demon_texture() -> Canvas {
     let wrist = [DEMON_ARM, 0.0];
     let veins: Vec<[f32; 2]> = edges.iter().map(|e| e[6]).collect();
     paint(&mut c, &poly, &edges, DEMON_INNER_AT, wrist, &veins);
-    let bone = [
-        0x07050a, 0x120d14, 0x1e1620, 0x2c2230, 0x3c3040, 0x544458, 0x74627a,
-    ];
+    let bone = colours.bone;
     paint_bone(&mut c, DEMON_BONE_AT, 112, 12, &bone);
     paint_box(
         &mut c,
@@ -923,14 +955,19 @@ fn demon_texture() -> Canvas {
             ramp(&bone, l)
         },
     );
-    paint_claw(&mut c, DEMON_CLAW_AT, [6, 18, 6]);
-    paint_claw(&mut c, DEMON_TIP_AT, [6, 14, 6]);
+    paint_claw(&mut c, DEMON_CLAW_AT, [6, 18, 6], &colours.claw);
+    paint_claw(&mut c, DEMON_TIP_AT, [6, 14, 6], &colours.claw);
     c
 }
 
 /// Demon Wings: each a bat's wing of solid bones (arm, hand, three fingers) with a leathery skin
 /// stretched between them, a claw at the wrist and the hand's tip.
 fn demon_item(texture: &Canvas) -> Value {
+    bat_wing_item("demon_wings", texture)
+}
+
+/// Bat wings (the Demon Wings' build) as item `id`.
+fn bat_wing_item(id: &str, texture: &Canvas) -> Value {
     let tex = [texture.w as f32, texture.h as f32];
     let wing = |name: &str, s: f32| -> Value {
         let (outer, _) = demon_outer_poly();
@@ -969,7 +1006,7 @@ fn demon_item(texture: &Canvas) -> Value {
         })
     };
     json!({
-        "format": 1, "id": "demon_wings", "slot": "back", "bone": "body",
+        "format": 1, "id": id, "slot": "back", "bone": "body",
         "attach": { "offset": [0, 0, 0], "rotation": [0, 0, 0], "scale": 1.0 / HDF },
         "texture": { "png": b64(&texture.png()) },
         "parts": [wing("left_wing", 1.0), wing("right_wing", -1.0)],
@@ -1018,7 +1055,8 @@ const PLUME: [u32; 7] = [
 
 /// A feather's face: `along` 0 at the root to 1 at the tip, `across` -1..1; transparent past
 /// its rounded tip.
-fn feather_texel(along: f32, across: f32, len: f32, back: bool) -> Rgba {
+fn feather_texel(along: f32, across: f32, len: f32, back: bool, look: &FeatherLook) -> Rgba {
+    let plume = &look.plume;
     // The rounded tip: the last few texels narrow to a point.
     let tip = ((1.0 - along) * len / 9.0).min(1.0);
     let half = (1.0 - (1.0 - tip).powi(2)).sqrt();
@@ -1026,7 +1064,7 @@ fn feather_texel(along: f32, across: f32, len: f32, back: bool) -> Rgba {
         return [0, 0, 0, 0];
     }
     if across.abs() > half - 0.15 {
-        return hex(PLUME[1]);
+        return hex(plume[1]);
     }
     let mut t = 0.95 - across.abs() * 0.3 - along * 0.15;
     // Barbs slanting from the shaft to the tip.
@@ -1038,14 +1076,77 @@ fn feather_texel(along: f32, across: f32, len: f32, back: bool) -> Rgba {
         t -= 0.15;
     }
     if across.abs() < 0.12 {
-        return mix(hex(0xfbf6e6), hex(0xe2cf96), along);
+        return mix(hex(look.shaft.0), hex(look.shaft.1), along);
     }
-    ramp(&PLUME, t)
+    let col = ramp(plume, t);
+    match look.blossoms.then(|| blossom(along * len, (across + 1.0) * 8.0, back)) {
+        Some(Some(b)) => b,
+        _ => col,
+    }
+}
+
+/// Feathered wings' colours: the plume dark to light, the shaft root to tip, the arm, and
+/// whether cherry blossoms are scattered over the feathers.
+struct FeatherLook {
+    plume: [u32; 7],
+    shaft: (u32, u32),
+    bone: [u32; 7],
+    blossoms: bool,
+}
+
+const ANGEL_LOOK: FeatherLook = FeatherLook {
+    plume: PLUME,
+    shaft: (0xfbf6e6, 0xe2cf96),
+    bone: [
+        0x5a3a0c, 0x8a5c14, 0xb8862a, 0xd9a83a, 0xf2c14e, 0xffdf86, 0xfff4c8,
+    ],
+    blossoms: false,
+};
+
+/// The Sakura Wings: pink feathers dotted with blossoms on a dark cherry-wood arm.
+const SAKURA_LOOK: FeatherLook = FeatherLook {
+    plume: [
+        0x8a2a4a, 0xb2406a, 0xd06890, 0xe690b0, 0xf2b4ca, 0xfad2e0, 0xfff0f6,
+    ],
+    shaft: (0xffe8f0, 0xc0587a),
+    bone: [
+        0x2a0e14, 0x40161e, 0x58202a, 0x6e2c36, 0x8a3c46, 0xa85460, 0xc87480,
+    ],
+    blossoms: true,
+};
+
+/// A five-petalled cherry blossom at texel (`x`, `y`) of a feather, if one falls there: white
+/// petals blushing pink, an orange heart. Blossoms sit in a loose grid, some cells empty.
+fn blossom(x: f32, y: f32, back: bool) -> Option<Rgba> {
+    let cell = 11.0;
+    let (cx, cy) = ((x / cell).floor() as i32, (y / cell).floor() as i32);
+    let seed = if back { 1207 } else { 1201 };
+    if noise(cx, cy, seed) < 0.45 {
+        return None;
+    }
+    let ox = (cx as f32 + 0.3 + noise(cx, cy, seed + 2) * 0.4) * cell;
+    let oy = (cy as f32 + 0.3 + noise(cx, cy, seed + 4) * 0.4) * cell;
+    let (dx, dy) = ((x - ox).floor() + 0.5, (y - oy).floor() + 0.5);
+    let r = dx.hypot(dy);
+    if r < 1.0 {
+        return Some(hex(0xf0a050));
+    }
+    let petal = (5.0 * dy.atan2(dx)).cos();
+    if r < 2.2 + 1.2 * petal.max(0.0) {
+        return Some(hex(if r < 2.0 { 0xffd6e6 } else { 0xfff6fa }));
+    }
+    None
 }
 
 /// Angel Wings' texture: long feathers with a gold shaft and slanting barbs, a row of small rounded
 /// coverts (one band all round its box, so a shorter box shows the same row), and a gold arm.
 fn angel_texture() -> Canvas {
+    feather_wing_texture(&ANGEL_LOOK)
+}
+
+/// Feathered wings' texture (the Angel Wings' build) in `look`.
+fn feather_wing_texture(look: &FeatherLook) -> Canvas {
+    let plume = &look.plume;
     let mut c = Canvas::new(ANGEL_TEX.0, ANGEL_TEX.1);
     for len in FEATHER_LENGTHS {
         let [u, v] = feather_uv(len);
@@ -1060,14 +1161,14 @@ fn angel_texture() -> Canvas {
                 let across = (i as f32 + 0.5) / fw as f32 * 2.0 - 1.0;
                 let along = (j as f32 + 0.5) / fh as f32;
                 match face {
-                    3 | 5 => feather_texel(along, across, len as f32, face == 5),
-                    0 | 1 => hex(PLUME[4]),
+                    3 | 5 => feather_texel(along, across, len as f32, face == 5, look),
+                    0 | 1 => hex(plume[4]),
                     _ => {
                         // The thin sides end where the tip begins to round.
                         if along > 1.0 - 6.0 / len as f32 {
                             [0, 0, 0, 0]
                         } else {
-                            hex(PLUME[2])
+                            hex(plume[2])
                         }
                     }
                 }
@@ -1076,7 +1177,7 @@ fn angel_texture() -> Canvas {
     }
     let ([w, h, d], [u, v]) = ANGEL_COVERT;
     let width = 2 * (w + d) + 64;
-    c.rect(u + d, v, 2 * w + 64, d, hex(PLUME[5]));
+    c.rect(u + d, v, 2 * w + 64, d, hex(plume[5]));
     for j in 0..h {
         for i in 0..width {
             let (x, y) = (i as f32 + 0.5, j as f32 + 0.5);
@@ -1096,21 +1197,22 @@ fn angel_texture() -> Canvas {
                 (high - y, (x / 16.0).fract())
             };
             let col = if edge < 1.2 {
-                hex(PLUME[1])
+                hex(plume[1])
             } else {
                 let t = 0.92
                     - (cell - 0.5).abs() * 0.45
                     - (1.0 - edge / 10.0).max(0.0) * 0.25
                     - y / h as f32 * 0.1;
-                ramp(&PLUME, t)
+                let col = ramp(plume, t);
+                match look.blossoms.then(|| blossom(x, y, false)) {
+                    Some(Some(b)) => b,
+                    _ => col,
+                }
             };
             c.set(u + i, v + d + j, col);
         }
     }
-    let gold = [
-        0x5a3a0c, 0x8a5c14, 0xb8862a, 0xd9a83a, 0xf2c14e, 0xffdf86, 0xfff4c8,
-    ];
-    paint_bone(&mut c, ANGEL_BONE_AT, 72, 12, &gold);
+    paint_bone(&mut c, ANGEL_BONE_AT, 72, 12, &look.bone);
     c
 }
 
@@ -1118,6 +1220,11 @@ fn angel_texture() -> Canvas {
 /// row of small coverts in front and long feathers hanging behind, longest at the tip, so the
 /// feathers fan out like a bird's.
 fn angel_item(texture: &Canvas) -> Value {
+    feather_wing_item("angel_wings", texture, true)
+}
+
+/// Feathered wings (the Angel Wings' build) as item `id`, bright at night with `glow`.
+fn feather_wing_item(id: &str, texture: &Canvas, glow: bool) -> Value {
     let ([_, ch, cd], cuv) = ANGEL_COVERT;
     let wing = |name: &str, s: f32| -> Value {
         // Built from the tip in, each section the child of the one before.
@@ -1172,7 +1279,7 @@ fn angel_item(texture: &Canvas) -> Value {
         }));
     }
     json!({
-        "format": 1, "id": "angel_wings", "slot": "back", "bone": "body", "glow": true,
+        "format": 1, "id": id, "slot": "back", "bone": "body", "glow": glow,
         "attach": { "offset": [0, 0, 0], "rotation": [0, 0, 0], "scale": 1.0 / HDF },
         "texture": { "png": b64(&texture.png()) },
         "parts": [wing("left_wing", 1.0), wing("right_wing", -1.0)],
@@ -1687,7 +1794,8 @@ const SANTA_CONE: [(i32, i32, f32, f32); 6] = [
     (11, 8, -3.0, 30.0),
     (8, 8, -2.0, 34.0),
 ];
-const SANTA_BRIM: [i32; 3] = [36, 7, 36];
+/// Wider than the skin's hat layer (9 px = 36 units) and above it, so the two never share a face.
+const SANTA_BRIM: [i32; 3] = [40, 8, 40];
 const SANTA_POMPOM: [i32; 3] = [10, 10, 10];
 
 /// Where each box of the hat sits in the texture: the brim, the cone's segments, the pompom.
@@ -1744,7 +1852,7 @@ fn santa_hat_item(texture: &Canvas) -> Value {
     for (k, &(w, h, back, side)) in SANTA_CONE.iter().enumerate().rev() {
         let (wf, hf) = (w as f32, h as f32);
         let pivot = if k == 0 {
-            [0.0, -33.0, 0.0]
+            [0.0, -35.0, 0.0]
         } else {
             [0.0, -(SANTA_CONE[k - 1].1 as f32) + 1.0, 0.0]
         };
@@ -1777,7 +1885,7 @@ fn santa_hat_item(texture: &Canvas) -> Value {
         "parts": [
             {
                 "name": "brim", "pivot": [0, 0, 0],
-                "cubes": [cube([-(bw as f32) / 2.0, -34.0, -(bd as f32) / 2.0], [bw, bh, bd], brim_uv)],
+                "cubes": [cube([-(bw as f32) / 2.0, -36.0, -(bd as f32) / 2.0], [bw, bh, bd], brim_uv)],
             },
             child.unwrap(),
         ],
@@ -1798,91 +1906,92 @@ enum Stuff {
     Cane,
 }
 
-/// The sack's boxes in 4-unit pixels on the body's back (+z away from it, y down from the
-/// shoulders): (part, origin, size, what it is made of). The sack is a few overlapping boxes so
-/// it bulges; the neck is gathered and tied, the ruffle spills over the rope.
-const SACK: [(&str, [f32; 3], [i32; 3], Stuff); 12] = [
-    ("sack", [-15.0, 6.0, 0.0], [30, 38, 24], Stuff::Sack),
-    ("sack", [-18.0, 11.0, 1.0], [36, 28, 22], Stuff::Sack),
-    ("sack", [-20.0, 16.0, 2.0], [40, 18, 18], Stuff::Sack),
-    ("sack", [-12.0, 40.0, 3.0], [24, 6, 18], Stuff::Sack),
-    ("sack", [-7.0, 0.0, 6.0], [14, 8, 12], Stuff::Sack),
-    ("sack", [-8.0, 2.0, 5.0], [16, 3, 14], Stuff::Rope),
-    ("sack", [-11.0, -5.0, 3.0], [22, 6, 18], Stuff::Ruffle),
-    ("sack", [-8.0, -8.0, 5.0], [16, 3, 14], Stuff::Ruffle),
-    ("gift", [-6.0, -12.0, -6.0], [12, 12, 12], Stuff::Gift),
-    ("cane", [-1.5, -22.0, -1.5], [3, 22, 3], Stuff::Cane),
-    ("cane", [-1.5, -25.0, -1.5], [10, 3, 3], Stuff::Cane),
-    ("cane", [5.5, -22.0, -1.5], [3, 6, 3], Stuff::Cane),
+/// The sack's boxes in skin pixels on the body's back (+z away from it, y down from the
+/// shoulders): (part, origin, size, what it is made of). Built at Minecraft's own scale, one
+/// texel a pixel: a stepped belly, the neck gathered and tied, the ruffle on top.
+const SACK: [(&str, [f32; 3], [i32; 3], Stuff); 10] = [
+    ("sack", [-4.0, 1.0, 0.0], [8, 9, 5], Stuff::Sack),
+    ("sack", [-5.0, 3.0, 0.5], [10, 5, 4], Stuff::Sack),
+    ("sack", [-3.0, 10.0, 0.5], [6, 1, 4], Stuff::Sack),
+    ("sack", [-2.0, -1.0, 1.0], [4, 2, 3], Stuff::Sack),
+    ("sack", [-2.5, 0.0, 0.5], [5, 1, 4], Stuff::Rope),
+    ("sack", [-3.0, -2.0, 0.5], [6, 1, 4], Stuff::Ruffle),
+    ("gift", [-1.5, -3.0, -1.5], [3, 3, 3], Stuff::Gift),
+    ("cane", [-0.5, -5.0, -0.5], [1, 5, 1], Stuff::Cane),
+    ("cane", [-0.5, -6.0, -0.5], [3, 1, 1], Stuff::Cane),
+    ("cane", [1.5, -5.0, -0.5], [1, 2, 1], Stuff::Cane),
 ];
 
+/// Santa's Sack's texture size: one texel a skin pixel, like a vanilla model.
+const SACK_TEX: i32 = 64;
+
 fn sack_uvs() -> Vec<[i32; 2]> {
-    let mut shelf = Shelf::new(256);
+    let mut shelf = Shelf::new(SACK_TEX);
     SACK.iter()
         .map(|&(_, _, size, _)| shelf.place(size))
         .collect()
 }
 
-/// Burlap: a weave of threads across and down, each a little different, with darker flecks.
-fn burlap(l: f32, i: i32, j: i32) -> Rgba {
-    let weave = if (i + j) % 2 == 0 { 0.06 } else { -0.06 };
-    let thread = (noise(i, 0, 631) - 0.5) * 0.14 + (noise(0, j, 633) - 0.5) * 0.14;
-    let fleck = if noise(i, j, 635) > 0.985 { -0.25 } else { 0.0 };
-    ramp(
-        &[0x3e2412, 0x5e3a1e, 0x80542c, 0x9f6e3c, 0xbd8c52, 0xd8ac72],
-        l + weave + thread + fleck + (vnoise(i as f32 * 0.12, j as f32 * 0.12, 637) - 0.5) * 0.2,
-    )
+/// One of `colors`, picked per texel the way vanilla textures are dithered: a base shade with
+/// a few pixels a step lighter or darker.
+fn pixel(colors: &[u32], base: i32, i: i32, j: i32, seed: u32) -> Rgba {
+    let n = noise(i, j, seed);
+    let step = if n > 0.82 { 1 } else if n < 0.18 { -1 } else { 0 };
+    hex(colors[(base + step).clamp(0, colors.len() as i32 - 1) as usize])
 }
 
-/// Santa's Sack's texture: brown burlap, a gold rope with a twist, a green present with a red
-/// ribbon, a red and white candy cane.
+/// Santa's Sack's texture, pixel art: brown sacking with a seam and a stitched patch, a gold
+/// rope, a green present with a red ribbon, a red and white candy cane.
 fn sack_texture() -> Canvas {
-    let mut c = Canvas::new(256, 256);
+    const BROWN: [u32; 5] = [0x4a2e18, 0x63401f, 0x7d5229, 0x966634, 0xb07d44];
+    let mut c = Canvas::new(SACK_TEX as u32, SACK_TEX as u32);
+    let uvs = sack_uvs();
     for (k, &(_, _, [w, h, d], stuff)) in SACK.iter().enumerate() {
-        let [u, v] = sack_uvs()[k];
+        let [u, v] = uvs[k];
         paint_box(&mut c, u, v, w, h, d, |face, i, j, fw, fh| {
-            let across = (i as f32 + 0.5) / fw as f32;
-            let down = (j as f32 + 0.5) / fh as f32;
-            let light = face_light(face);
+            // Vanilla's lighting does the shading; the top just a touch lighter.
+            let lift = (face == 0) as i32;
             match stuff {
                 Stuff::Sack => {
-                    // Bulging cloth: lit across its middle, a few creases running down.
-                    let bulge = (across * std::f32::consts::PI).sin() * 0.16;
-                    let crease = if (i * 7 + k as i32 * 13) % 23 == 0 {
-                        -0.12
-                    } else {
-                        0.0
-                    };
-                    burlap(light - 0.1 + bulge + crease, i, j)
+                    let outer = face == 3 || face == 5;
+                    // A stitched patch on the big faces of the main box.
+                    if k == 0 && outer && (2..=4).contains(&i) && (4..=6).contains(&j) {
+                        let edge = i == 2 || i == 4 || j == 4 || j == 6;
+                        if edge && (i + j) % 2 == 0 {
+                            return hex(0xd8c49a);
+                        }
+                        return pixel(&[0x7a3a22, 0x8e4a2a, 0xa45c34], 1, i, j, 641);
+                    }
+                    // A darker seam down the middle, and a shadowed bottom row.
+                    let mut base = 2 + lift;
+                    if outer && i == fw / 2 && k == 0 {
+                        base -= 1;
+                    }
+                    if face >= 2 && j == fh - 1 && fh > 2 {
+                        base -= 1;
+                    }
+                    pixel(&BROWN, base, i, j + k as i32 * 11, 631)
                 }
                 Stuff::Ruffle => {
-                    let fold = ((i as f32 * 0.9).sin() * 0.5 + 0.5) * 0.25;
-                    burlap(light + fold - 0.05, i, j + 40)
+                    let base = if i % 2 == 0 { 3 } else { 2 } + lift;
+                    pixel(&BROWN, base, i, j, 633)
                 }
                 Stuff::Rope => {
-                    let twist = (((i + j) as f32) / 3.0).fract();
-                    let l = 0.35 + 0.55 * (twist * std::f32::consts::PI).sin();
-                    ramp(
-                        &[0x6a4a10, 0xa8781c, 0xd8a838, 0xf2cc60, 0xfff0b0],
-                        l * light * 1.3,
-                    )
+                    let gold = [0x8a6414, 0xc8961e, 0xf0c040, 0xffe080];
+                    hex(gold[if (i + j) % 2 == 0 { 2 } else { 1 } + lift as usize])
                 }
                 Stuff::Gift => {
-                    // A red ribbon across both ways over green paper; a bow's knot on top.
-                    let ribbon = (across - 0.5).abs() < 0.14
-                        || (face >= 2 && (down - 0.5).abs() < 0.14)
-                        || (face < 2 && (down - 0.5).abs() < 0.14);
-                    if ribbon {
-                        ramp(&[0x7a0e16, 0xc01e2a, 0xee4a52, 0xff8a8e], light + 0.1)
+                    // A red ribbon down the middle both ways over green paper.
+                    let mid = (fw / 2, fh / 2);
+                    if i == mid.0 || j == mid.1 {
+                        hex(if lift == 1 { 0xee3a44 } else { 0xc01e2a })
                     } else {
-                        let dot = (i % 4 == 1 && j % 4 == 1) as i32 as f32 * 0.2;
-                        ramp(&[0x0c3a1c, 0x16602e, 0x1f8a40, 0x3cb862], light + dot)
+                        pixel(&[0x135a28, 0x1c7a36, 0x2a9a46], 1 + lift, i, j, 637)
                     }
                 }
                 Stuff::Cane => {
-                    let stripe = (((i + j) as f32) / 4.0).floor() as i32 % 2 == 0;
-                    let base = if stripe { 0xd42a35 } else { 0xf7f3ee };
-                    add_light(hex(base), [40.0, 40.0, 40.0], light - 0.6)
+                    let stripe = (i + j) % 2 == 0;
+                    hex(if stripe { 0xd42a35 } else { 0xf7f3ee })
                 }
             }
         });
@@ -1890,8 +1999,9 @@ fn sack_texture() -> Canvas {
     c
 }
 
-/// Santa's Sack: a big burlap sack over your back, leaning a little, gathered and tied at the
-/// neck with gold rope, a present and a candy cane poking out of the top. It sways as you walk.
+/// Santa's Sack: a big sack over your back in Minecraft's own pixels, leaning a little, gathered
+/// and tied at the neck with gold rope, a present and a candy cane poking out of the top. It
+/// sways as you walk.
 fn sack_item(texture: &Canvas) -> Value {
     let uvs = sack_uvs();
     let cubes = |part: &str| -> Vec<Value> {
@@ -1903,13 +2013,13 @@ fn sack_item(texture: &Canvas) -> Value {
     };
     json!({
         "format": 1, "id": "santa_sack", "slot": "weapon", "bone": "body",
-        "attach": { "offset": [0.5, 1.0, 2.1], "rotation": [0.0, 0.0, -12.0], "scale": 1.0 / XMAS_UNIT },
+        "attach": { "offset": [0.5, 1.0, 2.1], "rotation": [0.0, 0.0, -12.0], "scale": 1.0 },
         "texture": { "png": b64(&texture.png()) },
         "parts": [{
             "name": "sack", "pivot": [0, 0, 0], "cubes": cubes("sack"),
             "children": [
-                { "name": "gift", "pivot": [-6.0, -4.0, 12.0], "rotation": [8.0, 24.0, -14.0], "cubes": cubes("gift") },
-                { "name": "cane", "pivot": [7.0, -3.0, 13.0], "rotation": [-6.0, 0.0, 18.0], "cubes": cubes("cane") },
+                { "name": "gift", "pivot": [-1.0, -1.5, 2.5], "rotation": [8.0, 24.0, -14.0], "cubes": cubes("gift") },
+                { "name": "cane", "pivot": [1.5, -1.5, 3.0], "rotation": [-6.0, 0.0, 18.0], "cubes": cubes("cane") },
             ],
         }],
         "animations": [
@@ -2004,15 +2114,33 @@ fn framed_card(
     centre: f32,
     glow: [f32; 3],
 ) -> Canvas {
-    let skin = wearer_skin();
-    let body = preview::player_model(false);
     // Head items reach above the head's top, where the picture ends: the figure is lowered
     // a quarter of a block for them.
     let lower = if item.slot == wisp_cosmetics::Slot::Head {
-        Mat4::from_translation(glam::Vec3::new(0.0, 0.25, 0.0))
+        0.25
     } else {
-        Mat4::IDENTITY
+        0.0
     };
+    framed_card_lowered(item, w, h, yaw, zoom, drop, centre, glow, lower)
+}
+
+/// `framed_card` with the figure lowered `lower` blocks in its picture, for items reaching
+/// far above the head.
+#[allow(clippy::too_many_arguments)]
+fn framed_card_lowered(
+    item: &Item,
+    w: u32,
+    h: u32,
+    yaw: f32,
+    zoom: f32,
+    drop: f32,
+    centre: f32,
+    glow: [f32; 3],
+    lower: f32,
+) -> Canvas {
+    let skin = wearer_skin();
+    let body = preview::player_model(false);
+    let lower = Mat4::from_translation(glam::Vec3::new(0.0, lower, 0.0));
     let mut draws = vec![Draw {
         root: &body,
         base: lower,
@@ -2119,6 +2247,8 @@ fn main() {
     let angel = angel_texture();
     let bamboo = bamboo_texture();
     let straw = hat_texture();
+    let dragon = bat_wing_texture(&DRAGON_COLOURS);
+    let sakura = feather_wing_texture(&SAKURA_LOOK);
     let items = [
         (
             "demon_wings",
@@ -2184,12 +2314,48 @@ fn main() {
             0.3,
             [230.0, 180.0, 90.0],
         ),
+        (
+            "void_dragon_wings",
+            bat_wing_item("void_dragon_wings", &dragon),
+            198.0,
+            0.95,
+            0.1,
+            [140.0, 70.0, 220.0],
+        ),
+        (
+            "sakura_wings",
+            feather_wing_item("sakura_wings", &sakura, false),
+            198.0,
+            0.95,
+            0.1,
+            [240.0, 140.0, 180.0],
+        ),
+        ("blossom_shades", blocky::glasses().0, 30.0, 3.0, 0.6, [240.0, 140.0, 190.0]),
+        ("gearwork_topper", blocky::gearwork_topper().0, 25.0, 1.9, 0.62, [210.0, 160.0, 80.0]),
+        ("spelunker_helmet", blocky::spelunker_helmet().0, 25.0, 2.3, 0.58, [240.0, 210.0, 60.0]),
+        ("frost_wizard_hat", blocky::frost_wizard_hat().0, 60.0, 1.5, 0.45, [80.0, 200.0, 220.0]),
+        ("tangerine_topper", blocky::tangerine_topper().0, 25.0, 1.8, 0.63, [250.0, 140.0, 50.0]),
+        ("panda_cap", blocky::panda_cap().0, 25.0, 2.1, 0.6, [220.0, 220.0, 230.0]),
+        ("buccaneer_tricorn", blocky::buccaneer_tricorn().0, 25.0, 2.0, 0.6, [200.0, 150.0, 70.0]),
+        ("orbit_cap", blocky::orbit_cap().0, 25.0, 2.1, 0.58, [70.0, 130.0, 240.0]),
+        ("propeller_cap", blocky::propeller_cap().0, 25.0, 2.0, 0.6, [230.0, 90.0, 80.0]),
+        ("neon_headset", blocky::neon_headset().0, 25.0, 2.1, 0.58, [60.0, 220.0, 240.0]),
+        ("crimson_katana", blocky::crimson_katana().0, 195.0, 1.6, 0.35, [210.0, 50.0, 60.0]),
+        ("butterfly_swarm", blocky::butterfly_swarm().0, 20.0, 1.2, 0.2, [90.0, 160.0, 240.0]),
+        ("astro_buddy", blocky::astro_buddy().0, 30.0, 1.3, 0.3, [240.0, 160.0, 60.0]),
     ];
     for (id, value, yaw, zoom, drop, glow) in items {
         let file = serde_json::to_vec_pretty(&value).unwrap();
         let item = Item::parse(&file).unwrap_or_else(|e| panic!("{id}: {e}"));
         write(dir, &format!("{id}.json"), &file);
-        let card = framed_card(&item, cw, ch, yaw, zoom, drop, 0.5, glow);
+        // The new items that reach far up are lowered further in their picture.
+        let card = match id {
+            "frost_wizard_hat" => {
+                framed_card_lowered(&item, cw, ch, yaw, zoom, drop, 0.5, glow, 0.7)
+            }
+            "astro_buddy" => framed_card_lowered(&item, cw, ch, yaw, zoom, drop, 0.5, glow, 0.35),
+            _ => framed_card(&item, cw, ch, yaw, zoom, drop, 0.5, glow),
+        };
         write(dir, &format!("{id}.png"), &card.png());
         if let Ok(out) = std::env::var("WISP_SHOP_PREVIEW") {
             preview_sheet(&item, Path::new(&out), id);
@@ -2204,15 +2370,24 @@ fn preview_sheet(item: &Item, dir: &Path, id: &str) {
     let mut sheet = backdrop(size * 4, size * 4, [120.0, 120.0, 140.0], 7);
     let skin = wearer_skin();
     let body = preview::player_model(false);
+    // Head items reach above the picture's top, as on the cards: the figure is lowered for them.
+    let lower = if item.slot == wisp_cosmetics::Slot::Head {
+        Mat4::from_translation(glam::Vec3::new(0.0, 0.6, 0.0))
+    } else {
+        Mat4::IDENTITY
+    };
     for (row, ticks) in [0.0f32, 15.0, 30.0, 45.0].into_iter().enumerate() {
         for (col, yaw) in [200.0f32, 150.0, 90.0, 30.0].into_iter().enumerate() {
             let mut draws = vec![Draw {
                 root: &body,
-                base: Mat4::IDENTITY,
+                base: lower,
                 texture: &skin,
                 poses: Vec::new(),
             }];
-            draws.extend(Draw::item(item, &body, ticks));
+            draws.extend(Draw::item(item, &body, ticks).into_iter().map(|mut d| {
+                d.base = lower * d.base;
+                d
+            }));
             let figure = preview::render(&draws, size, size, yaw, 12.0);
             composite(
                 &mut sheet,

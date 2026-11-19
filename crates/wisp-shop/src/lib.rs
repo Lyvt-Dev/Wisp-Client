@@ -30,6 +30,8 @@ pub enum Kind {
     Bag,
     /// Worn on the head (a hat); a helmet hides it.
     Head,
+    /// Worn over the eyes, beside a hat; a helmet hides them.
+    Glasses,
     Pet,
     Trail,
     Aura,
@@ -45,12 +47,13 @@ impl Kind {
         self == other || (back(self) && back(other)) || (carried(self) && carried(other))
     }
 
-    pub const ALL: [Kind; 9] = [
+    pub const ALL: [Kind; 10] = [
         Kind::Cape,
         Kind::Wings,
         Kind::Weapon,
         Kind::Bag,
         Kind::Head,
+        Kind::Glasses,
         Kind::Pet,
         Kind::Trail,
         Kind::Aura,
@@ -221,6 +224,156 @@ const SANTA_SACK: Offer = offer!(
     item
 );
 
+/// Void Dragon Wings. 1,000 coins (8 €).
+const VOID_DRAGON_WINGS: Offer = offer!(
+    "void_dragon_wings",
+    "Void Dragon Wings",
+    "Huge dragon wings of near-black bone with a violet skin that glows lilac at its scalloped edge, beating slowly.",
+    Wings,
+    1_000,
+    item
+);
+
+/// Sakura Wings. 1,000 coins (8 €).
+const SAKURA_WINGS: Offer = offer!(
+    "sakura_wings",
+    "Sakura Wings",
+    "Pink feathered wings dotted with cherry blossoms on a dark cherry-wood arm, opening and closing as they beat.",
+    Wings,
+    1_000,
+    item
+);
+
+/// Crimson Katana. 600 coins (4.80 €).
+const CRIMSON_KATANA: Offer = offer!(
+    "crimson_katana",
+    "Crimson Katana",
+    "A katana in a red lacquered scabbard with gold fittings, a gold guard and a grip wound in black, slung across your back.",
+    Weapon,
+    600,
+    item
+);
+
+/// Gearwork Topper. 500 coins (4 €).
+const GEARWORK_TOPPER: Offer = offer!(
+    "gearwork_topper",
+    "Gearwork Topper",
+    "A tall leather top hat with a gold band and brass goggles resting on the front.",
+    Head,
+    500,
+    item
+);
+
+/// Spelunker Helmet. 400 coins (3.20 €).
+const SPELUNKER_HELMET: Offer = offer!(
+    "spelunker_helmet",
+    "Spelunker Helmet",
+    "A yellow hard hat with a black stripe over the top and a bright lamp on the front.",
+    Head,
+    400,
+    item
+);
+
+/// Frost Wizard Hat. 500 coins (4 €).
+const FROST_WIZARD_HAT: Offer = offer!(
+    "frost_wizard_hat",
+    "Frost Wizard Hat",
+    "A pointed ice-blue wizard hat bending back at the tip, a leather band with a gold buckle and a gold star at the point.",
+    Head,
+    500,
+    item
+);
+
+/// Tangerine Topper. 400 coins (3.20 €).
+const TANGERINE_TOPPER: Offer = offer!(
+    "tangerine_topper",
+    "Tangerine Topper",
+    "A tall orange hat with a white stripe, its crown leaning over to one side.",
+    Head,
+    400,
+    item
+);
+
+/// Panda Cap. 400 coins (3.20 €).
+const PANDA_CAP: Offer = offer!(
+    "panda_cap",
+    "Panda Cap",
+    "A soft white cap with a panda's face on the front, round black ears and cheek flaps.",
+    Head,
+    400,
+    item
+);
+
+/// Buccaneer Tricorn. 500 coins (4 €).
+const BUCCANEER_TRICORN: Offer = offer!(
+    "buccaneer_tricorn",
+    "Buccaneer Tricorn",
+    "A brown pirate hat, its brim turned up all round and trimmed in gold, a little skull on the front.",
+    Head,
+    500,
+    item
+);
+
+/// Orbit Cap. 600 coins (4.80 €).
+const ORBIT_CAP: Offer = offer!(
+    "orbit_cap",
+    "Orbit Cap",
+    "A starry deep-blue dome with a tilted ring round it and three little planets circling your head.",
+    Head,
+    600,
+    item
+);
+
+/// Propeller Cap. 400 coins (3.20 €).
+const PROPELLER_CAP: Offer = offer!(
+    "propeller_cap",
+    "Propeller Cap",
+    "A patchwork cap in red, green and yellow with a blue grid visor and a propeller spinning on top.",
+    Head,
+    400,
+    item
+);
+
+/// Neon Headset. 500 coins (4 €).
+const NEON_HEADSET: Offer = offer!(
+    "neon_headset",
+    "Neon Headset",
+    "A cyan visor wrapped round your eyes, dark ear cups that glow, a band over the top and two antennas.",
+    Head,
+    500,
+    item
+);
+
+/// Blossom Shades. 400 coins (3.20 €).
+const BLOSSOM_SHADES: Offer = offer!(
+    "blossom_shades",
+    "Blossom Shades",
+    "Pink flower-shaped glasses with rosy lenses. Worn with any hat.",
+    Glasses,
+    400,
+    item
+);
+
+/// Butterfly Swarm. 800 coins (6.40 €).
+const BUTTERFLY_SWARM: Offer = offer!(
+    "butterfly_swarm",
+    "Butterfly Swarm",
+    "Six pixel butterflies, blue and orange, fluttering round you on three rings at different heights.",
+    Aura,
+    800,
+    item
+);
+
+/// Astro Buddy. 900 coins (7.20 €).
+const ASTRO_BUDDY: Offer = offer!(
+    "astro_buddy",
+    "Astro Buddy",
+    "A little astronaut in a black suit floating by your shoulder, a happy face behind its gold visor and a jetpack puffing sparks.",
+    Pet,
+    900,
+    item
+);
+
 /// What the shop sells.
 #[cfg(not(any(test, feature = "test-items")))]
 pub const OFFERS: &[Offer] = &[
@@ -234,6 +387,21 @@ pub const OFFERS: &[Offer] = &[
     ANGEL_HALO,
     SANTA_HAT,
     SANTA_SACK,
+    VOID_DRAGON_WINGS,
+    SAKURA_WINGS,
+    CRIMSON_KATANA,
+    GEARWORK_TOPPER,
+    SPELUNKER_HELMET,
+    FROST_WIZARD_HAT,
+    TANGERINE_TOPPER,
+    PANDA_CAP,
+    BUCCANEER_TRICORN,
+    ORBIT_CAP,
+    PROPELLER_CAP,
+    NEON_HEADSET,
+    BLOSSOM_SHADES,
+    BUTTERFLY_SWARM,
+    ASTRO_BUDDY,
 ];
 
 /// With `test-items` (and in this crate's tests), made-up items beside the real ones, so the
@@ -251,6 +419,21 @@ pub const OFFERS: &[Offer] = &[
     ANGEL_HALO,
     SANTA_HAT,
     SANTA_SACK,
+    VOID_DRAGON_WINGS,
+    SAKURA_WINGS,
+    CRIMSON_KATANA,
+    GEARWORK_TOPPER,
+    SPELUNKER_HELMET,
+    FROST_WIZARD_HAT,
+    TANGERINE_TOPPER,
+    PANDA_CAP,
+    BUCCANEER_TRICORN,
+    ORBIT_CAP,
+    PROPELLER_CAP,
+    NEON_HEADSET,
+    BLOSSOM_SHADES,
+    BUTTERFLY_SWARM,
+    ASTRO_BUDDY,
     test_offer("test_cape", Kind::Cape, 1_200),
     test_offer("test_wings", Kind::Wings, 900),
     test_offer("test_hat", Kind::Head, 1_000),
@@ -539,7 +722,8 @@ mod tests {
             let slot = match offer.kind {
                 Kind::Cape | Kind::Wings => "back",
                 Kind::Weapon | Kind::Bag => "weapon",
-                Kind::Head => "head",
+                Kind::Head | Kind::Glasses => "head",
+                Kind::Pet | Kind::Aura => "shoulder",
                 other => panic!("{}: no slot for {other:?}", offer.id),
             };
             assert_eq!(v["slot"], slot, "{}", offer.id);
@@ -557,6 +741,21 @@ mod tests {
     }
 
     #[test]
+    fn glasses_are_worn_beside_a_hat() {
+        assert!(!Kind::Glasses.shares_slot(Kind::Head));
+        assert!(Kind::Glasses.shares_slot(Kind::Glasses));
+        let mut w = Wallet {
+            coins: 10_000,
+            ..Wallet::default()
+        };
+        w.buy("blossom_shades").unwrap();
+        w.buy("panda_cap").unwrap();
+        w.equip("blossom_shades").unwrap();
+        w.equip("panda_cap").unwrap();
+        assert!(w.wears("blossom_shades") && w.wears("panda_cap"));
+    }
+
+    #[test]
     fn the_shop_sells_the_founders_cape() {
         let ids: Vec<_> = real().map(|o| o.id).collect();
         assert_eq!(
@@ -571,7 +770,22 @@ mod tests {
                 "devil_horns",
                 "angel_halo",
                 "santa_hat",
-                "santa_sack"
+                "santa_sack",
+                "void_dragon_wings",
+                "sakura_wings",
+                "crimson_katana",
+                "gearwork_topper",
+                "spelunker_helmet",
+                "frost_wizard_hat",
+                "tangerine_topper",
+                "panda_cap",
+                "buccaneer_tricorn",
+                "orbit_cap",
+                "propeller_cap",
+                "neon_headset",
+                "blossom_shades",
+                "butterfly_swarm",
+                "astro_buddy"
             ]
         );
         let cape = offer(FOUNDERS).unwrap();
