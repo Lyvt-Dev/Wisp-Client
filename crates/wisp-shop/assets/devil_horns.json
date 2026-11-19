@@ -1,0 +1,355 @@
+{
+  "attach": {
+    "offset": [
+      0,
+      0,
+      0
+    ],
+    "rotation": [
+      0,
+      0,
+      0
+    ],
+    "scale": 0.125
+  },
+  "bone": "head",
+  "format": 1,
+  "id": "devil_horns",
+  "parts": [
+    {
+      "children": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "cubes": [
+                        {
+                          "origin": [
+                            -3.0,
+                            -16.0,
+                            -3.0
+                          ],
+                          "size": [
+                            6.0,
+                            16.0,
+                            6.0
+                          ],
+                          "uv": [
+                            0,
+                            126
+                          ]
+                        }
+                      ],
+                      "name": "left_horn_4",
+                      "pivot": [
+                        0.0,
+                        -15.0,
+                        0.0
+                      ],
+                      "rotation": [
+                        12.0,
+                        0.0,
+                        -24.0
+                      ]
+                    }
+                  ],
+                  "cubes": [
+                    {
+                      "origin": [
+                        -4.5,
+                        -16.0,
+                        -4.5
+                      ],
+                      "size": [
+                        9.0,
+                        16.0,
+                        9.0
+                      ],
+                      "uv": [
+                        0,
+                        99
+                      ]
+                    }
+                  ],
+                  "name": "left_horn_3",
+                  "pivot": [
+                    0.0,
+                    -15.0,
+                    0.0
+                  ],
+                  "rotation": [
+                    4.0,
+                    0.0,
+                    -22.0
+                  ]
+                }
+              ],
+              "cubes": [
+                {
+                  "origin": [
+                    -6.0,
+                    -16.0,
+                    -6.0
+                  ],
+                  "size": [
+                    12.0,
+                    16.0,
+                    12.0
+                  ],
+                  "uv": [
+                    0,
+                    69
+                  ]
+                }
+              ],
+              "name": "left_horn_2",
+              "pivot": [
+                0.0,
+                -15.0,
+                0.0
+              ],
+              "rotation": [
+                -6.0,
+                0.0,
+                -20.0
+              ]
+            }
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -7.5,
+                -16.0,
+                -7.5
+              ],
+              "size": [
+                15.0,
+                16.0,
+                15.0
+              ],
+              "uv": [
+                0,
+                36
+              ]
+            }
+          ],
+          "name": "left_horn_1",
+          "pivot": [
+            0.0,
+            -15.0,
+            0.0
+          ],
+          "rotation": [
+            -10.0,
+            0.0,
+            -16.0
+          ]
+        }
+      ],
+      "cubes": [
+        {
+          "origin": [
+            -9.0,
+            -16.0,
+            -9.0
+          ],
+          "size": [
+            18.0,
+            16.0,
+            18.0
+          ],
+          "uv": [
+            0,
+            0
+          ]
+        }
+      ],
+      "name": "left_horn",
+      "pivot": [
+        20.0,
+        -62.0,
+        -6.0
+      ],
+      "rotation": [
+        -16.0,
+        0.0,
+        38.0
+      ]
+    },
+    {
+      "children": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "cubes": [
+                        {
+                          "mirror": true,
+                          "origin": [
+                            -3.0,
+                            -16.0,
+                            -3.0
+                          ],
+                          "size": [
+                            6.0,
+                            16.0,
+                            6.0
+                          ],
+                          "uv": [
+                            0,
+                            126
+                          ]
+                        }
+                      ],
+                      "name": "right_horn_4",
+                      "pivot": [
+                        0.0,
+                        -15.0,
+                        0.0
+                      ],
+                      "rotation": [
+                        12.0,
+                        0.0,
+                        24.0
+                      ]
+                    }
+                  ],
+                  "cubes": [
+                    {
+                      "mirror": true,
+                      "origin": [
+                        -4.5,
+                        -16.0,
+                        -4.5
+                      ],
+                      "size": [
+                        9.0,
+                        16.0,
+                        9.0
+                      ],
+                      "uv": [
+                        0,
+                        99
+                      ]
+                    }
+                  ],
+                  "name": "right_horn_3",
+                  "pivot": [
+                    0.0,
+                    -15.0,
+                    0.0
+                  ],
+                  "rotation": [
+                    4.0,
+                    0.0,
+                    22.0
+                  ]
+                }
+              ],
+              "cubes": [
+                {
+                  "mirror": true,
+                  "origin": [
+                    -6.0,
+                    -16.0,
+                    -6.0
+                  ],
+                  "size": [
+                    12.0,
+                    16.0,
+                    12.0
+                  ],
+                  "uv": [
+                    0,
+                    69
+                  ]
+                }
+              ],
+              "name": "right_horn_2",
+              "pivot": [
+                0.0,
+                -15.0,
+                0.0
+              ],
+              "rotation": [
+                -6.0,
+                0.0,
+                20.0
+              ]
+            }
+          ],
+          "cubes": [
+            {
+              "mirror": true,
+              "origin": [
+                -7.5,
+                -16.0,
+                -7.5
+              ],
+              "size": [
+                15.0,
+                16.0,
+                15.0
+              ],
+              "uv": [
+                0,
+                36
+              ]
+            }
+          ],
+          "name": "right_horn_1",
+          "pivot": [
+            0.0,
+            -15.0,
+            0.0
+          ],
+          "rotation": [
+            -10.0,
+            0.0,
+            16.0
+          ]
+        }
+      ],
+      "cubes": [
+        {
+          "mirror": true,
+          "origin": [
+            -9.0,
+            -16.0,
+            -9.0
+          ],
+          "size": [
+            18.0,
+            16.0,
+            18.0
+          ],
+          "uv": [
+            0,
+            0
+          ]
+        }
+      ],
+      "name": "right_horn",
+      "pivot": [
+        -20.0,
+        -62.0,
+        -6.0
+      ],
+      "rotation": [
+        -16.0,
+        0.0,
+        -38.0
+      ]
+    }
+  ],
+  "slot": "head",
+  "texture": {
+    "png": "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"
+  }
+}

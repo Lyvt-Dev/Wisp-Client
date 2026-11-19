@@ -32,6 +32,8 @@ const ZOOM: (f32, f32) = (0.7, 1.7);
 /// Pictures kept of the figure (angles and animation frames) before they are drawn again:
 /// every frame of a 64-frame texture at one angle, and some.
 const FIGURES_KEPT: usize = 72;
+/// Game ticks between the pictures of an item's swinging parts: 10 a second.
+const ANIMATION_STEP: f32 = 2.0;
 
 pub(super) struct ShopUi {
     /// The kind the list shows; None: every kind.
@@ -81,7 +83,7 @@ fn kind_label(kind: Kind) -> &'static str {
         Kind::Cape => "Capes",
         Kind::Wings => "Wings",
         Kind::Weapon => "Weapons",
-        Kind::Head => "Hats",
+        Kind::Head => "Head",
         Kind::Pet => "Pets",
         Kind::Trail => "Trails",
         Kind::Aura => "Auras",
@@ -95,26 +97,11 @@ fn kind_one(kind: Kind) -> &'static str {
         Kind::Cape => "Cape",
         Kind::Wings => "Wings",
         Kind::Weapon => "Weapon",
-        Kind::Head => "Hat",
+        Kind::Head => "Head",
         Kind::Pet => "Pet",
         Kind::Trail => "Trail",
         Kind::Aura => "Aura",
         Kind::Emote => "Emote",
-    }
-}
-
-/// An item's tier by its price: name and colour.
-fn tier(offer: &Offer) -> (&'static str, u32) {
-    if offer.founders() {
-        ("Founders", GOLD)
-    } else if offer.price >= 1500 {
-        ("Legendary", 0xf59e0b)
-    } else if offer.price >= 1000 {
-        ("Epic", 0xa66bff)
-    } else if offer.price >= 400 {
-        ("Rare", 0x3d8bfd)
-    } else {
-        ("Common", 0x9aa0a8)
     }
 }
 
@@ -166,7 +153,64 @@ fn price(offer: &Offer, discount: u32, size: f32, s: f32) -> Div {
         })
 }
 
+/// The Shop without the Wisp server, for now: coins, purchases and what is worn are kept on this
+/// computer (`shop.json` in the launcher's folder), starting with `LOCAL_COINS` to try items
+/// with. Turn off to buy through the server again.
+pub(super) const LOCAL_SHOP: bool = true;
+const LOCAL_COINS: u32 = 10_000;
+
+/// The local Shop's wallet: the saved one, or a new one with `LOCAL_COINS`.
+pub(super) fn local_wallet(home: &std::path::Path) -> shop::Wallet {
+    let mut wallet = shop::Wallet::load(home);
+    if !wallet.welcomed {
+        wallet.welcomed = true;
+        wallet.coins = LOCAL_COINS;
+        let _ = wallet.save(home);
+    }
+    wallet
+}
+
 impl Launcher {
+    /// Buys (claims), equips or takes off `id` in the local wallet and saves it.
+    fn shop_act_locally(&mut self, id: &'static str, cx: &mut Context<Self>) {
+        let emote = shop::offer(id).is_some_and(|o| o.kind == Kind::Emote);
+        let result = if self.wallet.wears(id) {
+            self.wallet.unequip(id);
+            Ok(if emote {
+                "Taken out of your emote wheel."
+            } else {
+                "Taken off. You won't wear it the next time you play."
+            })
+        } else if self.wallet.owns(id) {
+            self.wallet.equip(id).map(|()| {
+                if emote {
+                    "In your emote wheel: press B in game to play it."
+                } else {
+                    "Equipped. You'll wear it the next time you play."
+                }
+            })
+        } else {
+            self.wallet
+                .buy(id)
+                .and_then(|()| self.wallet.equip(id))
+                .map(|()| {
+                    if emote {
+                        "Bought and added to your emote wheel: press B in game to play it."
+                    } else {
+                        "Added to your items and equipped."
+                    }
+                })
+        };
+        self.shop.notice = Some(match result {
+            Ok(done) => match self.wallet.save(&self.home) {
+                Ok(()) => (tr(done), false),
+                Err(e) => (e.to_string(), true),
+            },
+            Err(why) => (shop::refusal(&why), true),
+        });
+        cx.notify();
+    }
+
     /// The item shown large: the chosen one, else the first the shop sells.
     pub(super) fn shop_selected(&self) -> Option<&'static Offer> {
         self.shop
@@ -178,6 +222,9 @@ impl Launcher {
     /// Buys, equips or takes off `id` on the Wisp server, which keeps the coins and checks
     /// every purchase; its answer updates the wallet (`FriendsUpdate::Wallet`).
     fn shop_act(&mut self, id: &'static str, cx: &mut Context<Self>) {
+        if LOCAL_SHOP {
+            return self.shop_act_locally(id, cx);
+        }
         if self.shop.busy {
             return;
         }
@@ -431,26 +478,41 @@ impl Launcher {
             .filter(|o| self.shop.tab.is_none_or(|k| o.kind == k))
             .filter(|o| catalog::matches(&query, &[o.name, o.blurb, o.id]))
             .collect();
-        let pill = |id: (&'static str, usize), label: String, on: bool| {
+        // A kind's tab: its name and how many items it has, underlined when chosen.
+        let tab = |id: (&'static str, usize), label: String, count: usize, on: bool| {
             div()
                 .id(id)
-                .h(px(32. * s))
-                .px(px(12. * s))
-                .rounded_full()
                 .flex()
-                .items_center()
-                .text_size(px(13. * s))
+                .flex_col()
+                .gap(px(8. * s))
                 .cursor_pointer()
-                .when(on, |d| {
-                    d.bg(rgb(0xffffff))
-                        .text_color(rgb(0x0b0b0d))
+                .child(
+                    div()
+                        .flex()
+                        .items_baseline()
+                        .gap(px(5. * s))
+                        .text_size(px(14. * s))
                         .font_weight(FontWeight::SEMIBOLD)
-                })
-                .when(!on, |d| {
-                    d.text_color(rgb(0xc4c6cc))
-                        .hover(|d| d.bg(rgba(0xffffff14)))
-                })
-                .child(label)
+                        .text_color(rgb(if on { 0xffffff } else { 0x8e9099 }))
+                        .child(label)
+                        .child(
+                            div()
+                                .text_size(px(11. * s))
+                                .text_color(rgb(if on { 0xb4b6bd } else { 0x6b6d75 }))
+                                .child(count.to_string()),
+                        ),
+                )
+                .child(div().h(px(2. * s)).rounded_full().bg(if on {
+                    rgba(0xffffffff)
+                } else {
+                    rgba(0xffffff00)
+                }))
+        };
+        let count = |kind: Option<Kind>| {
+            shop::OFFERS
+                .iter()
+                .filter(|o| kind.is_none_or(|k| o.kind == k))
+                .count()
         };
         let mut list = div()
             .id("shop-list")
@@ -471,7 +533,6 @@ impl Launcher {
         }
         for (i, offer) in offers.iter().enumerate() {
             let on = chosen == Some(offer.id);
-            let (tier_name, tier_colour) = tier(offer);
             let state = if self.wallet.wears(offer.id) {
                 Some(tr("Equipped"))
             } else if self.wallet.owns(offer.id) {
@@ -526,22 +587,9 @@ impl Launcher {
                             )
                             .child(
                                 div()
-                                    .flex()
-                                    .items_center()
-                                    .gap(px(6. * s))
                                     .text_size(px(12. * s))
-                                    .child(
-                                        div()
-                                            .text_color(rgb(tier_colour))
-                                            .font_weight(FontWeight::SEMIBOLD)
-                                            .child(tr(tier_name)),
-                                    )
-                                    .child(div().text_color(rgb(0x6b6d75)).child("·"))
-                                    .child(
-                                        div()
-                                            .text_color(rgb(0xa9abb3))
-                                            .child(tr(kind_one(offer.kind))),
-                                    ),
+                                    .text_color(rgb(0xa9abb3))
+                                    .child(tr(kind_one(offer.kind))),
                             )
                             .child(match state {
                                 Some(state) => div()
@@ -597,25 +645,29 @@ impl Launcher {
                     div()
                         .flex()
                         .flex_wrap()
-                        .gap(px(2. * s))
-                        .p(px(4. * s))
-                        .rounded(px(22. * s))
-                        .bg(rgba(0x0b0b0d8c))
-                        .border_1()
+                        .gap_x(px(20. * s))
+                        .gap_y(px(10. * s))
+                        .px(px(4. * s))
+                        .border_b_1()
                         .border_color(rgba(0xffffff1a))
                         .child(
-                            pill(("shop-kind", 99), tr("All"), self.shop.tab.is_none()).on_click(
-                                cx.listener(|this, _, _, cx| {
-                                    this.shop.tab = None;
-                                    cx.notify();
-                                }),
-                            ),
+                            tab(
+                                ("shop-kind", 99),
+                                tr("All"),
+                                count(None),
+                                self.shop.tab.is_none(),
+                            )
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.shop.tab = None;
+                                cx.notify();
+                            })),
                         )
                         .children(kinds.iter().enumerate().map(|(i, kind)| {
                             let kind = *kind;
-                            pill(
+                            tab(
                                 ("shop-kind", i),
                                 tr(kind_label(kind)),
+                                count(Some(kind)),
                                 self.shop.tab == Some(kind),
                             )
                             .on_click(cx.listener(
@@ -655,9 +707,20 @@ impl Launcher {
         // The texture's frame due now (the game shows each for `frametime` ticks). The item
         // stands still otherwise, so an angle's frames are drawn once and then replayed.
         let step = item.as_ref().map_or(2, |i| i.frametime.max(1)) as f32;
-        let frame = item.as_ref().map_or(0, |i| {
-            (self.shop.started.elapsed().as_secs_f32() * 20.0 / step) as usize
-                % i.frames.len().max(1)
+        let elapsed = self.shop.started.elapsed().as_secs_f32() * 20.0;
+        let frame = item
+            .as_ref()
+            .map_or(0, |i| (elapsed / step) as usize % i.frames.len().max(1));
+        // The parts' swing (wings opening and closing) at the game tick due, in steps of
+        // `ANIMATION_STEP` over the longest animation's period, so a loop's pictures are drawn
+        // once and then replayed.
+        let ticks = item.as_ref().map_or(0.0, |i| {
+            let period = i.animations.iter().map(|a| a.period).fold(0.0, f32::max);
+            if period > 0.0 {
+                ((elapsed / ANIMATION_STEP).floor() * ANIMATION_STEP) % period.round()
+            } else {
+                0.0
+            }
         });
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
         self.avatar_key.hash(&mut hasher);
@@ -665,6 +728,7 @@ impl Launcher {
         yaw.to_bits().hash(&mut hasher);
         pitch.to_bits().hash(&mut hasher);
         frame.hash(&mut hasher);
+        ticks.to_bits().hash(&mut hasher);
         pixels.hash(&mut hasher);
         offer.id.hash(&mut hasher);
         let key = hasher.finish();
@@ -683,16 +747,27 @@ impl Launcher {
             None => (stand_in_skin(), false),
         };
         let body = preview::player_model(slim);
+        // Head items (horns, a halo) reach above the head's top, where the picture ends: the
+        // figure is lowered a quarter of a block for them.
+        let lower = if item
+            .as_ref()
+            .is_some_and(|i| i.slot == wisp_cosmetics::Slot::Head)
+        {
+            glam::Mat4::from_translation(glam::Vec3::new(0.0, 0.25, 0.0))
+        } else {
+            glam::Mat4::IDENTITY
+        };
         let mut draws = vec![Draw {
             root: &body,
-            base: glam::Mat4::IDENTITY,
+            base: lower,
             texture: &texture,
             poses: Vec::new(),
         }];
         if let Some(item) = &item {
             let texture = item.frames.get(frame).unwrap_or(&item.texture);
-            draws.extend(Draw::item(item, &body, 0.0).into_iter().map(|mut d| {
+            draws.extend(Draw::item(item, &body, ticks).into_iter().map(|mut d| {
                 d.texture = texture;
+                d.base = lower * d.base;
                 d
             }));
         }
@@ -791,14 +866,7 @@ impl Launcher {
                 .justify_center()
                 .child(quiet("New cosmetics are coming soon."));
         };
-        let (tier_name, tier_colour) = tier(offer);
-        let line = trf(
-            "{tier} {kind}",
-            &[
-                ("tier", tr(tier_name).as_str()),
-                ("kind", tr(kind_one(offer.kind)).as_str()),
-            ],
-        );
+        let line = tr(kind_one(offer.kind));
         let status = self
             .shop
             .notice
@@ -812,7 +880,7 @@ impl Launcher {
                 div()
                     .text_size(px(16. * s))
                     .font_weight(FontWeight::SEMIBOLD)
-                    .text_color(rgb(tier_colour))
+                    .text_color(rgb(0xb4b6bd))
                     .child(line),
             )
             .child(
@@ -905,7 +973,7 @@ impl Launcher {
                             .flex()
                             .gap(px(14. * s))
                             .child(self.shop_coins(cx))
-                            .child(self.shop_creator(cx)),
+                            .when(!LOCAL_SHOP, |d| d.child(self.shop_creator(cx))),
                     ),
             )
             .child(self.shop_list(cx))
@@ -927,7 +995,7 @@ mod tests {
     #[test]
     fn the_founders_cape_is_free() {
         let cape = shop::offer(shop::FOUNDERS).unwrap();
-        assert_eq!(tier(cape).0, "Founders");
+        assert!(cape.founders());
         assert_eq!(cape.price, 0);
     }
 }

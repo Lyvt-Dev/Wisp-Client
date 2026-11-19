@@ -391,10 +391,36 @@ Do not rewrite main or force a changed remote branch. Preserve local changes and
   drawn at the format's maximum (256-texel textures, `HD` = 8 texels a design unit; the Bamboo
   Sword's boxes are 8× at attach scale 0.1). 4K would need the renderer's 256×256 HD slots raised.
 - Stray Head: the owner confirmed a realistic straw hat (`cosmeticideas/strayhead.jpg`), not the
-  Stray mob's head: a smooth 32-sided cone, 16 px across on the 8 px head (the old one was 24).
-- `shop_items`: `demon_wing`, `angel_wing` (+ `feather`), `wings_item` (two double-sided panels a
-  wing), `bamboo_texture`/`bamboo_item`, `straw_texture`/`stray_item`. Checked by `Item::parse`
+  Stray mob's head, 16 px across on the 8 px head (the old one was 24).
+- 2026-11-19: after 0.20.0 the owner said the wings and hat "look shit" next to the Bamboo Sword
+  and Founders Cape (which they like) and asked for "real Minecraft cosmetics like NoRisk Client",
+  with wings that open and close. So they are now built like Blockbench cosmetics out of solid
+  boxes, as the sword is, instead of flat painted panels: Demon Wings with bone boxes (arm, hand,
+  three fingers in their own parts) and skin quads between; Angel Wings in three bending sections
+  of coverts and box feathers; the hat eleven stepped layers of box crosses at a quarter scale.
+  The wings rest swept back (y -40°) and `flap` swings them ±26-28° so they open wide and fold
+  back without passing through the body. The reach limit (24 px) sets their size.
+- `shop_items`: `demon_texture`/`demon_item`, `angel_texture`/`angel_item`, `flap`,
+  `bamboo_texture`/`bamboo_item`, `hat_texture`/`hat_item`. `WISP_SHOP_PREVIEW=<dir>` writes a
+  sheet of each item from four sides at four moments of its animation. Checked by `Item::parse`
   and in preview renders; not yet seen in a running game.
+- The launcher's Store figure now plays part animations (`shop_view` `shop_picture`: ticks in
+  `ANIMATION_STEP`s over the longest period, part of the picture cache key); before, it always
+  drew time 0, so the wings stood still there. The Locker still shows the rest pose.
+- Lavender (`lavender_cape`, 800 coins / 6.40 €, price chosen by the agent): the owner asked
+  (2026-11-19) for an animated cape of lavender flowers on a green hill. `lavender_frames`: a 12×
+  cape like the Founders Cape, 48 frames at 2 ticks; `cape_item` now takes the frametime and glow.
+- 2026-11-19, the owner: no rarity labels ("epic, rare etc." removed: `tier` is gone, the Store
+  shows the kind), the category pills replaced (underline tabs with item counts; "Hats" is now
+  "Head"), and the Shop server "removed for now" to test without setting it up:
+  `shop_view::LOCAL_SHOP` (true) keeps coins, purchases and what is worn in `shop.json` in the
+  launcher's folder, starting with `LOCAL_COINS` (10,000), ignores the server's wallet and hides
+  the creator code. Set it to false to go back to the server. Launching still dresses the game
+  from that wallet (`Wallet::dress`).
+- Devil Horns and Angel Halo (Head, 400 coins each, prices chosen by the agent): `horns_item`
+  (five tapering box segments a horn, each its own part), `halo_item` (twelve gold bars in a ring,
+  spinning and bobbing, glowing). Head items' cards and Store figure are lowered a quarter block
+  so horns aren't cut off at the picture's top.
 
 ## Unreleased: four emotes, Wisp Original Cape and Stray Head
 

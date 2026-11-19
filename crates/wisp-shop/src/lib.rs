@@ -131,7 +131,7 @@ const FOUNDERS_CAPE: Offer = offer!(
 const DEMON_WINGS: Offer = offer!(
     "demon_wings",
     "Demon Wings",
-    "Black-boned bat wings with a crimson membrane and a pale claw at each wrist, beating slowly behind you.",
+    "Big bat wings of solid black bones with an ember-red skin and ivory claws, opening and folding as they beat.",
     Wings,
     1_000,
     item
@@ -141,7 +141,7 @@ const DEMON_WINGS: Offer = offer!(
 const ANGEL_WINGS: Offer = offer!(
     "angel_wings",
     "Angel Wings",
-    "Three rows of white feathers on a gold-edged arm, bright even at night.",
+    "White feathered wings on a gold arm that open and close as they beat, bright even at night.",
     Wings,
     1_000,
     item
@@ -157,7 +157,7 @@ const BAMBOO_SWORD: Offer = offer!(
     item
 );
 
-/// The Stray Head: a smooth conical straw hat sized for Minecraft's head. 400 coins (3.20 €).
+/// The Stray Head: a conical straw hat in stepped layers, sized for Minecraft's head. 400 coins (3.20 €).
 const STRAY_HEAD: Offer = offer!(
     "stray_head",
     "Stray Head",
@@ -167,14 +167,47 @@ const STRAY_HEAD: Offer = offer!(
     item
 );
 
+/// The Lavender cape: an animated HD lavender field on a green hill. 800 coins (6.40 €).
+const LAVENDER_CAPE: Offer = offer!(
+    "lavender_cape",
+    "Lavender",
+    "Lavender swaying on a green hill under a summer sky, clouds drifting by and a butterfly fluttering past.",
+    Cape,
+    800,
+    item
+);
+
+/// Devil Horns: two curved crimson horns. 400 coins (3.20 €).
+const DEVIL_HORNS: Offer = offer!(
+    "devil_horns",
+    "Devil Horns",
+    "Two curved horns, dark crimson to a black point, sweeping out and up from your head.",
+    Head,
+    400,
+    item
+);
+
+/// Angel Halo: a glowing gold ring over the head. 400 coins (3.20 €).
+const ANGEL_HALO: Offer = offer!(
+    "angel_halo",
+    "Angel Halo",
+    "A ring of glowing gold floating over your head, turning slowly.",
+    Head,
+    400,
+    item
+);
+
 /// What the shop sells.
 #[cfg(not(any(test, feature = "test-items")))]
 pub const OFFERS: &[Offer] = &[
     FOUNDERS_CAPE,
+    LAVENDER_CAPE,
     DEMON_WINGS,
     ANGEL_WINGS,
     BAMBOO_SWORD,
     STRAY_HEAD,
+    DEVIL_HORNS,
+    ANGEL_HALO,
 ];
 
 /// With `test-items` (and in this crate's tests), made-up items beside the real ones, so the
@@ -183,10 +216,13 @@ pub const OFFERS: &[Offer] = &[
 #[cfg(any(test, feature = "test-items"))]
 pub const OFFERS: &[Offer] = &[
     FOUNDERS_CAPE,
+    LAVENDER_CAPE,
     DEMON_WINGS,
     ANGEL_WINGS,
     BAMBOO_SWORD,
     STRAY_HEAD,
+    DEVIL_HORNS,
+    ANGEL_HALO,
     test_offer("test_cape", Kind::Cape, 1_200),
     test_offer("test_wings", Kind::Wings, 900),
     test_offer("test_hat", Kind::Head, 1_000),
@@ -489,10 +525,13 @@ mod tests {
             ids,
             [
                 FOUNDERS,
+                "lavender_cape",
                 "demon_wings",
                 "angel_wings",
                 "bamboo_sword",
-                "stray_head"
+                "stray_head",
+                "devil_horns",
+                "angel_halo"
             ]
         );
         let cape = offer(FOUNDERS).unwrap();

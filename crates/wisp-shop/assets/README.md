@@ -12,19 +12,30 @@ running round it, a breathing halo, a light sweep across the feather and a gold 
 - `founders_cape.png`: its card in the launcher's list.
 - `banner_founders_cape.png`: the Store's backdrop while it is chosen (16:9).
 
-HD items, drawn by `shop_items` at the format's most detail (256-texel textures; boxes are 8×
-a model pixel at an eighth of the scale), no Minecraft assets. 100 coins are worth 0.80 €:
+HD items, drawn by `shop_items` and built like Blockbench cosmetics out of solid boxes (8 units
+a model pixel at an eighth of the scale, the hat 4 at a quarter), with 256-texel textures and no
+Minecraft assets. 100 coins are worth 0.80 €:
 
-- `demon_wings` (Wings, 1,000 coins / 8 €): bat wings, round black bones with a knuckle and an
-  ivory claw at the wrist, a leathery crimson membrane with veins, glowing where it thins
-  towards its scalloped edge. Two panels a wing, the outer bending as they beat.
-- `angel_wings` (Wings, 1,000 coins / 8 €): white feathers in three rows on a gold-edged arm,
-  each with its quill and barbs, each row shading the next; they glow.
+- `lavender_cape` (Cape, 800 coins / 6.40 €): "Lavender", an animated 12× cape like the
+  Founders Cape (48 frames, 2 ticks each): rows of lavender over a green hill, tall lavender
+  stalks swaying in a gust that runs over the field, clouds drifting, a white butterfly.
+- `demon_wings` (Wings, 1,000 coins / 8 €): big bat wings: arm, hand and three fanned fingers
+  of black bone boxes, a knuckle and ivory claws, a leathery skin stretched between them, dark by
+  the bones and ember-red towards its scalloped edge. They open wide and fold back as they beat
+  (`flap`), the outer half a beat behind.
+- `angel_wings` (Wings, 1,000 coins / 8 €): three sections of gold arm, each bending further
+  down, with a row of rounded coverts in front and box feathers behind, longest at the tip so
+  they fan out; they open and close as they beat, and glow.
 - `bamboo_sword` (Weapon, 500 coins / 4 €): a bamboo stalk with fibres and raised nodes, cut
   ends showing the hollow, a bamboo guard and pommel, a twine grip and a leaf, across the back
   with the grip over the right shoulder.
 - `stray_head` (Head, 400 coins / 3.20 €): the conical straw hat of `cosmeticideas/strayhead.jpg`,
-  a smooth 32-sided cone of woven straw 16 pixels across on the 8-pixel head, a copper rim wound
-  with red thread, a white cord knot.
+  eleven stepped layers of rounded box crosses, woven straw 16 pixels across on the 8-pixel head,
+  a copper rim wound with red thread, a white cord knot.
+
+- `devil_horns` (Head, 400 coins / 3.20 €): two horns of five tapering boxes each, bending
+  out, up and back, dark crimson with ridged rings to a black point.
+- `angel_halo` (Head, 400 coins / 3.20 €): twelve gold bars in a ring over the head, tilted a
+  little, turning slowly and bobbing; it glows.
 
 Each has `<id>.json` (the item) and `<id>.png` (its card).

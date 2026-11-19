@@ -387,7 +387,7 @@ fn strip(frames: &[Canvas]) -> Canvas {
     s
 }
 
-fn cape_item(id: &str, frames: &[Canvas]) -> Value {
+fn cape_item(id: &str, frames: &[Canvas], frametime: u32, glow: bool) -> Value {
     let (w, h, d) = CAPE;
     json!({
         "format": 1,
@@ -395,17 +395,191 @@ fn cape_item(id: &str, frames: &[Canvas]) -> Value {
         "slot": "back",
         "bone": "body",
         // A night-sky cape stays bright in the dark.
-        "glow": true,
+        "glow": glow,
         // Behind the back, turned round like vanilla's cape, at a twelfth of the scale for its
         // 12× texture.
         "attach": { "offset": [0, 0, 2], "rotation": [0, 180, 0], "scale": 1.0 / RES as f32 },
-        "texture": { "png": b64(&strip(frames).png()), "frames": frames.len(), "frametime": CAPE_FRAMETIME },
+        "texture": { "png": b64(&strip(frames).png()), "frames": frames.len(), "frametime": frametime },
         "parts": [{
             "name": "cape", "pivot": [0, 0, 0], "rotation": [-7, 0, 0],
             "cubes": [{ "origin": [-w / 2, 0, -d], "size": [w, h, d], "uv": [0, 0] }]
         }],
         "animations": [{ "part": "cape", "motion": "swing", "axis": "x", "amplitude": 3, "period": 70, "phase": 0 }]
     })
+}
+
+// ---------------------------------------------------------------- Lavender cape
+
+/// Lavender's frames: 48 at two ticks each, a 4.8 s loop (the flowers sway slowly).
+const LAVENDER_FRAMES: u32 = 48;
+const LAVENDER_FRAMETIME: u32 = 2;
+
+/// Lavender's purples, dark to light.
+const LAVENDER: [u32; 6] = [0x4a2a78, 0x6b3fa0, 0x8f5fc4, 0xb57edc, 0xcfa4ec, 0xeedcfb];
+
+/// The Lavender cape at 12×, animated: a green hill under a summer sky, rows of lavender running
+/// over it towards the crest, tall lavender stalks in front swaying in the wind, clouds drifting
+/// and a white butterfly fluttering across. Every motion turns once a loop, so it never jumps.
+fn lavender_frames() -> Vec<Canvas> {
+    let (w, h, d) = CAPE;
+    let faces = box_faces(0, 0, w, h, d);
+    let (fx, fy, _, _) = faces[3];
+    let tau = std::f32::consts::TAU;
+    let (wf, hf) = (w as f32, h as f32);
+    // The hill's crest (texel rows, y down): a broad rounded top a little right of the middle.
+    let crest = |x: f32| 74.0 * K / 1.5 + 0.0045 * (x - 0.62 * wf).powi(2) / K * 1.5;
+    // Where the rows meet, above the crest.
+    let (vx, vy) = (0.62 * wf, crest(0.62 * wf) - 26.0);
+    // The front stalks: (base x, base y, height, phase, lean), back to front.
+    let mut stalks: Vec<(f32, f32, f32, f32, f32)> = (0..30)
+        .map(|i| {
+            let n = |s: u32| noise(i, 0, s);
+            let base_y = hf * (0.8 + 0.22 * n(301));
+            (
+                wf * (i as f32 + 0.5) / 30.0 + (n(302) - 0.5) * 6.0,
+                base_y,
+                (38.0 + 30.0 * n(303)) * (base_y / hf),
+                n(304) * 0.6,
+                (n(305) - 0.5) * 6.0,
+            )
+        })
+        .collect();
+    stalks.sort_by(|a, b| a.1.total_cmp(&b.1));
+    (0..LAVENDER_FRAMES)
+        .map(|k| {
+            let t = k as f32 / LAVENDER_FRAMES as f32;
+            let turn = t * tau;
+            let mut c = Canvas::new(CAPE_TEX.0, CAPE_TEX.1);
+            // The edges a deep green, the inner side darker.
+            for (x, y, fw, fh) in faces {
+                c.rect(x, y, fw, fh, hex(0x2c4a22));
+            }
+            let (bx, by, _, _) = faces[5];
+            c.rect(bx, by, w, h, hex(0x1c3016));
+            // The wind: a gust running over the field once a loop.
+            let wind = |x: f32, y: f32| (turn - x * 0.03 - y * 0.012).sin();
+            for y in 0..h {
+                for x in 0..w {
+                    let (xf, yf) = (x as f32 + 0.5, y as f32 + 0.5);
+                    let top = crest(xf);
+                    let col = if yf < top {
+                        // The sky: deep blue up high to a warm haze at the horizon, a sun's glow
+                        // to the right, clouds drifting (sampled round a circle so they loop).
+                        let v = yf / top;
+                        let mut col = mix(hex(0x5b9be0), hex(0xf6dcc0), v.powf(1.6));
+                        let (sx, sy) = (xf - 0.8 * wf, yf - 0.22 * hf);
+                        let sun = (-(sx * sx + sy * sy) / (110.0 * K * K)).exp();
+                        col = add_light(col, [255.0, 240.0, 200.0], sun * 0.75);
+                        let (lx, ly) = (turn.cos() * 0.9, turn.sin() * 0.25);
+                        let cloud = fbm(xf / (30.0 * K) + lx, yf / (12.0 * K) + ly, 311);
+                        let cloud = ((cloud - 0.55) * 4.0).clamp(0.0, 1.0) * (1.0 - v * 0.6);
+                        mix(col, hex(0xffffff), cloud * 0.85)
+                    } else {
+                        // The hill: rows of lavender converging on the crest, green between.
+                        let depth = ((yf - top) / (hf - top)).clamp(0.0, 1.0);
+                        let across = (xf - vx) / (yf - vy).max(1.0);
+                        let rows = across * 9.0;
+                        let f = rows - rows.floor();
+                        // Grass and lavender alike lighter far off, in the haze.
+                        let haze = (1.0 - depth).powi(3) * 0.45;
+                        let sway = wind(xf, yf) * 0.08 * depth;
+                        let bush = (f - 0.5 + sway).abs() < 0.2 && depth > 0.06;
+                        let bump = vnoise(xf / (2.0 + 5.0 * depth), yf / (1.5 + 4.0 * depth), 313);
+                        let mut col = if bush {
+                            let edge = 1.0 - (f - 0.5 + sway).abs() / 0.2;
+                            ramp(&LAVENDER, 0.2 + edge * 0.45 + bump * 0.35)
+                        } else {
+                            let g = 0.3 + bump * 0.4 + depth * 0.1;
+                            ramp(&[0x2f5a1e, 0x3f7426, 0x55912f, 0x6fae3c, 0x8cc552], g)
+                        };
+                        // The hill's own light: the crest lit, the slope away shaded.
+                        col = add_light(col, [40.0, 40.0, 10.0], (1.0 - depth) * 0.6);
+                        mix(col, hex(0xe8e0f0), haze)
+                    };
+                    c.set(fx + x, fy + y, col);
+                }
+            }
+            // The front stalks: a green stem bending with the wind, a spike of lavender buds
+            // on its top third, each bud lit from the upper left.
+            for &(x0, y0, len, phase, lean) in &stalks {
+                let sway = (wind(x0, y0) * 0.75 + (turn * 2.0 + phase * tau).sin() * 0.25) * 7.0;
+                let at = |s: f32| [x0 + (lean + sway) * s * s, y0 - len * s];
+                let steps = (len * 2.0) as i32;
+                for i in 0..steps {
+                    let s = i as f32 / steps as f32;
+                    let [px, py] = at(s);
+                    if s < 0.62 {
+                        c.set(fx + px as i32 - 1, fy + py as i32, hex(0x6c9a4a));
+                        c.set(fx + px as i32, fy + py as i32, hex(0x4f7a3a));
+                        c.set(fx + px as i32 + 1, fy + py as i32, hex(0x37592a));
+                    }
+                }
+                let buds = 9;
+                for b in 0..buds {
+                    let s = 0.6 + 0.4 * b as f32 / buds as f32;
+                    let [px, py] = at(s);
+                    let r = 5.0 * (1.0 - 0.45 * b as f32 / buds as f32) * (y0 / hf);
+                    let side = if b % 2 == 0 { -1.0 } else { 1.0 };
+                    let cx = px + side * r * 0.45;
+                    for dy in -7..=7 {
+                        for dx in -6..=6 {
+                            let (ex, ey) = (dx as f32 / r, dy as f32 / (r * 1.25));
+                            let dd = ex * ex + ey * ey;
+                            if dd > 1.0 {
+                                continue;
+                            }
+                            let light = 0.75 - (ex + ey) * 0.25 - dd * 0.3;
+                            let (xx, yy) = (cx as i32 + dx, py as i32 + dy);
+                            if xx >= 0 && yy >= 0 && xx < w && yy < h {
+                                c.set(fx + xx, fy + yy, ramp(&LAVENDER, light));
+                            }
+                        }
+                    }
+                }
+            }
+            // A white butterfly fluttering across and back once a loop, its wings beating.
+            let (bx, by) = (
+                wf * (0.5 + 0.34 * turn.sin()),
+                hf * (0.5 + 0.06 * (turn * 2.0).sin()),
+            );
+            let open = ((turn * 12.0).sin() * 0.5 + 0.5) * 3.5 * K / 1.5 + 1.0;
+            for dy in -10..=10 {
+                for dx in -12..=12 {
+                    let (ex, ey) = (dx as f32 / 2.0, dy as f32 / 2.0);
+                    let wing =
+                        ex.abs() <= open && ex.abs() >= 0.5 && ey.abs() <= 3.0 + ex.abs() * 0.4;
+                    if wing {
+                        let col = if ey.abs() > 2.0 + ex.abs() * 0.35 {
+                            hex(0xd8d0e8)
+                        } else {
+                            hex(0xfdfbff)
+                        };
+                        c.set(fx + bx as i32 + dx, fy + by as i32 + dy, col);
+                    }
+                }
+            }
+            for dy in -4..=4 {
+                c.set(fx + bx as i32, fy + by as i32 + dy, hex(0x2a2030));
+                c.set(fx + bx as i32 + 1, fy + by as i32 + dy, hex(0x2a2030));
+            }
+            // A fine lavender border and a deep-purple hem.
+            let line = RES / 4;
+            for x in 0..w {
+                for k in 0..line {
+                    c.set(fx + x, fy + k, ramp(&LAVENDER, 0.7));
+                    c.set(fx + x, fy + h - 1 - k, ramp(&LAVENDER, 0.1));
+                    c.set(fx + x, fy + h - 1 - line - k, ramp(&LAVENDER, 0.45));
+                }
+            }
+            for y in 0..h {
+                for k in 0..line {
+                    c.set(fx + k, fy + y, ramp(&LAVENDER, 0.7));
+                    c.set(fx + w - 1 - k, fy + y, ramp(&LAVENDER, 0.7));
+                }
+            }
+            c
+        })
+        .collect()
 }
 
 // ---------------------------------------------------------------- Minecraft-style pieces
@@ -435,26 +609,6 @@ fn to_segment(p: [f32; 2], a: [f32; 2], b: [f32; 2]) -> f32 {
 
 fn lerp2(a: [f32; 2], b: [f32; 2], t: f32) -> [f32; 2] {
     [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]
-}
-
-/// Darkens the opaque texels of the `w`×`h` region at (0, 0) that touch a transparent one: the
-/// one-texel outline Minecraft's pixel art has.
-fn outline(c: &mut Canvas, w: i32, h: i32, colour: Rgba) {
-    let solid =
-        |c: &Canvas, x: i32, y: i32| x >= 0 && y >= 0 && x < w && y < h && c.get(x, y)[3] > 0;
-    let edge: Vec<(i32, i32)> = (0..h)
-        .flat_map(|y| (0..w).map(move |x| (x, y)))
-        .filter(|&(x, y)| {
-            solid(c, x, y)
-                && [(1, 0), (-1, 0), (0, 1), (0, -1)]
-                    .iter()
-                    .any(|(dx, dy)| !solid(c, x + dx, y + dy))
-        })
-        .collect();
-    for (x, y) in edge {
-        let p = c.get(x, y);
-        c.set(x, y, mix([p[0], p[1], p[2], 255], colour, 0.7));
-    }
 }
 
 /// Each of the six faces of a box at (`u`, `v`) painted texel by texel: `paint(face, i, j, fw, fh)`
@@ -495,19 +649,101 @@ fn quad(points: [[f32; 3]; 4], uvs: [[f32; 2]; 4]) -> Value {
 
 // ---------------------------------------------------------------- wings
 
-/// Texels per design unit: the HD items are drawn 8× finer than Minecraft's pixel, the most the
-/// format's 256-texel textures hold.
+/// Units per model pixel for the HD items: their boxes are built this many times Minecraft's size
+/// and drawn at that fraction of the scale, so a 256-texel texture covers them 8 texels a pixel.
 const HD: i32 = 8;
 const HDF: f32 = HD as f32;
 
-/// A wing's design: `WING.0`×`WING.1` units (drawn at `HD` texels each, 256×192), the shoulder on
-/// the left (row `WING_ROOT`), the tip on the right. Columns left of `WING_JOINT` are the inner
-/// panel, the rest the outer one, which bends as the wing beats.
-const WING: (i32, i32) = (32, 24);
-const WING_ROOT: f32 = 7.0;
-const WING_JOINT: f32 = 13.0;
-/// Model pixels a design unit covers: a span of 18 pixels, within the 24-pixel reach.
-const WING_TEXEL: f32 = 0.55;
+/// A box on the `side` (1 the wearer's left, +x; -1 the right) wing: a left-wing box mirrored in x
+/// for the right, texture and all.
+fn side_cube(side: f32, origin: [f32; 3], size: [f32; 3], uv: [i32; 2]) -> Value {
+    if side > 0.0 {
+        json!({ "origin": origin, "size": size, "uv": uv })
+    } else {
+        json!({
+            "origin": [-origin[0] - size[0], origin[1], origin[2]],
+            "size": size, "uv": uv, "mirror": true,
+        })
+    }
+}
+
+/// A point `len` along a direction `deg` degrees below +x (y is down), from `from`.
+fn ray(from: [f32; 2], deg: f32, len: f32) -> [f32; 2] {
+    let a = deg.to_radians();
+    [from[0] + a.cos() * len, from[1] + a.sin() * len]
+}
+
+/// A scalloped edge from `a` to `b`: a curve bowed `depth` towards `towards`, as points.
+fn scallop(a: [f32; 2], b: [f32; 2], towards: [f32; 2], depth: f32) -> Vec<[f32; 2]> {
+    let mid = lerp2(a, b, 0.5);
+    let (dx, dy) = (towards[0] - mid[0], towards[1] - mid[1]);
+    let l = dx.hypot(dy).max(0.001);
+    let ctrl = [mid[0] + dx / l * depth * 2.0, mid[1] + dy / l * depth * 2.0];
+    (0..=12)
+        .map(|i| {
+            let t = i as f32 / 12.0;
+            let p = lerp2(lerp2(a, ctrl, t), lerp2(ctrl, b, t), t);
+            [p[0], p[1]]
+        })
+        .collect()
+}
+
+/// A flat skin stretched over a polygon in a part's plane (z 0): the polygon's bounding box as one
+/// quad each way round, its texels at `at` in the texture (one a unit), so the texture's cut-out
+/// gives the shape. Returns the quads and the box (x0, y0, w, h).
+fn skin_quads(side: f32, poly: &[[f32; 2]], at: [i32; 2], tex: [f32; 2]) -> (Vec<Value>, [i32; 4]) {
+    let x0 = poly.iter().map(|p| p[0]).fold(f32::MAX, f32::min).floor();
+    let y0 = poly.iter().map(|p| p[1]).fold(f32::MAX, f32::min).floor();
+    let x1 = poly.iter().map(|p| p[0]).fold(f32::MIN, f32::max).ceil();
+    let y1 = poly.iter().map(|p| p[1]).fold(f32::MIN, f32::max).ceil();
+    let p = |x: f32, y: f32| [side * x, y, 0.0];
+    let uv = |x: f32, y: f32| {
+        [
+            (at[0] as f32 + x - x0) / tex[0],
+            (at[1] as f32 + y - y0) / tex[1],
+        ]
+    };
+    let pts = [p(x0, y0), p(x1, y0), p(x1, y1), p(x0, y1)];
+    let uvs = [uv(x0, y0), uv(x1, y0), uv(x1, y1), uv(x0, y1)];
+    let quads = vec![
+        quad(pts, uvs),
+        quad(
+            [pts[3], pts[2], pts[1], pts[0]],
+            [uvs[3], uvs[2], uvs[1], uvs[0]],
+        ),
+    ];
+    (
+        quads,
+        [x0 as i32, y0 as i32, (x1 - x0) as i32, (y1 - y0) as i32],
+    )
+}
+
+/// Paints a skin's texels: `paint(point)` for each texel of the box at `at`, transparent outside
+/// the polygon, with a dark one-texel outline round it.
+fn paint_skin(
+    c: &mut Canvas,
+    poly: &[[f32; 2]],
+    at: [i32; 2],
+    bbox: [i32; 4],
+    edge: Rgba,
+    mut paint: impl FnMut([f32; 2]) -> Rgba,
+) {
+    let [x0, y0, w, h] = bbox;
+    for j in 0..h {
+        for i in 0..w {
+            let p = [(x0 + i) as f32 + 0.5, (y0 + j) as f32 + 0.5];
+            if !inside(poly, p) {
+                continue;
+            }
+            let col = if to_edge(poly, p) < 1.6 {
+                edge
+            } else {
+                paint(p)
+            };
+            c.set(at[0] + i, at[1] + j, col);
+        }
+    }
+}
 
 /// The distance from `p` to the polygon's edge.
 fn to_edge(poly: &[[f32; 2]], p: [f32; 2]) -> f32 {
@@ -516,283 +752,431 @@ fn to_edge(poly: &[[f32; 2]], p: [f32; 2]) -> f32 {
         .fold(f32::MAX, f32::min)
 }
 
-/// Each texel of a `WING`-sized HD canvas, with its point in design units.
-fn each_wing_texel(mut f: impl FnMut(i32, i32, [f32; 2])) {
-    for y in 0..WING.1 * HD {
-        for x in 0..WING.0 * HD {
-            f(x, y, [(x as f32 + 0.5) / HDF, (y as f32 + 0.5) / HDF]);
-        }
-    }
+/// The distance from `p` to a polyline.
+fn to_line(line: &[[f32; 2]], p: [f32; 2]) -> f32 {
+    line.windows(2)
+        .map(|s| to_segment(p, s[0], s[1]))
+        .fold(f32::MAX, f32::min)
 }
 
-/// Demon Wings in HD: a bat's wing. Round black bones lit along their length, knuckles at the
-/// wrist, an ivory claw on the wrist and at the tip; a leathery membrane, dark by the body and
-/// glowing ember-red where it thins towards its scalloped edge, with veins branching through it.
-fn demon_wing() -> Canvas {
-    let (w, h) = (WING.0 * HD, WING.1 * HD);
-    let mut c = Canvas::new(w as u32, h as u32);
-    let root = [0.5, 7.5];
-    let wrist = [12.5, 2.6];
-    let tips = [
-        [31.4, 1.2],
-        [30.5, 10.5],
-        [23.5, 18.0],
-        [14.0, 23.0],
-        [3.5, 19.5],
-    ];
-    let mut poly = vec![root, wrist, tips[0]];
-    for pair in tips.windows(2) {
-        let (a, b) = (pair[0], pair[1]);
-        let ctrl = lerp2(lerp2(a, b, 0.5), wrist, 0.32);
-        for k in 1..=24 {
-            let t = k as f32 / 24.0;
-            poly.push(lerp2(lerp2(a, ctrl, t), lerp2(ctrl, b, t), t));
-        }
-    }
-    // (from, to, radius at `from`, radius at `to`)
-    let bones: [([f32; 2], [f32; 2], f32, f32); 6] = [
-        (root, wrist, 0.85, 0.6),
-        (wrist, tips[0], 0.5, 0.22),
-        (wrist, tips[1], 0.42, 0.18),
-        (wrist, tips[2], 0.42, 0.18),
-        (wrist, tips[3], 0.42, 0.18),
-        ([1.0, 8.0], tips[4], 0.4, 0.18),
-    ];
-    // How deep into the nearest bone `p` is (0 on its axis, 1 at its surface) and which side.
-    let bone_at = |p: [f32; 2]| -> Option<(f32, f32)> {
-        let mut best: Option<(f32, f32)> = None;
-        for &(a, b, ra, rb) in &bones {
-            let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
-            let t =
-                (((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / (dx * dx + dy * dy)).clamp(0.0, 1.0);
-            let (qx, qy) = (a[0] + t * dx, a[1] + t * dy);
-            let r = ra + (rb - ra) * t;
-            let d = (p[0] - qx).hypot(p[1] - qy) / r;
-            // Which side of the axis: the light comes from above.
-            let side = ((p[0] - qx) * -dy + (p[1] - qy) * dx).signum() * dx.signum();
-            if d < 1.0 && best.is_none_or(|(bd, _)| d < bd) {
-                best = Some((d, side));
+/// A colour from a ramp of shades by `t` in 0..1, stepped (pixel art's few tones, no smooth blend).
+fn ramp(shades: &[u32], t: f32) -> Rgba {
+    let i = (t.clamp(0.0, 0.999) * shades.len() as f32) as usize;
+    hex(shades[i])
+}
+
+/// A round bone along x (box UV, `w` long, `t` thick) painted from a ramp: lit on top, a bright
+/// line along it, darker underneath, rings every so often, its ends lighter.
+fn paint_bone(c: &mut Canvas, uv: [i32; 2], w: i32, t: i32, shades: &[u32]) {
+    paint_box(c, uv[0], uv[1], w, t, t, |face, i, j, fw, fh| {
+        let n = noise(i / 2, j / 2, 41) * 0.08;
+        match face {
+            0 => ramp(shades, 0.78 + n),
+            1 => ramp(shades, 0.12 + n),
+            2 | 4 => ramp(shades, 0.55 + n),
+            _ => {
+                let across = (j as f32 + 0.5) / fh as f32;
+                let round = (across * std::f32::consts::PI).sin();
+                let mut l = 0.18 + 0.62 * round - 0.35 * across;
+                if (i % 26) < 2 && i > 4 && i < fw - 4 {
+                    l -= 0.25;
+                }
+                if (across - 0.3).abs() < 0.09 {
+                    l += 0.22;
+                }
+                ramp(shades, l + n)
             }
-        }
-        // A knuckle at the wrist.
-        let k = (p[0] - wrist[0]).hypot(p[1] - wrist[1]) / 0.95;
-        if k < 1.0 && best.is_none_or(|(bd, _)| k < bd) {
-            best = Some((k, (p[1] - wrist[1]).signum()));
-        }
-        best
-    };
-    // The distance to the nearest bone axis, for the shadow the bones throw on the skin.
-    let near_bone = |p: [f32; 2]| {
-        bones
-            .iter()
-            .map(|&(a, b, ..)| to_segment(p, a, b))
-            .fold(f32::MAX, f32::min)
-    };
-    each_wing_texel(|x, y, p| {
-        if let Some((d, side)) = bone_at(p) {
-            // A round bone: bright on its upper flank, black at its rim.
-            let round = (1.0 - d * d).sqrt();
-            let lit = (round * 0.8 + if side < 0.0 { 0.25 } else { -0.1 } * round).clamp(0.0, 1.0);
-            let mut col = mix(hex(0x0c0506), hex(0x6e4440), lit);
-            if d < 0.25 && side < 0.0 {
-                col = add_light(col, [120.0, 90.0, 85.0], (0.25 - d) * 1.6);
-            }
-            col = add_light(
-                col,
-                [30.0, 20.0, 20.0],
-                (fbm(p[0] * 6.0, p[1] * 6.0, 705) - 0.5) * 1.2,
-            );
-            c.set(x, y, col);
-        } else if inside(&poly, p) {
-            let t = ((p[0] - root[0]).hypot(p[1] - root[1]) / 30.0).clamp(0.0, 1.0);
-            let skin = fbm(p[0] * 1.1, p[1] * 1.1, 702);
-            let mut col = mix(
-                hex(0x22040a),
-                hex(0xa01c26),
-                (t * 0.9 + (skin - 0.5) * 0.35).clamp(0.0, 1.0),
-            );
-            // Thin skin glows towards the edge, as if lit from behind.
-            let edge = to_edge(&poly, p);
-            col = add_light(
-                col,
-                [255.0, 70.0, 40.0],
-                (1.0 - edge / 2.2).max(0.0) * 0.35 * t,
-            );
-            // Veins: the ridges of a noise, darker, branching between the fingers.
-            let ridge = 1.0 - (fbm(p[0] * 0.9, p[1] * 0.9, 709) * 2.0 - 1.0).abs();
-            if ridge > 0.9 {
-                col = mix(col, hex(0x2a0307), (ridge - 0.9) * 7.0);
-            }
-            // Fine wrinkles of the leather.
-            let wrinkle = vnoise(p[0] * 14.0, p[1] * 3.0, 711);
-            col = add_light(col, [40.0, 10.0, 10.0], (wrinkle - 0.5) * 0.5);
-            // The bones' shadow and the skin pulled taut along them.
-            let nb = near_bone(p);
-            if nb < 1.4 {
-                col = mix(col, hex(0x180205), (1.4 - nb) / 1.4 * 0.55);
-            }
-            c.set(x, y, col);
         }
     });
-    // Claws: an ivory hook on the wrist and a small one at the tip, shaded round.
-    for (base, point, r) in [(wrist, [11.7, 0.15], 0.5), (tips[0], [31.9, 0.1], 0.3)] {
-        each_wing_texel(|x, y, p| {
-            let (dx, dy) = (point[0] - base[0], point[1] - base[1]);
-            let t = (((p[0] - base[0]) * dx + (p[1] - base[1]) * dy) / (dx * dx + dy * dy))
-                .clamp(0.0, 1.0);
-            // A hook: the axis bends forward as it rises.
-            let bend = 0.35 * r * (t * std::f32::consts::PI).sin();
-            let q = [base[0] + t * dx - bend, base[1] + t * dy];
-            let d = (p[0] - q[0]).hypot(p[1] - q[1]) / (r * (1.0 - t * 0.92));
-            if d < 1.0 && t > 0.05 {
-                let round = (1.0 - d * d).sqrt();
-                let col = mix(hex(0x6b5e48), hex(0xf2e9d2), round * (1.0 - t * 0.5));
-                c.set(x, y, mix(col, hex(0x2a2218), (t - 0.75).max(0.0) * 3.0));
+}
+
+/// A horn-like claw (box UV, pointing along -y): pale at the root, dark at the point.
+fn paint_claw(c: &mut Canvas, uv: [i32; 2], size: [i32; 3]) {
+    let [w, h, d] = size;
+    paint_box(c, uv[0], uv[1], w, h, d, |face, i, j, fw, fh| {
+        let along = 1.0 - (j as f32 + 0.5) / fh as f32;
+        let across = (i as f32 + 0.5) / fw as f32;
+        let side = if face == 3 || face == 5 { 0.15 } else { 0.0 };
+        ramp(
+            &[0x2a2018, 0x5e4c36, 0x9c8a68, 0xcfc1a0, 0xece2c6],
+            0.95 - along * 0.75 + side - across * 0.15,
+        )
+    });
+}
+
+/// The Demon Wings' layout: the wrist, how far the hand reaches, each finger's angle below the
+/// hand (degrees) and length, all in HD units in the outer part's frame.
+const DEMON_ARM: f32 = 88.0;
+const DEMON_HAND: f32 = 78.0;
+const DEMON_FINGERS: [(f32, f32); 3] = [(70.0, 88.0), (42.0, 96.0), (16.0, 84.0)];
+/// The outer part's rest bend (degrees about z, down-outward from the arm).
+const DEMON_BEND: f32 = 30.0;
+/// Where the skins, bones and claws sit in the texture.
+const DEMON_INNER_AT: [i32; 2] = [0, 0];
+const DEMON_OUTER_AT: [i32; 2] = [100, 0];
+const DEMON_BONE_AT: [i32; 2] = [0, 120];
+const DEMON_KNUCKLE_AT: [i32; 2] = [0, 148];
+const DEMON_CLAW_AT: [i32; 2] = [64, 148];
+const DEMON_TIP_AT: [i32; 2] = [96, 148];
+const DEMON_TEX: (u32, u32) = (256, 184);
+
+/// The outer skin's outline (outer frame): the hand to its tip, then the scalloped edge from
+/// fingertip to fingertip back to the innermost finger, and along it to the wrist.
+fn demon_outer_poly() -> (Vec<[f32; 2]>, Vec<Vec<[f32; 2]>>) {
+    let wrist = [0.0, 0.0];
+    let tips: Vec<[f32; 2]> = DEMON_FINGERS
+        .iter()
+        .rev()
+        .map(|&(a, l)| ray(wrist, a, l))
+        .collect();
+    let hand = [DEMON_HAND, 3.0];
+    let mut poly = vec![[0.0, -2.0], [DEMON_HAND - 4.0, -2.0], hand];
+    let mut edges = Vec::new();
+    let mut from = hand;
+    for &tip in &tips {
+        let s = scallop(from, tip, wrist, 7.0);
+        poly.extend_from_slice(&s[1..]);
+        edges.push(s);
+        from = tip;
+    }
+    (poly, edges)
+}
+
+/// The inner skin's outline (root frame): along the arm to the wrist, down the innermost finger as
+/// it rests, a scalloped edge back to the body.
+fn demon_inner_poly() -> (Vec<[f32; 2]>, Vec<Vec<[f32; 2]>>) {
+    let wrist = [DEMON_ARM, 0.0];
+    let (a, l) = DEMON_FINGERS[0];
+    let tip = ray(wrist, a + DEMON_BEND, l);
+    let body = [6.0, 70.0];
+    let mut poly = vec![[6.0, -2.0], [DEMON_ARM, -2.0], tip];
+    let mid = [40.0, 92.0];
+    let s1 = scallop(tip, mid, [50.0, 10.0], 6.0);
+    let s2 = scallop(mid, body, [50.0, 10.0], 5.0);
+    poly.extend_from_slice(&s1[1..]);
+    poly.extend_from_slice(&s2[1..]);
+    (poly, vec![s1, s2])
+}
+
+/// Demon Wings' texture: two leathery skins, dark by the bones and glowing ember-red where they
+/// thin towards the scalloped edge, veined from the wrist; black bones; ivory claws.
+fn demon_texture() -> Canvas {
+    let mut c = Canvas::new(DEMON_TEX.0, DEMON_TEX.1);
+    let tex = [DEMON_TEX.0 as f32, DEMON_TEX.1 as f32];
+    let skin = [
+        0x14030a, 0x2b0710, 0x470b16, 0x6a1019, 0x8f1a1f, 0xb82a24, 0xe2482c, 0xff8a3c,
+    ];
+    let paint = |c: &mut Canvas,
+                 poly: &[[f32; 2]],
+                 edges: &[Vec<[f32; 2]>],
+                 at: [i32; 2],
+                 wrist: [f32; 2],
+                 veins: &[[f32; 2]]| {
+        let (_, bbox) = skin_quads(1.0, poly, at, tex);
+        paint_skin(c, poly, at, bbox, hex(0x0c0205), |p| {
+            // Chunky shading: worked out per 2×2 texels, like a 4-texel-a-pixel painting.
+            let q = [
+                (p[0] / 2.0).floor() * 2.0 + 1.0,
+                (p[1] / 2.0).floor() * 2.0 + 1.0,
+            ];
+            let free = edges.iter().map(|e| to_line(e, q)).fold(f32::MAX, f32::min);
+            let from_wrist = (q[0] - wrist[0]).hypot(q[1] - wrist[1]);
+            let mut t =
+                0.22 + (from_wrist / 110.0) * 0.35 + fbm(q[0] / 18.0, q[1] / 18.0, 61) * 0.18;
+            t += (1.0 - free / 14.0).max(0.0) * 0.45;
+            let vein = veins
+                .iter()
+                .map(|&v| to_segment(p, wrist, v))
+                .fold(f32::MAX, f32::min);
+            if vein < 1.3 {
+                t -= 0.28;
+            } else if vein < 2.6 {
+                t += 0.07;
             }
+            if free < 2.8 {
+                t = 0.97;
+            }
+            ramp(&skin, t)
         });
-    }
-    outline(&mut c, w, h, hex(0x0a0103));
-    c
-}
-
-/// One feather's colour: `base` with its rounded flanks shaded, the quill down its middle, fine
-/// barbs angled from it, a dark seam where it meets the next, and the shade of the row above
-/// `shadow` units over it.
-fn feather(base: Rgba, fx: f32, fy: f32, len: f32, shadow: f32, quill: bool) -> Rgba {
-    let edge = (2.0 * fx - 1.0).abs();
-    let mut col = mix(base, hex(0xbfc8da), edge.powi(3) * 0.55);
-    if quill && (fx - 0.5).abs() < 0.04 && fy > 0.05 && fy < 0.93 {
-        col = mix(col, hex(0xe9dcbc), 0.7);
-    }
-    let barb = (fy * len * 7.0 - edge * 2.5).fract();
-    if barb < 0.18 {
-        col = mix(col, hex(0xd9dfea), 0.5);
-    }
-    if fx < 0.045 {
-        col = mix(col, hex(0x9da8c0), 0.8);
-    }
-    // The tip a little cooler.
-    col = mix(col, hex(0xdfe5f0), ((fy - 0.75) * 3.0).clamp(0.0, 0.5));
-    if shadow < 0.9 {
-        col = mix(col, hex(0xa9b3c9), (1.0 - shadow / 0.9) * 0.65);
-    }
-    col
-}
-
-/// Angel Wings in HD: white feathers in three rows hanging from a gold-edged arm. Rounded
-/// coverts at the top, a row of short feathers under them, then the long primaries, longest in
-/// the middle of the wing; every feather has its quill and barbs, and each row shades the one
-/// under it.
-fn angel_wing() -> Canvas {
-    let (w, h) = (WING.0 * HD, WING.1 * HD);
-    let mut c = Canvas::new(w as u32, h as u32);
-    let pi = std::f32::consts::PI;
-    let top = |x: f32| 6.0 - 5.0 * (pi * x / 36.0).sin();
-    const LONG: [f32; 11] = [
-        9.0, 11.0, 13.0, 15.0, 16.0, 17.0, 17.0, 16.0, 14.0, 11.0, 7.0,
-    ];
-    let round = |f: f32| (1.0 - (2.0 * f - 1.0).powi(2)).max(0.0).sqrt();
-    each_wing_texel(|x, y, [px, py]| {
-        let t = top(px);
-        if py < t {
-            return;
-        }
-        let fc = ((px + 2.0) / 4.0).fract();
-        let covert = t + 5.0 + round(fc) * 1.1;
-        let fm = ((px + 1.0) / 3.0).fract();
-        let middle = t + 9.0 + round(fm) * 1.2;
-        let k = ((px / 3.0) as usize).min(LONG.len() - 1);
-        let fp = (px / 3.0).fract();
-        // Pointed tips, the outer side a little longer so each points out.
-        let long = t + LONG[k] + (1.0 - (2.0 * fp - 1.0).abs()).powf(0.6) * 1.3 + fp * 0.5;
-        let col = if py <= covert {
-            let mut col = feather(hex(0xfffaf0), fc, (py - t) / (covert - t), 5.0, 9.0, false);
-            // Gold along the arm, fading down.
-            let g = (py - t) / 0.9;
-            if g < 1.0 {
-                col = mix(hex(0xe2b54a), col, g * g);
-                col = add_light(col, [255.0, 240.0, 190.0], (1.0 - g) * 0.25);
-            }
-            col
-        } else if py <= middle {
-            feather(
-                hex(0xf7f8fc),
-                fm,
-                (py - t) / (middle - t),
-                9.0,
-                py - covert,
-                true,
-            )
-        } else if py <= long {
-            feather(
-                hex(0xf0f3f9),
-                fp,
-                (py - t) / (long - t),
-                LONG[k],
-                py - middle,
-                true,
-            )
-        } else {
-            return;
-        };
-        c.set(x, y, col);
-    });
-    outline(&mut c, w, h, hex(0x7a87a3));
-    c
-}
-
-/// A pair of wings on the back from one wing's HD art: each wing two panels, the outer one
-/// bending after the inner as they beat, slowly, swept back and raised a little.
-fn wings_item(id: &str, texture: &Canvas, glow: bool, beat: u32) -> Value {
-    let (tw, th) = (texture.w as f32, texture.h as f32);
-    // A panel from design column `u0` to `u1` reaching to +x (`side` 1) or -x, both faces,
-    // with column `pivot` and row `WING_ROOT` at the part's pivot.
-    let panel = |side: f32, u0: f32, u1: f32, pivot: f32| -> Vec<Value> {
-        let corner = |u: f32, v: f32| {
-            [
-                side * (u - pivot) * WING_TEXEL,
-                (v - WING_ROOT) * WING_TEXEL,
-                0.0,
-            ]
-        };
-        let uv = |u: f32, v: f32| [u * HDF / tw, v * HDF / th];
-        let h = WING.1 as f32;
-        let pts = [
-            corner(u0, 0.0),
-            corner(u1, 0.0),
-            corner(u1, h),
-            corner(u0, h),
-        ];
-        let uvs = [uv(u0, 0.0), uv(u1, 0.0), uv(u1, h), uv(u0, h)];
-        let one = quad(pts, uvs);
-        let other = quad(
-            [pts[3], pts[2], pts[1], pts[0]],
-            [uvs[3], uvs[2], uvs[1], uvs[0]],
-        );
-        vec![one, other]
     };
-    let wing = |name: &str, side: f32| -> Value {
+    let (poly, edges) = demon_outer_poly();
+    let wrist = [0.0, 0.0];
+    let veins: Vec<[f32; 2]> = edges.iter().map(|e| e[6]).collect();
+    paint(&mut c, &poly, &edges, DEMON_OUTER_AT, wrist, &veins);
+    let (poly, edges) = demon_inner_poly();
+    let wrist = [DEMON_ARM, 0.0];
+    let veins: Vec<[f32; 2]> = edges.iter().map(|e| e[6]).collect();
+    paint(&mut c, &poly, &edges, DEMON_INNER_AT, wrist, &veins);
+    let bone = [
+        0x07050a, 0x120d14, 0x1e1620, 0x2c2230, 0x3c3040, 0x544458, 0x74627a,
+    ];
+    paint_bone(&mut c, DEMON_BONE_AT, 112, 12, &bone);
+    paint_box(
+        &mut c,
+        DEMON_KNUCKLE_AT[0],
+        DEMON_KNUCKLE_AT[1],
+        16,
+        16,
+        16,
+        |face, i, j, _, _| {
+            let l = [0.7, 0.1, 0.45, 0.5, 0.45, 0.35][face] + noise(i / 2, j / 2, 43) * 0.12;
+            ramp(&bone, l)
+        },
+    );
+    paint_claw(&mut c, DEMON_CLAW_AT, [6, 18, 6]);
+    paint_claw(&mut c, DEMON_TIP_AT, [6, 14, 6]);
+    c
+}
+
+/// Demon Wings: each a bat's wing of solid bones (arm, hand, three fingers) with a leathery skin
+/// stretched between them, a claw at the wrist and the hand's tip.
+fn demon_item(texture: &Canvas) -> Value {
+    let tex = [texture.w as f32, texture.h as f32];
+    let wing = |name: &str, s: f32| -> Value {
+        let (outer, _) = demon_outer_poly();
+        let (inner, _) = demon_inner_poly();
+        let (outer_quads, _) = skin_quads(s, &outer, DEMON_OUTER_AT, tex);
+        let (inner_quads, _) = skin_quads(s, &inner, DEMON_INNER_AT, tex);
+        let fingers: Vec<Value> = DEMON_FINGERS
+            .iter()
+            .enumerate()
+            .map(|(i, &(a, l))| {
+                json!({
+                    "name": format!("{name}_finger{}", i + 1), "pivot": [0, 0, 0],
+                    "rotation": [0.0, 0.0, s * a],
+                    "cubes": [side_cube(s, [0.0, -4.0, -4.0], [l, 8.0, 8.0], DEMON_BONE_AT)],
+                })
+            })
+            .collect();
         json!({
-            "name": name, "pivot": [side * 1.5, 1.5, 2.6], "rotation": [0.0, side * -22.0, side * -10.0],
-            "quads": panel(side, 0.0, WING_JOINT, 0.0),
+            "name": name, "pivot": [s * 10.0, 16.0, 20.0], "rotation": [0.0, s * -40.0, s * -24.0],
+            "cubes": [
+                side_cube(s, [0.0, -6.0, -6.0], [DEMON_ARM, 12.0, 12.0], DEMON_BONE_AT),
+                side_cube(s, [DEMON_ARM - 8.0, -8.0, -8.0], [16.0, 16.0, 16.0], DEMON_KNUCKLE_AT),
+                side_cube(s, [DEMON_ARM - 3.0, -24.0, -3.0], [6.0, 18.0, 6.0], DEMON_CLAW_AT),
+            ],
+            "quads": inner_quads,
             "children": [{
-                "name": format!("{name}_tip"),
-                "pivot": [side * WING_JOINT * WING_TEXEL, 0.0, 0.0],
-                "rotation": [0.0, side * 10.0, 0.0],
-                "quads": panel(side, WING_JOINT, WING.0 as f32, WING_JOINT),
+                "name": format!("{name}_tip"), "pivot": [s * DEMON_ARM, 0.0, 0.0],
+                "rotation": [0.0, s * -10.0, s * DEMON_BEND],
+                "cubes": [
+                    side_cube(s, [0.0, -5.0, -5.0], [DEMON_HAND, 10.0, 10.0], DEMON_BONE_AT),
+                    side_cube(s, [DEMON_HAND - 3.0, -16.0, -3.0], [6.0, 14.0, 6.0], DEMON_TIP_AT),
+                ],
+                "quads": outer_quads,
+                "children": fingers,
             }],
         })
     };
     json!({
-        "format": 1, "id": id, "slot": "back", "bone": "body", "glow": glow,
+        "format": 1, "id": "demon_wings", "slot": "back", "bone": "body",
+        "attach": { "offset": [0, 0, 0], "rotation": [0, 0, 0], "scale": 1.0 / HDF },
         "texture": { "png": b64(&texture.png()) },
         "parts": [wing("left_wing", 1.0), wing("right_wing", -1.0)],
-        "animations": [
-            { "part": "left_wing", "motion": "swing", "axis": "y", "amplitude": 12, "period": beat },
-            { "part": "right_wing", "motion": "swing", "axis": "y", "amplitude": -12, "period": beat },
-            { "part": "left_wing_tip", "motion": "swing", "axis": "y", "amplitude": 9, "period": beat, "phase": 0.14 },
-            { "part": "right_wing_tip", "motion": "swing", "axis": "y", "amplitude": -9, "period": beat, "phase": 0.14 },
-        ],
+        "animations": flap(60.0, 28.0, 7.0, 20.0),
+    })
+}
+
+/// Wings opening and closing: each wing swings back and forth about y (`open` degrees) and up and
+/// down a little (`lift`), its outer half following a beat later (`tip` degrees).
+fn flap(period: f32, open: f32, lift: f32, tip: f32) -> Value {
+    let mut out = Vec::new();
+    for (name, s) in [("left_wing", 1.0), ("right_wing", -1.0)] {
+        out.push(json!({ "part": name, "motion": "swing", "axis": "y", "amplitude": s * open, "period": period }));
+        out.push(json!({ "part": name, "motion": "swing", "axis": "z", "amplitude": s * lift, "period": period, "phase": 0.25 }));
+        out.push(json!({ "part": format!("{name}_tip"), "motion": "swing", "axis": "y", "amplitude": s * tip, "period": period, "phase": 0.9 }));
+    }
+    json!(out)
+}
+
+/// Angel Wings' feathers: five lengths (HD units), each its own place in the texture's top rows.
+const FEATHER_W: i32 = 16;
+const FEATHER_D: i32 = 4;
+const FEATHER_LENGTHS: [i32; 5] = [104, 92, 80, 68, 56];
+/// The three sections of a wing, root to tip: bone length, bend from the section before (degrees,
+/// down-outward), and the lengths of the feathers hanging from it.
+const ANGEL_SECTIONS: [(f32, f32, [i32; 4]); 3] = [
+    (68.0, 0.0, [56, 56, 68, 68]),
+    (60.0, 26.0, [80, 80, 92, 92]),
+    (46.0, 26.0, [104, 104, 92, 0]),
+];
+/// The coverts: a row of small rounded feathers over each section's bone.
+const ANGEL_COVERT: ([i32; 3], [i32; 2]) = ([68, 34, 8], [0, 112]);
+const ANGEL_BONE_AT: [i32; 2] = [0, 160];
+const ANGEL_TEX: (u32, u32) = (256, 192);
+
+/// Where a feather length's box sits in the texture.
+fn feather_uv(len: i32) -> [i32; 2] {
+    let i = FEATHER_LENGTHS.iter().position(|&l| l == len).unwrap() as i32;
+    [i * 2 * (FEATHER_W + FEATHER_D), 0]
+}
+
+/// White feather shades, cool blue-grey in the shadow.
+const PLUME: [u32; 7] = [
+    0x8792b4, 0xa6b1ce, 0xc2cbe2, 0xd9e0ef, 0xe9eef8, 0xf6f8fd, 0xffffff,
+];
+
+/// A feather's face: `along` 0 at the root to 1 at the tip, `across` -1..1; transparent past
+/// its rounded tip.
+fn feather_texel(along: f32, across: f32, len: f32, back: bool) -> Rgba {
+    // The rounded tip: the last few texels narrow to a point.
+    let tip = ((1.0 - along) * len / 9.0).min(1.0);
+    let half = (1.0 - (1.0 - tip).powi(2)).sqrt();
+    if across.abs() > half * 1.02 {
+        return [0, 0, 0, 0];
+    }
+    if across.abs() > half - 0.15 {
+        return hex(PLUME[1]);
+    }
+    let mut t = 0.95 - across.abs() * 0.3 - along * 0.15;
+    // Barbs slanting from the shaft to the tip.
+    let barb = ((along * len - across.abs() * 6.0) / 5.0).fract();
+    if barb < 0.18 {
+        t -= 0.12;
+    }
+    if back {
+        t -= 0.15;
+    }
+    if across.abs() < 0.12 {
+        return mix(hex(0xfbf6e6), hex(0xe2cf96), along);
+    }
+    ramp(&PLUME, t)
+}
+
+/// Angel Wings' texture: long feathers with a gold shaft and slanting barbs, a row of small rounded
+/// coverts (one band all round its box, so a shorter box shows the same row), and a gold arm.
+fn angel_texture() -> Canvas {
+    let mut c = Canvas::new(ANGEL_TEX.0, ANGEL_TEX.1);
+    for len in FEATHER_LENGTHS {
+        let [u, v] = feather_uv(len);
+        paint_box(
+            &mut c,
+            u,
+            v,
+            FEATHER_W,
+            len,
+            FEATHER_D,
+            |face, i, j, fw, fh| {
+                let across = (i as f32 + 0.5) / fw as f32 * 2.0 - 1.0;
+                let along = (j as f32 + 0.5) / fh as f32;
+                match face {
+                    3 | 5 => feather_texel(along, across, len as f32, face == 5),
+                    0 | 1 => hex(PLUME[4]),
+                    _ => {
+                        // The thin sides end where the tip begins to round.
+                        if along > 1.0 - 6.0 / len as f32 {
+                            [0, 0, 0, 0]
+                        } else {
+                            hex(PLUME[2])
+                        }
+                    }
+                }
+            },
+        );
+    }
+    let ([w, h, d], [u, v]) = ANGEL_COVERT;
+    let width = 2 * (w + d) + 64;
+    c.rect(u + d, v, 2 * w + 64, d, hex(PLUME[5]));
+    for j in 0..h {
+        for i in 0..width {
+            let (x, y) = (i as f32 + 0.5, j as f32 + 0.5);
+            // Two rows of small rounded feathers, the lower row offset by half a feather.
+            let row = |off: f32, bottom: f32| {
+                let cell = ((x + off) / 16.0).fract() * 2.0 - 1.0;
+                bottom - 6.0 + 6.0 * (1.0 - cell * cell).sqrt()
+            };
+            let low = row(8.0, h as f32);
+            let high = row(0.0, h as f32 * 0.55);
+            if y > low {
+                continue;
+            }
+            let (edge, cell) = if y > high {
+                (low - y, ((x + 8.0) / 16.0).fract())
+            } else {
+                (high - y, (x / 16.0).fract())
+            };
+            let col = if edge < 1.2 {
+                hex(PLUME[1])
+            } else {
+                let t = 0.92
+                    - (cell - 0.5).abs() * 0.45
+                    - (1.0 - edge / 10.0).max(0.0) * 0.25
+                    - y / h as f32 * 0.1;
+                ramp(&PLUME, t)
+            };
+            c.set(u + i, v + d + j, col);
+        }
+    }
+    let gold = [
+        0x5a3a0c, 0x8a5c14, 0xb8862a, 0xd9a83a, 0xf2c14e, 0xffdf86, 0xfff4c8,
+    ];
+    paint_bone(&mut c, ANGEL_BONE_AT, 72, 12, &gold);
+    c
+}
+
+/// Angel Wings: each wing three sections of gold bone, each bending further down and out, with a
+/// row of small coverts in front and long feathers hanging behind, longest at the tip, so the
+/// feathers fan out like a bird's.
+fn angel_item(texture: &Canvas) -> Value {
+    let ([_, ch, cd], cuv) = ANGEL_COVERT;
+    let wing = |name: &str, s: f32| -> Value {
+        // Built from the tip in, each section the child of the one before.
+        let mut child: Option<Value> = None;
+        for (k, &(len, bend, feathers)) in ANGEL_SECTIONS.iter().enumerate().rev() {
+            let t = 10.0 - k as f32 * 2.0;
+            let mut cubes = vec![
+                side_cube(
+                    s,
+                    [0.0, -t / 2.0, -t / 2.0],
+                    [len + 4.0, t, t],
+                    ANGEL_BONE_AT,
+                ),
+                side_cube(s, [0.0, 2.0, -9.0], [len, ch as f32, cd as f32], cuv),
+            ];
+            for (f, flen) in feathers.into_iter().enumerate().filter(|f| f.1 > 0) {
+                let x = f as f32 * (len - 16.0) / 3.0;
+                let z = if f % 2 == 0 { 0.0 } else { 2.0 };
+                cubes.push(side_cube(
+                    s,
+                    [x, 2.0 + f as f32 * 2.0, z],
+                    [FEATHER_W as f32, flen as f32, FEATHER_D as f32],
+                    feather_uv(flen),
+                ));
+            }
+            let section_name = match k {
+                0 => name.to_owned(),
+                1 => format!("{name}_mid"),
+                _ => format!("{name}_tip"),
+            };
+            let (pivot, rotation) = if k == 0 {
+                ([s * 10.0, 16.0, 20.0], [0.0, s * -40.0, s * -34.0])
+            } else {
+                let before = ANGEL_SECTIONS[k - 1].0;
+                ([s * before, 0.0, 0.0], [0.0, s * -6.0, s * bend])
+            };
+            let mut part = json!({
+                "name": section_name, "pivot": pivot, "rotation": rotation, "cubes": cubes,
+            });
+            if let Some(c) = child.take() {
+                part["children"] = json!([c]);
+            }
+            child = Some(part);
+        }
+        child.unwrap()
+    };
+    let mut animations = flap(72.0, 26.0, 6.0, 14.0);
+    for (name, s) in [("left_wing", 1.0), ("right_wing", -1.0)] {
+        animations.as_array_mut().unwrap().push(json!({
+            "part": format!("{name}_mid"), "motion": "swing", "axis": "y",
+            "amplitude": s * 10.0, "period": 72, "phase": 0.95,
+        }));
+    }
+    json!({
+        "format": 1, "id": "angel_wings", "slot": "back", "bone": "body", "glow": true,
+        "attach": { "offset": [0, 0, 0], "rotation": [0, 0, 0], "scale": 1.0 / HDF },
+        "texture": { "png": b64(&texture.png()) },
+        "parts": [wing("left_wing", 1.0), wing("right_wing", -1.0)],
+        "animations": animations,
     })
 }
 
@@ -957,162 +1341,271 @@ fn bamboo_item(texture: &Canvas) -> Value {
 
 // ---------------------------------------------------------------- Stray Head (a straw hat)
 
-/// The hat's cone: segments round it, the rim's radius and height (model pixels, y down: the
-/// head's top is -8), the copper band's depth, and the apexes outside and underneath. The brim
-/// is twice the head's width and the cone clears the head's corners.
-const HAT_SEGMENTS: usize = 32;
-const HAT_RIM: f32 = 8.0;
-const HAT_RIM_Y: f32 = -8.0;
-const HAT_BAND: f32 = 0.45;
-const HAT_APEX_Y: f32 = -13.0;
-const HAT_UNDER_APEX_Y: f32 = -12.2;
-/// The tiny ring the cone closes to at its top, under the knot.
-const HAT_TOP: f32 = 0.25;
-/// The texture's rows: the outside (apex to rim), the band, the underside (rim to apex).
-const HAT_OUT: f32 = 160.0;
-const HAT_BAND_END: f32 = 176.0;
+/// The hat is built of thin layers of boxes, 4 units a model pixel (drawn at a quarter scale):
+/// each layer a rounded cross of three boxes, stepping in towards the top like a conical straw
+/// hat's slope. `HAT_LAYERS` layers, each `HAT_STEP` units tall, the widest `HAT_RADIUS` across
+/// (twice the head), the brim's underside at `HAT_BRIM_Y` (the head's top is -32).
+const HAT_UNIT: f32 = 4.0;
+const HAT_LAYERS: i32 = 11;
+const HAT_STEP: f32 = 2.0;
+const HAT_RADIUS: f32 = 32.0;
+const HAT_TOP_RADIUS: f32 = 5.0;
+const HAT_BRIM_Y: f32 = -25.0;
+/// A layer's three boxes as (half-width in x, half-width in z), of its radius.
+const HAT_CROSS: [(f32, f32); 3] = [(1.0, 0.5), (0.5, 1.0), (0.8, 0.8)];
+/// Texture places: the brim's three boxes (copper sides), then one shared by all the others.
+const HAT_BRIM_AT: [[i32; 2]; 3] = [[0, 0], [0, 34], [0, 100]];
+const HAT_STRAW_AT: [i32; 2] = [0, 154];
+const HAT_KNOT_AT: [i32; 2] = [212, 0];
 
-/// The hat's 256×256 texture: woven palm-leaf strips running from the apex to the rim, each its
-/// own shade with fibres along it, rows of thread stitched round it, a sheen where the light
-/// falls; a copper rim wound with red thread; the darker underside with its bamboo rings; a
-/// white cord knot at the apex.
-fn straw_texture() -> Canvas {
+/// A layer's radius, the brim 0.
+fn hat_radius(layer: i32) -> f32 {
+    let t = layer as f32 / (HAT_LAYERS - 1) as f32;
+    HAT_RADIUS + (HAT_TOP_RADIUS - HAT_RADIUS) * t.powf(0.9)
+}
+
+/// A layer's three boxes (origin, size), even sizes so they sit centred.
+fn hat_boxes(layer: i32) -> [([f32; 3], [f32; 3]); 3] {
+    let r = hat_radius(layer);
+    let y = HAT_BRIM_Y - HAT_STEP * (layer + 1) as f32;
+    HAT_CROSS.map(|(ax, az)| {
+        let (w, d) = ((r * ax).round() * 2.0, (r * az).round() * 2.0);
+        ([-w / 2.0, y, -d / 2.0], [w, HAT_STEP, d])
+    })
+}
+
+/// Straw: woven palm strips running round the hat, each its own shade, with fibres along them,
+/// stitch rows across, and a few darker tucks.
+fn straw(i: i32, j: i32) -> Rgba {
+    let shades = [
+        0x7a5a2c, 0x9c7a42, 0xb8965a, 0xcdb072, 0xdcc28a, 0xe8d5a4, 0xf3e6c4,
+    ];
+    let strip = j.div_euclid(3);
+    let mut t = 0.55 + (noise(strip, 0, 71) - 0.5) * 0.35;
+    t += (vnoise(i as f32 * 0.25, strip as f32, 73) - 0.5) * 0.3;
+    if j.rem_euclid(3) == 2 {
+        t -= 0.18;
+    }
+    if (i + strip * 5).rem_euclid(14) == 0 {
+        t -= 0.3;
+    }
+    ramp(&shades, t)
+}
+
+/// The Stray Head's texture: straw all over; the brim's sides a copper rim wound with red thread;
+/// a white cord knot.
+fn hat_texture() -> Canvas {
     let mut c = Canvas::new(256, 256);
-    let (out, band) = (HAT_OUT as i32, HAT_BAND_END as i32);
-    for y in 0..256 {
-        for x in 0..256 {
-            let strip = x / 4;
-            let col = if y < 10 {
-                mix(hex(0xf7f2e8), hex(0xd9d0be), noise(x / 2, y / 2, 921))
-            } else if y < out {
-                let v = y as f32 / out as f32;
-                let mut col = mix(hex(0xf4e4bf), hex(0xcaa872), v * 0.75);
-                col = mix(col, hex(0xb8935c), noise(strip, 0, 923) * 0.35);
-                let fibre = vnoise(x as f32 * 1.1, y as f32 * 0.07, 925);
-                col = add_light(col, [60.0, 50.0, 30.0], (fibre - 0.5) * 0.9);
-                if x % 4 == 0 {
-                    col = mix(col, hex(0x8f6e42), 0.4);
-                }
-                // A sheen a third of the way down.
-                col = add_light(
-                    col,
-                    [255.0, 250.0, 230.0],
-                    (-((v - 0.33) / 0.12).powi(2)).exp() * 0.18,
-                );
-                // Rows of stitching: pale thread over the strips, a groove beside it.
-                let row = y % 20;
-                if row < 2 {
-                    col = if (x + (y / 20) * 3) % 6 < 3 {
-                        mix(hex(0xfdf7e6), col, row as f32 * 0.3)
-                    } else {
-                        mix(col, hex(0x7d5f38), 0.35)
-                    };
-                } else if row == 2 {
-                    col = mix(col, hex(0x8c6c40), 0.2);
-                }
-                col
-            } else if y < band {
-                // Copper, round, wound with red thread.
-                let k = (y - out) as f32 / (band - out - 1) as f32;
-                let shade = (k * std::f32::consts::PI).sin();
-                let thread = (x + (y - out)) % 10 < 3;
-                if thread {
-                    mix(hex(0x7a1a10), hex(0xe2604a), shade)
+    let brim = hat_boxes(0);
+    for (k, &(_, [w, h, d])) in brim.iter().enumerate() {
+        let [u, v] = HAT_BRIM_AT[k];
+        let (w, h, d) = (w as i32, h as i32, d as i32);
+        paint_box(&mut c, u, v, w, h, d, |face, i, j, _, _| {
+            if face < 2 {
+                let s = straw(i, j);
+                if face == 1 {
+                    mix(s, hex(0x4a3418), 0.35)
                 } else {
-                    mix(hex(0x5e2a12), hex(0xeaa36a), shade)
+                    s
                 }
+            } else if (i + j).rem_euclid(4) == 0 {
+                hex(0xc8322a)
             } else {
-                // Underneath: darker straw, the strips running in to the crown, a bamboo ring
-                // every 16 rows.
-                let v = (y - band) as f32 / (255 - band) as f32;
-                let mut col = mix(hex(0xb08f60), hex(0x6e5233), v);
-                col = mix(col, hex(0x5e4428), noise(strip, 2, 927) * 0.35);
-                col = add_light(
-                    col,
-                    [40.0, 30.0, 20.0],
-                    (vnoise(x as f32 * 1.1, y as f32 * 0.1, 929) - 0.5) * 0.8,
-                );
-                let ring = (y - band) % 16;
-                if ring < 2 {
-                    col = mix(col, hex(0x4a3418), 0.6);
-                } else if ring == 2 {
-                    col = add_light(col, [60.0, 50.0, 30.0], 0.4);
-                }
-                col
-            };
-            c.set(x, y, col);
+                ramp(
+                    &[0x7a3e18, 0xa8602a, 0xd08a48, 0xeab070],
+                    0.35 + 0.4 * (1.0 - j as f32),
+                )
+            }
+        });
+    }
+    // The other layers share one place, big enough for the brim's widest box layout.
+    let (sw, sh) = (2 * (52 + 64), 66);
+    for j in 0..sh {
+        for i in 0..sw {
+            c.set(HAT_STRAW_AT[0] + i, HAT_STRAW_AT[1] + j, straw(i, j + 5));
         }
+    }
+    paint_box(
+        &mut c,
+        HAT_KNOT_AT[0],
+        HAT_KNOT_AT[1],
+        8,
+        6,
+        8,
+        |face, i, j, _, _| {
+            let t = 0.6 + (noise(i, j, 77) - 0.5) * 0.3 + if face == 0 { 0.2 } else { 0.0 };
+            ramp(
+                &[0x9a9488, 0xc8c2b4, 0xe6e2d8, 0xfaf8f2],
+                t - ((i + j) % 3 == 0) as i32 as f32 * 0.2,
+            )
+        },
+    );
+    c
+}
+
+/// The Stray Head: a conical straw hat in stepped layers, twice the head's width, its copper rim
+/// wound with red thread and a white knot on top.
+fn hat_item(texture: &Canvas) -> Value {
+    let mut cubes = Vec::new();
+    for layer in 0..HAT_LAYERS {
+        for (k, (origin, size)) in hat_boxes(layer).into_iter().enumerate() {
+            let uv = if layer == 0 {
+                HAT_BRIM_AT[k]
+            } else {
+                HAT_STRAW_AT
+            };
+            cubes.push(json!({ "origin": origin, "size": size, "uv": uv }));
+        }
+    }
+    let top = HAT_BRIM_Y - HAT_STEP * (HAT_LAYERS + 1) as f32;
+    cubes.push(json!({ "origin": [-4.0, top - 4.0, -4.0], "size": [8, 6, 8], "uv": HAT_KNOT_AT }));
+    json!({
+        "format": 1, "id": "stray_head", "slot": "head", "bone": "head",
+        "attach": { "offset": [0, 0, 0], "rotation": [0, 0, 0], "scale": 1.0 / HAT_UNIT },
+        "texture": { "png": b64(&texture.png()) },
+        "parts": [{ "name": "hat", "pivot": [0, 0, 0], "cubes": cubes }],
+    })
+}
+
+// ---------------------------------------------------------------- Devil Horns and Angel Halo
+
+/// A devil horn's segments, base to tip: thickness (HD units) and the bend from the one before
+/// (degrees: out towards the side, back). Each is `HORN_LEN` units (2 pixels) long.
+const HORN: [(i32, f32, f32); 5] = [
+    (18, 38.0, -16.0),
+    (15, -16.0, -10.0),
+    (12, -20.0, -6.0),
+    (9, -22.0, 4.0),
+    (6, -24.0, 12.0),
+];
+const HORN_LEN: i32 = 16;
+
+/// Where a horn segment's box sits in the texture: a column of them.
+fn horn_uv(k: usize) -> [i32; 2] {
+    [0, HORN[..k].iter().map(|(t, _, _)| t + HORN_LEN + 2).sum()]
+}
+
+/// The horns' texture: dark crimson at the base to near black at the tip, ridged rings round
+/// each segment, a sheen down the front.
+fn horn_texture() -> Canvas {
+    let mut c = Canvas::new(80, 160);
+    let shades = [
+        0x0c0204, 0x1e0508, 0x3a090e, 0x5c0f14, 0x84181a, 0xae2a22, 0xd8502e,
+    ];
+    for (k, &(t, _, _)) in HORN.iter().enumerate() {
+        let [u, v] = horn_uv(k);
+        let base = 0.82 - k as f32 * 0.12;
+        paint_box(&mut c, u, v, t, HORN_LEN, t, |face, i, j, fw, fh| {
+            let across = (i as f32 + 0.5) / fw as f32;
+            let along = (j as f32 + 0.5) / fh as f32;
+            let mut l = base + (1.0 - along) * 0.08;
+            match face {
+                0 | 1 => l -= 0.05,
+                3 => l += 0.1 - (across - 0.4).abs() * 0.3,
+                5 => l -= 0.12,
+                _ => l -= (across - 0.5).abs() * 0.2,
+            }
+            if face >= 2 && j % 4 == 3 {
+                l -= 0.14;
+            }
+            l += (noise(i, j + k as i32 * 31, 501) - 0.5) * 0.06;
+            ramp(&shades, l)
+        });
     }
     c
 }
 
-/// The Stray Head: a smooth conical straw hat sized for Minecraft's head, double-sided so it
-/// reads from above and below, with a knot of white cord at its top.
-fn stray_item(texture: &Canvas) -> Value {
-    let n = HAT_SEGMENTS;
-    let row = |t: f32| t / 256.0;
-    let mut quads = Vec::new();
-    let mut both = |p: [[f32; 3]; 4], uv: [[f32; 2]; 4]| {
-        quads.push(quad(p, uv));
-        quads.push(quad([p[3], p[2], p[1], p[0]], [uv[3], uv[2], uv[1], uv[0]]));
+/// Devil Horns: two curved horns on the head, each five tapering segments bending out, up and
+/// back, dark crimson to a black point.
+fn horns_item(texture: &Canvas) -> Value {
+    let horn = |name: &str, s: f32| -> Value {
+        let mut child: Option<Value> = None;
+        for (k, &(t, out, back)) in HORN.iter().enumerate().rev() {
+            let tf = t as f32;
+            let pivot = if k == 0 {
+                [s * 20.0, -62.0, -6.0]
+            } else {
+                [0.0, -(HORN_LEN as f32) + 1.0, 0.0]
+            };
+            let mut part = json!({
+                "name": if k == 0 { name.to_owned() } else { format!("{name}_{k}") },
+                "pivot": pivot, "rotation": [back, 0.0, s * out],
+                "cubes": [side_cube(s, [-tf / 2.0, -(HORN_LEN as f32), -tf / 2.0], [tf, HORN_LEN as f32, tf], horn_uv(k))],
+            });
+            if let Some(c) = child.take() {
+                part["children"] = json!([c]);
+            }
+            child = Some(part);
+        }
+        child.unwrap()
     };
-    let ring = |a: f32, r: f32, y: f32| [a.cos() * r, y, a.sin() * r];
-    let band_y = HAT_RIM_Y + HAT_BAND;
-    for i in 0..n {
-        let (u0, u1) = (i as f32 / n as f32, (i + 1) as f32 / n as f32);
-        let (a0, a1) = (u0 * std::f32::consts::TAU, u1 * std::f32::consts::TAU);
-        both(
-            [
-                ring(a1, HAT_TOP, HAT_APEX_Y),
-                ring(a0, HAT_TOP, HAT_APEX_Y),
-                ring(a0, HAT_RIM, HAT_RIM_Y),
-                ring(a1, HAT_RIM, HAT_RIM_Y),
-            ],
-            [
-                [u1, row(0.5)],
-                [u0, row(0.5)],
-                [u0, row(HAT_OUT - 0.5)],
-                [u1, row(HAT_OUT - 0.5)],
-            ],
-        );
-        both(
-            [
-                ring(a1, HAT_RIM, HAT_RIM_Y),
-                ring(a0, HAT_RIM, HAT_RIM_Y),
-                ring(a0, HAT_RIM, band_y),
-                ring(a1, HAT_RIM, band_y),
-            ],
-            [
-                [u1, row(HAT_OUT + 0.5)],
-                [u0, row(HAT_OUT + 0.5)],
-                [u0, row(HAT_BAND_END - 0.5)],
-                [u1, row(HAT_BAND_END - 0.5)],
-            ],
-        );
-        both(
-            [
-                ring(a1, HAT_RIM, band_y),
-                ring(a0, HAT_RIM, band_y),
-                ring(a0, HAT_TOP, HAT_UNDER_APEX_Y),
-                ring(a1, HAT_TOP, HAT_UNDER_APEX_Y),
-            ],
-            [
-                [u1, row(HAT_BAND_END + 0.5)],
-                [u0, row(HAT_BAND_END + 0.5)],
-                [u0, row(255.5)],
-                [u1, row(255.5)],
-            ],
-        );
-    }
     json!({
-        "format": 1, "id": "stray_head", "slot": "head", "bone": "head",
+        "format": 1, "id": "devil_horns", "slot": "head", "bone": "head",
+        "attach": { "offset": [0, 0, 0], "rotation": [0, 0, 0], "scale": 1.0 / HDF },
+        "texture": { "png": b64(&texture.png()) },
+        "parts": [horn("left_horn", 1.0), horn("right_horn", -1.0)],
+    })
+}
+
+/// The halo: a ring of `HALO_SEGMENTS` gold bars round a circle `HALO_RADIUS` across (HD units),
+/// floating `HALO_Y` above the head's pivot.
+const HALO_SEGMENTS: usize = 12;
+const HALO_RADIUS: f32 = 30.0;
+const HALO_THICK: f32 = 5.0;
+const HALO_Y: f32 = -82.0;
+
+/// The halo's texture: bright gold, a white-hot line along the top, warmer underneath.
+fn halo_texture() -> Canvas {
+    let mut c = Canvas::new(64, 16);
+    let gold = [
+        0x8a5c14, 0xc08a26, 0xe8b83c, 0xf8d662, 0xffe9a0, 0xfff8e0, 0xffffff,
+    ];
+    let len = halo_bar() as i32;
+    let t = HALO_THICK as i32;
+    paint_box(&mut c, 0, 0, len, t, t, |face, i, j, _, fh| {
+        let l = match face {
+            0 => 0.95,
+            1 => 0.3,
+            _ => 0.85 - (j as f32 + 0.5) / fh as f32 * 0.45,
+        };
+        ramp(&gold, l + (noise(i, j, 511) - 0.5) * 0.05)
+    });
+    c
+}
+
+/// A halo bar's length: the chord of its share of the circle, a little longer so they meet.
+fn halo_bar() -> f32 {
+    (2.0 * HALO_RADIUS * (std::f32::consts::PI / HALO_SEGMENTS as f32).tan() + HALO_THICK).round()
+}
+
+/// Angel Halo: a glowing gold ring floating over the head, tilted a little, turning slowly and
+/// bobbing.
+fn halo_item(texture: &Canvas) -> Value {
+    let len = halo_bar();
+    let bars: Vec<Value> = (0..HALO_SEGMENTS)
+        .map(|i| {
+            json!({
+                "name": format!("halo_{i}"), "pivot": [0, 0, 0],
+                "rotation": [0.0, i as f32 * 360.0 / HALO_SEGMENTS as f32, 0.0],
+                "cubes": [{
+                    "origin": [-len / 2.0, -HALO_THICK / 2.0, HALO_RADIUS - HALO_THICK / 2.0],
+                    "size": [len, HALO_THICK, HALO_THICK], "uv": [0, 0],
+                }],
+            })
+        })
+        .collect();
+    json!({
+        "format": 1, "id": "angel_halo", "slot": "head", "bone": "head", "glow": true,
+        "attach": { "offset": [0, 0, 0], "rotation": [0, 0, 0], "scale": 1.0 / HDF },
         "texture": { "png": b64(&texture.png()) },
         "parts": [{
-            "name": "hat", "pivot": [0, 0, 0],
-            // The knot at the top (its texels are the cord's cream of the apex rows).
-            "cubes": [{ "origin": [-1.0, HAT_APEX_Y - 0.8, -1.0], "size": [2, 1, 2], "uv": [248, 0] }],
-            "quads": quads,
+            "name": "halo", "pivot": [0.0, HALO_Y, 0.0], "rotation": [-8, 0, 0],
+            "children": bars,
         }],
+        "animations": [
+            { "part": "halo", "motion": "spin", "axis": "y", "amplitude": 0, "period": 240 },
+            { "part": "halo", "motion": "bob", "axis": "y", "amplitude": 4.0, "period": 60 },
+        ],
     })
 }
 
@@ -1204,13 +1697,23 @@ fn framed_card(
 ) -> Canvas {
     let skin = wearer_skin();
     let body = preview::player_model(false);
+    // Head items reach above the head's top, where the picture ends: the figure is lowered
+    // a quarter of a block for them.
+    let lower = if item.slot == wisp_cosmetics::Slot::Head {
+        Mat4::from_translation(glam::Vec3::new(0.0, 0.25, 0.0))
+    } else {
+        Mat4::IDENTITY
+    };
     let mut draws = vec![Draw {
         root: &body,
-        base: Mat4::IDENTITY,
+        base: lower,
         texture: &skin,
         poses: Vec::new(),
     }];
-    draws.extend(Draw::item(item, &body, 0.0));
+    draws.extend(Draw::item(item, &body, 0.0).into_iter().map(|mut d| {
+        d.base = lower * d.base;
+        d
+    }));
     let size = (h as f32 * zoom) as u32;
     let figure = preview::render(&draws, size, size, yaw, 12.0);
     let mut card = backdrop(w, h, glow, item.id.len() as u32 * 31);
@@ -1270,7 +1773,7 @@ fn main() {
     let id = "founders_cape";
     let frames = founders_frames();
     let texture = &frames[0];
-    let file = serde_json::to_vec_pretty(&cape_item(id, &frames)).unwrap();
+    let file = serde_json::to_vec_pretty(&cape_item(id, &frames, CAPE_FRAMETIME, true)).unwrap();
     let item = Item::parse(&file).unwrap_or_else(|e| panic!("{id}: {e}"));
     write(dir, &format!("{id}.json"), &file);
     write(
@@ -1283,26 +1786,45 @@ fn main() {
     let banner = framed_card(&item, bw, bh, 160.0, 0.82, 0.04, 0.55, glow);
     write(dir, &format!("banner_{id}.png"), &banner.png());
 
+    let id = "lavender_cape";
+    let frames = lavender_frames();
+    let file =
+        serde_json::to_vec_pretty(&cape_item(id, &frames, LAVENDER_FRAMETIME, false)).unwrap();
+    let item = Item::parse(&file).unwrap_or_else(|e| panic!("{id}: {e}"));
+    write(dir, &format!("{id}.json"), &file);
+    write(
+        dir,
+        &format!("{id}.png"),
+        &cape_card(&item, &frames[0], cw, ch, [180.0, 130.0, 220.0]).png(),
+    );
+    if let Ok(out) = std::env::var("WISP_SHOP_PREVIEW") {
+        let out = Path::new(&out);
+        std::fs::create_dir_all(out).unwrap();
+        for k in [0, 12, 24, 36] {
+            write(out, &format!("{id}_frame{k}.png"), &frames[k].png());
+        }
+    }
+
     // The Minecraft-style items: (id, item file, yaw, zoom, drop, glow behind).
-    let demon = demon_wing();
-    let angel = angel_wing();
+    let demon = demon_texture();
+    let angel = angel_texture();
     let bamboo = bamboo_texture();
-    let straw = straw_texture();
+    let straw = hat_texture();
     let items = [
         (
             "demon_wings",
-            wings_item("demon_wings", &demon, false, 80),
-            200.0,
-            1.25,
-            0.2,
+            demon_item(&demon),
+            198.0,
+            0.95,
+            0.1,
             [190.0, 40.0, 50.0],
         ),
         (
             "angel_wings",
-            wings_item("angel_wings", &angel, true, 64),
-            200.0,
-            1.25,
-            0.2,
+            angel_item(&angel),
+            198.0,
+            0.95,
+            0.1,
             [235.0, 225.0, 180.0],
         ),
         (
@@ -1315,11 +1837,27 @@ fn main() {
         ),
         (
             "stray_head",
-            stray_item(&straw),
+            hat_item(&straw),
             25.0,
             2.6,
-            0.6,
+            0.5,
             [230.0, 200.0, 140.0],
+        ),
+        (
+            "devil_horns",
+            horns_item(&horn_texture()),
+            25.0,
+            2.4,
+            0.52,
+            [200.0, 50.0, 50.0],
+        ),
+        (
+            "angel_halo",
+            halo_item(&halo_texture()),
+            25.0,
+            2.6,
+            0.5,
+            [240.0, 210.0, 120.0],
         ),
     ];
     for (id, value, yaw, zoom, drop, glow) in items {
@@ -1328,5 +1866,37 @@ fn main() {
         write(dir, &format!("{id}.json"), &file);
         let card = framed_card(&item, cw, ch, yaw, zoom, drop, 0.5, glow);
         write(dir, &format!("{id}.png"), &card.png());
+        if let Ok(out) = std::env::var("WISP_SHOP_PREVIEW") {
+            preview_sheet(&item, Path::new(&out), id);
+        }
     }
+}
+
+/// With `WISP_SHOP_PREVIEW` set: a sheet of the item from four sides at four moments of its
+/// animations, to look the art over.
+fn preview_sheet(item: &Item, dir: &Path, id: &str) {
+    let size = 360;
+    let mut sheet = backdrop(size * 4, size * 4, [120.0, 120.0, 140.0], 7);
+    let skin = wearer_skin();
+    let body = preview::player_model(false);
+    for (row, ticks) in [0.0f32, 15.0, 30.0, 45.0].into_iter().enumerate() {
+        for (col, yaw) in [200.0f32, 150.0, 90.0, 30.0].into_iter().enumerate() {
+            let mut draws = vec![Draw {
+                root: &body,
+                base: Mat4::IDENTITY,
+                texture: &skin,
+                poses: Vec::new(),
+            }];
+            draws.extend(Draw::item(item, &body, ticks));
+            let figure = preview::render(&draws, size, size, yaw, 12.0);
+            composite(
+                &mut sheet,
+                &figure,
+                col as i32 * size as i32,
+                row as i32 * size as i32,
+            );
+        }
+    }
+    std::fs::create_dir_all(dir).unwrap();
+    write(dir, &format!("{id}_sheet.png"), &sheet.png());
 }

@@ -504,8 +504,13 @@ impl Launcher {
                 if changed { cx.notify(); }
             }).is_err() { break; }
         }).detach();
-        // The wallet comes from the Wisp server (the friends worker collects the daily coins).
-        let wallet = wisp_launcher::shop::Wallet::default();
+        // The wallet comes from the Wisp server (the friends worker collects the daily coins),
+        // or while the Shop runs without it (`shop_view::LOCAL_SHOP`) from this computer.
+        let wallet = if shop_view::LOCAL_SHOP {
+            shop_view::local_wallet(&home)
+        } else {
+            wisp_launcher::shop::Wallet::default()
+        };
         let accounts = auth::accounts(&home).map(|(a, _)| a).unwrap_or_default();
         let start = match prefs.start_page {
             wisp_launcher::prefs::StartPage::Home => Page::Home,
@@ -535,7 +540,7 @@ impl Launcher {
             shop: Default::default(),
             wallet,
             server_wallet: Default::default(),
-            shop_state: Some(tr("Connecting to the Wisp server…")),
+            shop_state: (!shop_view::LOCAL_SHOP).then(|| tr("Connecting to the Wisp server…")),
             home,
             settings,
             prefs,
@@ -810,6 +815,9 @@ impl Launcher {
                 friends_view::FriendsUpdate::Notice(text, bad) => {
                     self.friends_notice = Some((text, bad))
                 }
+                friends_view::FriendsUpdate::Wallet(_)
+                | friends_view::FriendsUpdate::ShopUnavailable(_)
+                    if shop_view::LOCAL_SHOP => {}
                 friends_view::FriendsUpdate::Wallet(wallet) => {
                     self.wallet = wallet.as_shop();
                     self.server_wallet = wallet;
