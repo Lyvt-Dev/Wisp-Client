@@ -6,7 +6,11 @@
 //! (`Title::press_main`). With `titleScreen:vanilla` in `wisp.txt` the game shows vanilla's.
 use crate::{
     lang,
-    ui_theme::{Face, Icon, Ui, color::hex},
+    ui_theme::{
+        Face, Icon, Ui,
+        color::hex,
+        festive::{self, accent, accent_hover, on_accent},
+    },
 };
 
 mod wardrobe;
@@ -18,9 +22,6 @@ const STROKE: u32 = hex(0xFFFFFF, 22);
 const INK: u32 = hex(0xFFFFFF, 255);
 const MUTED: u32 = hex(0xFFFFFF, 150);
 const FAINT: u32 = hex(0xFFFFFF, 105);
-const ACCENT: u32 = hex(wisp_theme::glass::ACCENT, 255);
-const ACCENT_HOVER: u32 = hex(0xFFFFFF, 255);
-const ON_ACCENT: u32 = hex(wisp_theme::glass::ON_LIGHT, 255);
 const DANGER: u32 = hex(0xE5484D, 230);
 const DANGER_HOVER: u32 = hex(0xF0575C, 255);
 
@@ -181,6 +182,11 @@ impl Home {
             ui.rounded(0.0, y, w, 20.0, 0.0, hex(0x000000, a as u8));
         }
         let pad = (w * 0.035).clamp(20.0, 48.0);
+        // Wisp Christmas: snow behind everything, fairy lights along the top.
+        if festive::on() {
+            festive::snow(ui, (0.0, 0.0, w, h), ease);
+            festive::lights(ui, 0.0, 2.0, w);
+        }
         if self.page == Page::Wardrobe {
             self.draw_wardrobe(ui, &data.wardrobe, pad, rise);
         } else {
@@ -212,6 +218,9 @@ impl Home {
         ui.rounded(bx, by, side, side, 12.0, tile);
         ui.border(bx, by, side, side, 12.0, STROKE);
         ui.feather(bx + side / 2.0, by + side / 2.0, side, INK, tile);
+        if festive::on() {
+            festive::hat(ui, bx, by, side);
+        }
         ui.text_line(Face::Heading, 26.0, side, bx + 54.0, by - 1.0, INK, "WISP");
         let buttons = [
             (Icon::Language, button::LANGUAGE, false),
@@ -250,7 +259,11 @@ impl Home {
         let mark = "Wisp";
         let mw = ui.measure(Face::Heading, 64.0, mark);
         ui.text(Face::Heading, 64.0, cx - mw / 2.0, y - 104.0, INK, mark);
-        let tag = lang::get_or("wisp.home.tagline", "Client for Minecraft");
+        let tag = if festive::on() {
+            lang::get_or("wisp.home.tagline.christmas", "Merry Christmas from Wisp")
+        } else {
+            lang::get_or("wisp.home.tagline", "Client for Minecraft")
+        };
         let tw = ui.measure(Face::Regular, 14.0, &tag);
         ui.text(Face::Regular, 14.0, cx - tw / 2.0, y - 16.0, MUTED, &tag);
         y += 14.0;
@@ -312,8 +325,8 @@ impl Home {
     ) {
         let hovered = enabled && hover(ui, x, y, w, h);
         let (fill, ink) = match (primary, hovered) {
-            (true, false) => (ACCENT, ON_ACCENT),
-            (true, true) => (ACCENT_HOVER, ON_ACCENT),
+            (true, false) => (accent(), on_accent()),
+            (true, true) => (accent_hover(), on_accent()),
             (false, false) => (PLATE, INK),
             (false, true) => (PLATE_HOVER, INK),
         };
@@ -377,8 +390,8 @@ impl Home {
         );
         ui.border(x, y, w, card_h, 18.0, STROKE);
         let (ix, iy, side) = (x + 12.0, y + 12.0, 40.0);
-        ui.rounded(ix, iy, side, side, 12.0, ACCENT);
-        ui.icon(Icon::Hanger, ix + 9.0, iy + 9.0, 22.0, ON_ACCENT);
+        ui.rounded(ix, iy, side, side, 12.0, accent());
+        ui.icon(Icon::Hanger, ix + 9.0, iy + 9.0, 22.0, on_accent());
         let title = lang::get_or("wisp.home.wardrobe", "Wardrobe");
         let detail = lang::get_or("wisp.home.wardrobe.detail", "Skin and cosmetics");
         let tx = ix + side + 14.0;

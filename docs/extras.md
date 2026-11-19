@@ -364,9 +364,12 @@ Behind it and every screen opened from the title, a picture from the player's ow
 folder (the launcher's, passed as `WISP_BACKGROUNDS`; else `backgrounds/` in the game folder) is
 drawn over the screen in place of the panorama (`gfx/picture.rs`), cropped to cover it, drifting
 in slowly, and blurred (at least radius 8). No picture there: the panorama, blurred. Wisp never
-ships pictures. Options › Wisp Settings › Interface › **Menu style** switches between Wisp and
-Minecraft (`vanillaMenus` in `wisp-extras.txt`); Minecraft brings vanilla's title menu and
-panorama back. The older `titleScreen:vanilla` in `wisp.txt`, and `WISP_VANILLA_TITLE` (for a run
+ships pictures. Options › Wisp Settings › Interface › **Menu style** picks Wisp, Wisp Christmas or
+Minecraft (`menuStyle:wisp|christmas|minecraft` in `wisp-extras.txt`; 0.22.0's
+`vanillaMenus:true` still reads as Minecraft). Minecraft brings vanilla's title menu and panorama
+back. Wisp Christmas (`ui_theme::festive`) keeps Wisp's screens and dresses the home screen and
+the Wisp Menu: snow falling, a string of twinkling fairy lights, a Santa hat on the feather, the
+accent in Christmas red with white text, and "Merry Christmas from Wisp" as the tagline. The older `titleScreen:vanilla` in `wisp.txt`, and `WISP_VANILLA_TITLE` (for a run
 that compares the title with vanilla), still do the same.
 
 **Wisp Settings** (Options › Wisp Settings) is in sections: Interface (Menu style, Extras),

@@ -38,4 +38,13 @@ Minecraft assets. 100 coins are worth 0.80 €:
 - `angel_halo` (Head, 400 coins / 3.20 €): twelve gold bars in a ring over the head, tilted a
   little, turning slowly and bobbing; it glows.
 
+Christmas items, 4 units a model pixel (drawn at a quarter scale) like the Stray Head:
+
+- `santa_hat` (Head, 500 coins / 4 €): a rolled white fur brim round the head, a red velvet cone
+  of six segments rising and then flopping over to one side, a white pompom at its tip; the tip
+  swings as you move.
+- `santa_sack` (Bag, 700 coins / 5.60 €): a lumpy brown burlap sack slung over the back beside a
+  cape (a bag takes a weapon's place), gathered at the neck and tied with gold rope, a green
+  present with a red ribbon and a candy cane poking out of the top; it sways.
+
 Each has `<id>.json` (the item) and `<id>.png` (its card).

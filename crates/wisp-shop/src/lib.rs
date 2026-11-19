@@ -26,6 +26,8 @@ pub enum Kind {
     Wings,
     /// Carried across the back (a sword), beside a cape.
     Weapon,
+    /// A bag on the back (Santa's sack), beside a cape: it takes a weapon's place.
+    Bag,
     /// Worn on the head (a hat); a helmet hides it.
     Head,
     Pet,
@@ -39,13 +41,15 @@ impl Kind {
     /// Whether the game draws both in the same place, so only one of them is worn.
     pub fn shares_slot(self, other: Kind) -> bool {
         let back = |k: Kind| matches!(k, Kind::Cape | Kind::Wings);
-        self == other || (back(self) && back(other))
+        let carried = |k: Kind| matches!(k, Kind::Weapon | Kind::Bag);
+        self == other || (back(self) && back(other)) || (carried(self) && carried(other))
     }
 
-    pub const ALL: [Kind; 8] = [
+    pub const ALL: [Kind; 9] = [
         Kind::Cape,
         Kind::Wings,
         Kind::Weapon,
+        Kind::Bag,
         Kind::Head,
         Kind::Pet,
         Kind::Trail,
@@ -197,6 +201,26 @@ const ANGEL_HALO: Offer = offer!(
     item
 );
 
+/// Santa Hat: red velvet with a white fur brim and pompom. 500 coins (4 €).
+const SANTA_HAT: Offer = offer!(
+    "santa_hat",
+    "Santa Hat",
+    "Red velvet with a white fur brim, its tip flopping over to one side with a pompom that swings as you move.",
+    Head,
+    500,
+    item
+);
+
+/// Santa's Sack: a burlap sack over the back with presents. 700 coins (5.60 €).
+const SANTA_SACK: Offer = offer!(
+    "santa_sack",
+    "Santa's Sack",
+    "A big burlap sack slung over your back, tied with gold rope, a present and a candy cane poking out of the top.",
+    Bag,
+    700,
+    item
+);
+
 /// What the shop sells.
 #[cfg(not(any(test, feature = "test-items")))]
 pub const OFFERS: &[Offer] = &[
@@ -208,6 +232,8 @@ pub const OFFERS: &[Offer] = &[
     STRAY_HEAD,
     DEVIL_HORNS,
     ANGEL_HALO,
+    SANTA_HAT,
+    SANTA_SACK,
 ];
 
 /// With `test-items` (and in this crate's tests), made-up items beside the real ones, so the
@@ -223,6 +249,8 @@ pub const OFFERS: &[Offer] = &[
     STRAY_HEAD,
     DEVIL_HORNS,
     ANGEL_HALO,
+    SANTA_HAT,
+    SANTA_SACK,
     test_offer("test_cape", Kind::Cape, 1_200),
     test_offer("test_wings", Kind::Wings, 900),
     test_offer("test_hat", Kind::Head, 1_000),
@@ -510,12 +538,22 @@ mod tests {
             assert_eq!(v["id"], offer.id);
             let slot = match offer.kind {
                 Kind::Cape | Kind::Wings => "back",
-                Kind::Weapon => "weapon",
+                Kind::Weapon | Kind::Bag => "weapon",
                 Kind::Head => "head",
                 other => panic!("{}: no slot for {other:?}", offer.id),
             };
             assert_eq!(v["slot"], slot, "{}", offer.id);
         }
+    }
+
+    #[test]
+    fn a_bag_takes_a_weapons_place_beside_a_cape() {
+        assert!(Kind::Bag.shares_slot(Kind::Weapon));
+        assert!(Kind::Weapon.shares_slot(Kind::Bag));
+        assert!(!Kind::Bag.shares_slot(Kind::Cape));
+        assert!(!Kind::Bag.shares_slot(Kind::Head));
+        assert_eq!(offer("santa_sack").unwrap().kind, Kind::Bag);
+        assert_eq!(offer("santa_hat").unwrap().kind, Kind::Head);
     }
 
     #[test]
@@ -531,7 +569,9 @@ mod tests {
                 "bamboo_sword",
                 "stray_head",
                 "devil_horns",
-                "angel_halo"
+                "angel_halo",
+                "santa_hat",
+                "santa_sack"
             ]
         );
         let cape = offer(FOUNDERS).unwrap();

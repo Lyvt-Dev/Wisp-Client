@@ -2,12 +2,16 @@
 //! (a library from the skins folder, tried on with a click, worn on the account or, offline,
 //! in this game) and the cosmetics (Show my cosmetics, and each owned item worn or taken off).
 use super::{
-    ACCENT, ACCENT_HOVER, Click, FAINT, Home, INK, ItemRow, MUTED, ON_ACCENT, PLATE, PLATE_HOVER,
-    STROKE, Tab, WardrobeData, fit, hover, record,
+    Click, FAINT, Home, INK, ItemRow, MUTED, PLATE, PLATE_HOVER, STROKE, Tab, WardrobeData, fit,
+    hover, record,
 };
 use crate::{
     lang,
-    ui_theme::{Face, Icon, Ui, color::hex},
+    ui_theme::{
+        Face, Icon, Ui,
+        color::hex,
+        festive::{accent, accent_hover, on_accent},
+    },
 };
 
 const PANEL: u32 = hex(0x0E0F13, 214);
@@ -109,7 +113,7 @@ impl Home {
         for ((tab, label), tw) in tabs.iter().zip(widths) {
             let on = self.tab == *tab;
             if on {
-                ui.rounded(tx, y + 4.0, tw, 34.0, 11.0, ACCENT);
+                ui.rounded(tx, y + 4.0, tw, 34.0, 11.0, accent());
             } else if hover(ui, tx, y + 4.0, tw, 34.0) {
                 ui.rounded(tx, y + 4.0, tw, 34.0, 11.0, hex(0xFFFFFF, 16));
             }
@@ -120,7 +124,7 @@ impl Home {
                 34.0,
                 tx + (tw - lw) / 2.0,
                 y + 4.0,
-                if on { ON_ACCENT } else { INK },
+                if on { on_accent() } else { INK },
                 label,
             );
             self.hit(ui, tx, y + 4.0, tw, 34.0, Click::Tab(*tab));
@@ -199,8 +203,8 @@ impl Home {
                 if hovered || on { TILE_HOVER } else { TILE },
             );
             if on {
-                ui.border(tx, ty, tw, th, 14.0, ACCENT);
-                ui.border(tx + 1.0, ty + 1.0, tw - 2.0, th - 2.0, 13.0, ACCENT);
+                ui.border(tx, ty, tw, th, 14.0, accent());
+                ui.border(tx + 1.0, ty + 1.0, tw - 2.0, th - 2.0, 13.0, accent());
             } else {
                 ui.border(tx, ty, tw, th, 14.0, STROKE);
             }
@@ -276,11 +280,11 @@ impl Home {
         let hovered = enabled && hover(ui, ax, bar_y, aw, 42.0);
         let fill = match (enabled, hovered) {
             (false, _) => hex(0xFFFFFF, 30),
-            (true, false) => ACCENT,
-            (true, true) => ACCENT_HOVER,
+            (true, false) => accent(),
+            (true, true) => accent_hover(),
         };
         ui.rounded(ax, bar_y, aw, 42.0, 13.0, fill);
-        let ink = if enabled { ON_ACCENT } else { FAINT };
+        let ink = if enabled { on_accent() } else { FAINT };
         ui.icon(Icon::Check, ax + 16.0, bar_y + 12.0, 18.0, ink);
         ui.text_line(Face::SemiBold, 14.0, 42.0, ax + 40.0, bar_y, ink, &apply);
         if enabled {
@@ -347,14 +351,14 @@ impl Home {
             sw,
             sh,
             sh / 2.0,
-            if on { ACCENT } else { SWITCH_OFF },
+            if on { accent() } else { SWITCH_OFF },
         );
         let knob = if on { sx + sw - sh + 3.0 } else { sx + 3.0 };
         ui.circle(
             knob + (sh - 6.0) / 2.0,
             sy + sh / 2.0,
             (sh - 6.0) / 2.0,
-            if on { ON_ACCENT } else { INK },
+            if on { on_accent() } else { INK },
         );
         self.hit(ui, x, cy, w, ch, Click::ShowCosmetics);
         record(ui, &title, (x, cy, w, ch), true);
@@ -406,8 +410,8 @@ impl Home {
         let (fill, ink) = match (item.worn, hovered) {
             (true, false) => (hex(0xFFFFFF, 26), INK),
             (true, true) => (hex(0xFFFFFF, 40), INK),
-            (false, false) => (ACCENT, ON_ACCENT),
-            (false, true) => (ACCENT_HOVER, ON_ACCENT),
+            (false, false) => (accent(), on_accent()),
+            (false, true) => (accent_hover(), on_accent()),
         };
         ui.rounded(bx, by, bw, 34.0, 11.0, fill);
         let lw = ui.measure(Face::SemiBold, 13.0, &label);

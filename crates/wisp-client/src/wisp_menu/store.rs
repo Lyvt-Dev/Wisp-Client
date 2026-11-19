@@ -78,6 +78,7 @@ pub fn kind_name(kind: Kind) -> String {
         Kind::Cape => ("capes", "Capes"),
         Kind::Wings => ("wings", "Wings"),
         Kind::Weapon => ("weapons", "Weapons"),
+        Kind::Bag => ("bags", "Bags"),
         Kind::Head => ("hats", "Hats"),
         Kind::Pet => ("pets", "Pets"),
         Kind::Trail => ("trails", "Trails"),
@@ -205,14 +206,14 @@ impl Menu {
             }
             let selected = self.store_kind == kind;
             let fill = if selected {
-                ACCENT
+                accent()
             } else if hover(ui, x, cy, w, 28.0) {
                 CARD_HOVER
             } else {
                 CARD
             };
             ui.rounded(x, cy, w, 28.0, 14.0, fill);
-            let colour = if selected { ON_ACCENT } else { INK_SOFT };
+            let colour = if selected { on_accent() } else { INK_SOFT };
             ui.text_line(Face::Medium, 12.0, 28.0, x + 12.0, cy, colour, &name);
             self.hit(ui, x, cy, w, 28.0, Action::Store(StoreClick::Kind(kind)));
             x += w + 6.0;
@@ -383,13 +384,17 @@ impl Menu {
         let bx = x + w - bw - 10.0;
         let hovered = hover(ui, bx, by, bw, 28.0) && visible(by, by + 28.0);
         let fill = match (bright && !busy, hovered) {
-            (true, true) => ACCENT_HOVER,
-            (true, false) => ACCENT,
+            (true, true) => accent_hover(),
+            (true, false) => accent(),
             (false, true) => CARD_HOVER,
             (false, false) => hex(0xFFFFFF, 16),
         };
         ui.rounded(bx, by, bw, 28.0, 10.0, fill);
-        let colour = if bright && !busy { ON_ACCENT } else { INK_SOFT };
+        let colour = if bright && !busy {
+            on_accent()
+        } else {
+            INK_SOFT
+        };
         ui.text_line(Face::Medium, 12.0, 28.0, bx + 12.0, by, colour, &label);
         if visible(by, by + 28.0) && !busy {
             self.hit(
@@ -439,12 +444,12 @@ impl Menu {
         let ready = focused && !self.store_input.trim().is_empty() && !busy;
         let bx = x + w - bw;
         let fill = match (ready, hover(ui, bx, y, bw, h)) {
-            (true, true) => ACCENT_HOVER,
-            (true, false) => ACCENT,
+            (true, true) => accent_hover(),
+            (true, false) => accent(),
             (false, _) => CARD_HOVER,
         };
         ui.rounded(bx, y, bw, h, 12.0, fill);
-        let colour = if ready { ON_ACCENT } else { MUTED };
+        let colour = if ready { on_accent() } else { MUTED };
         ui.text_line(Face::Medium, 13.0, h, bx + 14.0, y, colour, label);
         self.hit(ui, bx, y, bw, h, Action::Store(StoreClick::Submit(field)));
     }

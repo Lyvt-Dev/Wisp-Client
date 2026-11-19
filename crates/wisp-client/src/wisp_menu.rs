@@ -20,7 +20,11 @@ use crate::{
         features::{self, Category, Feature, Kind, SWATCHES, Setting, TEXT_MAX, WIDGET_GROUPS},
     },
     lang,
-    ui_theme::{Face, Ui, color::hex},
+    ui_theme::{
+        Face, Ui,
+        color::hex,
+        festive::{self, accent, accent_alpha, accent_hover, on_accent},
+    },
 };
 
 // The launcher's dark look in the HUD encoding: neutral greys, the violet for what is selected,
@@ -28,11 +32,9 @@ use crate::{
 const SCRIM: u32 = 0x050507;
 const PANEL: u32 = hex(0x111217, 238);
 const SIDEBAR: u32 = hex(0x0B0C10, 246);
-const ACCENT: u32 = hex(wisp_theme::glass::ACCENT, 255);
-const ACCENT_HOVER: u32 = hex(0xFFFFFF, 255);
 const ACCENT_SOFT: u32 = hex(0xD4D4D8, 255);
-/// Text on the accent: it is near white, so the text is dark.
-const ON_ACCENT: u32 = hex(wisp_theme::glass::ON_LIGHT, 255);
+// The accent itself (and the text on it) comes from `ui_theme::festive`: near white with dark
+// text, or Christmas red with white text.
 const INK: u32 = hex(0xFFFFFF, 255);
 const INK_SOFT: u32 = hex(0xFFFFFF, 210);
 const MUTED: u32 = hex(0xFFFFFF, 150);
@@ -42,9 +44,6 @@ const CARD: u32 = hex(0xFFFFFF, 10);
 const CARD_HOVER: u32 = hex(0xFFFFFF, 19);
 const FIELD: u32 = hex(0xFFFFFF, 14);
 const SWITCH_OFF: u32 = hex(0xFFFFFF, 38);
-const fn accent_alpha(a: u8) -> u32 {
-    hex(wisp_theme::glass::ACCENT, a)
-}
 
 /// The sidebar's width, the page's head (title, search, close) and the chips under it, in dp.
 const SIDEBAR_W: f32 = 228.0;
@@ -239,6 +238,10 @@ impl Menu {
             .map_or(1.0, |at| (at.elapsed().as_secs_f32() / OPEN_ANIM).min(1.0));
         let ease = 1.0 - (1.0 - t).powi(3);
         ui.rounded(0.0, 0.0, w, h, 0.0, hex(SCRIM, (110.0 * ease) as u8));
+        // Wisp Christmas: snow falling over the world behind the panel.
+        if festive::on() {
+            festive::snow(ui, (0.0, 0.0, w, h), ease);
+        }
         self.hit(ui, 0.0, 0.0, w, h, Action::Close);
         let pw = (w - 48.0).clamp(520.0, 1120.0);
         let ph = (h - 48.0).clamp(340.0, 660.0);
@@ -257,6 +260,10 @@ impl Menu {
         ui.border(px, py, pw, ph, RADIUS, STROKE);
         self.hit(ui, px, py, pw, ph, Action::Nothing);
         self.draw_sidebar(ui, e, (px, py, ph), friends, store, player);
+        // Fairy lights hung along the panel's top edge.
+        if festive::on() {
+            festive::lights(ui, px + RADIUS, py - 3.0, pw - 2.0 * RADIUS);
+        }
         let (cx, cw) = (px + SIDEBAR_W + 28.0, pw - SIDEBAR_W - 56.0);
         let modules = !self.friends_page && self.store_page.is_none();
         let grid = modules && self.open.is_none();
@@ -304,6 +311,9 @@ impl Menu {
         ui.rounded(bx, by, side, side, 10.0, tile);
         ui.border(bx, by, side, side, 10.0, STROKE);
         ui.feather(bx + side / 2.0, by + side / 2.0, side, INK, tile);
+        if festive::on() {
+            festive::hat(ui, bx, by, side);
+        }
         ui.text_line(Face::Heading, 22.0, side, bx + 46.0, by - 1.0, INK, "WISP");
         let (x, w) = (px + 14.0, SIDEBAR_W - 28.0);
         let mut y = py + 82.0;
@@ -440,12 +450,12 @@ impl Menu {
         let h = 36.0;
         let hovered = hover(ui, x, y, w, h);
         if selected {
-            ui.rounded(x, y, w, h, 10.0, ACCENT);
+            ui.rounded(x, y, w, h, 10.0, accent());
         } else if hovered {
             ui.rounded(x, y, w, h, 10.0, CARD_HOVER);
         }
         let colour = if selected {
-            ON_ACCENT
+            on_accent()
         } else if hovered {
             INK
         } else {
@@ -463,7 +473,7 @@ impl Menu {
             let (bx, bh) = (x + w - 10.0 - bw, 16.0);
             let by = y + (h - bh) / 2.0;
             let (fill, ink) = if selected {
-                (hex(0x000000, 40), ON_ACCENT)
+                (hex(0x000000, 40), on_accent())
             } else {
                 (fill, INK)
             };
@@ -594,7 +604,7 @@ impl Menu {
             }
             let hovered = hover(ui, x, y, cw, ch);
             let (fill, ink) = if selected {
-                (ACCENT, ON_ACCENT)
+                (accent(), on_accent())
             } else if hovered {
                 (CARD_HOVER, INK)
             } else {
@@ -907,12 +917,20 @@ impl Menu {
                 let bw = ui.measure(Face::Medium, 13.0, &button) + 28.0;
                 let (bx, by) = (x + w - bw, y + (ROW_H - 32.0) / 2.0);
                 let fill = if hover(ui, bx, by, bw, 32.0) {
-                    ACCENT_HOVER
+                    accent_hover()
                 } else {
-                    ACCENT
+                    accent()
                 };
                 ui.rounded(bx, by, bw, 32.0, 10.0, fill);
-                ui.text_line(Face::Medium, 13.0, 32.0, bx + 14.0, by, ON_ACCENT, &button);
+                ui.text_line(
+                    Face::Medium,
+                    13.0,
+                    32.0,
+                    bx + 14.0,
+                    by,
+                    on_accent(),
+                    &button,
+                );
                 self.hit(ui, bx, by, bw, 32.0, Action::EditHud);
                 return;
             }
@@ -974,11 +992,11 @@ impl Menu {
                 let mut sx = tx + 2.0;
                 for (i, (name, sw)) in names.iter().zip(&widths).enumerate() {
                     if i == current {
-                        ui.rounded(sx, cy - th / 2.0 + 2.0, *sw, th - 4.0, 8.0, ACCENT);
+                        ui.rounded(sx, cy - th / 2.0 + 2.0, *sw, th - 4.0, 8.0, accent());
                     } else if hover(ui, sx, cy - th / 2.0, *sw, th) {
                         ui.rounded(sx, cy - th / 2.0 + 2.0, *sw, th - 4.0, 8.0, CARD_HOVER);
                     }
-                    let colour = if i == current { ON_ACCENT } else { MUTED };
+                    let colour = if i == current { on_accent() } else { MUTED };
                     ui.text_line(
                         Face::Medium,
                         12.0,
@@ -1151,10 +1169,10 @@ impl Menu {
                     0.0
                 };
                 ui.rounded(tx, cy - 2.0, tw, 4.0, 2.0, hex(0xFFFFFF, 34));
-                ui.rounded(tx, cy - 2.0, tw * t, 4.0, 2.0, ACCENT);
+                ui.rounded(tx, cy - 2.0, tw * t, 4.0, 2.0, accent());
                 let knob = tx + tw * t;
                 ui.circle(knob, cy, 8.0, INK);
-                ui.circle(knob, cy, 3.0, ACCENT);
+                ui.circle(knob, cy, 3.0, accent());
                 let value = if (max - min) <= 4.0 {
                     format!("{v:.2}{unit}")
                 } else {
@@ -1235,9 +1253,16 @@ fn hover(ui: &Ui, x: f32, y: f32, w: f32, h: f32) -> bool {
 }
 /// A switch: a 38x22 pill, the accent with a dark knob when on, grey with a white one when off.
 fn draw_switch(ui: &mut Ui, x: f32, y: f32, on: bool) {
-    ui.rounded(x, y, 38.0, 22.0, 11.0, if on { ACCENT } else { SWITCH_OFF });
+    ui.rounded(
+        x,
+        y,
+        38.0,
+        22.0,
+        11.0,
+        if on { accent() } else { SWITCH_OFF },
+    );
     let kx = if on { x + 27.0 } else { x + 11.0 };
-    ui.circle(kx, y + 11.0, 8.0, if on { ON_ACCENT } else { INK });
+    ui.circle(kx, y + 11.0, 8.0, if on { on_accent() } else { INK });
 }
 
 /// A section's name in the sidebar; returns where its first row starts.

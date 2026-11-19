@@ -14508,6 +14508,10 @@ impl Game<'_> {
         )
     }
     fn apply_settings(&mut self) {
+        // Wisp Settings › Menu style: Wisp Christmas dresses Wisp's own screens.
+        wisp_client::ui_theme::festive::set(
+            self.settings.extras.menu_style == wisp_client::extras::MenuStyle::Christmas,
+        );
         // LocalPlayer.refreshChatAbilities: the chat shows what the Chat option allows.
         let abilities = self.chat_abilities();
         self.ui.chat.set_abilities(&self.gui.atlas.font, abilities);

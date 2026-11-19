@@ -39,6 +39,164 @@ pub fn set_preference(dir: &Path, key: &str, value: Option<&str>) {
     let _ = std::fs::write(dir.join("wisp.txt"), out);
 }
 
+/// Wisp Christmas, the third Menu style (Wisp Settings): Wisp's own screens (the home screen,
+/// the Wisp Menu) in a Christmas look. The game sets it each frame from the setting
+/// ([`set`]); the screens read their accent from here and add the decorations: snow falling,
+/// a string of fairy lights and a Santa hat on the feather.
+pub mod festive {
+    use super::{Ui, color::hex};
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    static ON: AtomicBool = AtomicBool::new(false);
+
+    /// Christmas red, the accent while the look is on.
+    pub const RED: u32 = 0xD42A35;
+    const RED_HOVER: u32 = 0xE94C56;
+    const WHITE: u32 = 0xFFFFFF;
+    /// The lights' bulbs: red, gold, green, blue.
+    const BULBS: [u32; 4] = [0xFF4D4D, 0xFFD24A, 0x3DDC84, 0x5AA9FF];
+
+    pub fn set(on: bool) {
+        ON.store(on, Ordering::Relaxed);
+    }
+    pub fn on() -> bool {
+        ON.load(Ordering::Relaxed)
+    }
+    /// The accent's colour (no alpha): Wisp's near-white, or Christmas red.
+    pub fn accent_rgb() -> u32 {
+        if on() { RED } else { wisp_theme::glass::ACCENT }
+    }
+    /// The accent, the hovered accent and the ink on it, in the HUD's encoding.
+    pub fn accent() -> u32 {
+        hex(accent_rgb(), 255)
+    }
+    pub fn accent_hover() -> u32 {
+        hex(if on() { RED_HOVER } else { 0xFFFFFF }, 255)
+    }
+    pub fn on_accent() -> u32 {
+        hex(
+            if on() {
+                WHITE
+            } else {
+                wisp_theme::glass::ON_LIGHT
+            },
+            255,
+        )
+    }
+    /// The accent at alpha `a`.
+    pub fn accent_alpha(a: u8) -> u32 {
+        hex(accent_rgb(), a)
+    }
+
+    /// Seconds since the first call, for the snow and the lights.
+    fn clock() -> f32 {
+        static START: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
+        START
+            .get_or_init(std::time::Instant::now)
+            .elapsed()
+            .as_secs_f32()
+    }
+
+    /// A number in 0..1 from `i` and `seed`, the same every frame.
+    fn rand(i: u32, seed: u32) -> f32 {
+        let mut x = i.wrapping_mul(0x9E37_79B9) ^ seed.wrapping_mul(0x85EB_CA6B);
+        x ^= x >> 15;
+        x = x.wrapping_mul(0x2C1B_3C6D);
+        x ^= x >> 12;
+        (x & 0xFFFF) as f32 / 65535.0
+    }
+
+    /// Snow falling over the rectangle: flakes of three sizes, the big ones nearer and faster,
+    /// each swaying as it falls and wrapping round to the top.
+    pub fn snow(ui: &mut Ui, (x, y, w, h): (f32, f32, f32, f32), alpha: f32) {
+        let t = clock();
+        let count = ((w * h) / 9000.0).clamp(30.0, 160.0) as u32;
+        for i in 0..count {
+            let depth = rand(i, 1);
+            let r = 1.0 + depth * 2.2;
+            let speed = 14.0 + depth * 34.0;
+            let fx = x + rand(i, 2) * w + (t * 0.7 + rand(i, 3) * 6.3).sin() * (4.0 + depth * 8.0);
+            let fy = y + (rand(i, 4) * h + t * speed).rem_euclid(h + 10.0) - 5.0;
+            let a = ((0.35 + depth * 0.55) * alpha * 255.0) as u8;
+            ui.circle(fx, fy, r, hex(0xFFFFFF, a));
+        }
+    }
+
+    /// A string of fairy lights hanging across from `x` to `x + w`, its wire at `y`, sagging
+    /// between pins; each bulb twinkles on its own.
+    pub fn lights(ui: &mut Ui, x: f32, y: f32, w: f32) {
+        let t = clock();
+        let span = 70.0;
+        let spans = (w / span).ceil().max(1.0) as u32;
+        let step = w / spans as f32;
+        let sag = 9.0;
+        let wire_at = |px: f32| {
+            let k = ((px - x) / step).fract();
+            y + sag * 4.0 * k * (1.0 - k)
+        };
+        let mut wire = Vec::new();
+        let mut px = x;
+        while px <= x + w {
+            wire.push([px, wire_at(px)]);
+            px += 4.0;
+        }
+        wire.push([x + w, y]);
+        ui.polyline(&wire, 1.4, hex(0x1F3A24, 230));
+        let bulbs = spans * 3;
+        for i in 0..bulbs {
+            let bx = x + step * (i as f32 + 0.5) / 3.0;
+            let by = wire_at(bx);
+            let colour = BULBS[(i % 4) as usize];
+            let pulse = 0.55 + 0.45 * (t * (1.3 + rand(i, 7)) + rand(i, 8) * 6.3).sin().abs();
+            // The cap on the wire, the glow, then the bulb.
+            ui.rounded(bx - 1.5, by - 1.0, 3.0, 3.0, 1.0, hex(0x2A2A2A, 255));
+            ui.circle(bx, by + 5.0, 7.0, hex(colour, (60.0 * pulse) as u8));
+            ui.circle(
+                bx,
+                by + 5.0,
+                3.2,
+                hex(colour, (150.0 + 105.0 * pulse) as u8),
+            );
+            ui.circle(
+                bx - 0.9,
+                by + 4.0,
+                1.0,
+                hex(0xFFFFFF, (140.0 * pulse) as u8),
+            );
+        }
+    }
+
+    /// A Santa hat sitting on a square tile `side` dp across at (`x`, `y`): red, bending to the
+    /// right, a white fur brim along the tile's top and a pompom at the tip.
+    pub fn hat(ui: &mut Ui, x: f32, y: f32, side: f32) {
+        let k = side / 40.0;
+        let red = hex(RED, 255);
+        let shade = hex(0xA81E28, 255);
+        let (l, r, base) = (x + 3.0 * k, x + side - 3.0 * k, y + 4.0 * k);
+        let peak = [x + side * 0.62, y - 16.0 * k];
+        let tip = [x + side + 5.0 * k, y - 6.0 * k];
+        ui.quad([[l, base], peak, [r, base], [r, base]], red);
+        ui.quad(
+            [
+                peak,
+                tip,
+                [r - 6.0 * k, base - 4.0 * k],
+                [r - 6.0 * k, base - 4.0 * k],
+            ],
+            shade,
+        );
+        ui.rounded(
+            x - 1.0 * k,
+            y - 1.0 * k,
+            side + 2.0 * k,
+            8.0 * k,
+            4.0 * k,
+            hex(0xF4F4F4, 255),
+        );
+        ui.circle(tip[0], tip[1], 4.6 * k, hex(0xFFFFFF, 255));
+    }
+}
+
 /// The dark palette (`wisp_theme::DARK`) in the HUD's colour encoding, plus the
 /// translucent plates the overlays draw over the game.
 pub mod color {

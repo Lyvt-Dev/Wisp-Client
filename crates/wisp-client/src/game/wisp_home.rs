@@ -73,11 +73,11 @@ impl Game<'_> {
             && self.wisp_home_on()
     }
 
-    /// Wisp's home screen is on: Menu style is Wisp (Wisp Settings, `vanillaMenus` in
-    /// `wisp-extras.txt`), `wisp.txt` doesn't say `titleScreen:vanilla` (the older switch) and
+    /// Wisp's home screen is on: Menu style is Wisp or Wisp Christmas (Wisp Settings,
+    /// `menuStyle` in `wisp-extras.txt`), `wisp.txt` doesn't say `titleScreen:vanilla` (the older switch) and
     /// `WISP_VANILLA_TITLE` is not set (for a run that compares the title with vanilla's).
     fn wisp_home_on(&self) -> bool {
-        !self.settings.extras.vanilla_menus
+        self.settings.extras.menu_style != wisp_client::extras::MenuStyle::Minecraft
             && wisp_compat::var_os("WISP_VANILLA_TITLE").is_none()
             && wisp_client::ui_theme::preference(&Self::options_dir(), "titleScreen").as_deref()
                 != Some("vanilla")

@@ -1609,6 +1609,315 @@ fn halo_item(texture: &Canvas) -> Value {
     })
 }
 
+// ---------------------------------------------------------------- Christmas: Santa Hat and Santa's Sack
+
+/// Both are built 4 units a model pixel (drawn at a quarter scale), like the Stray Head.
+const XMAS_UNIT: f32 = 4.0;
+
+/// Lays boxes out in a texture left to right in rows: each box takes its unwrap's footprint
+/// (2 × (w + d) across, d + h down).
+struct Shelf {
+    x: i32,
+    y: i32,
+    row: i32,
+    width: i32,
+}
+
+impl Shelf {
+    fn new(width: i32) -> Self {
+        Self {
+            x: 0,
+            y: 0,
+            row: 0,
+            width,
+        }
+    }
+    fn place(&mut self, [w, h, d]: [i32; 3]) -> [i32; 2] {
+        let (fw, fh) = (2 * (w + d), d + h);
+        if self.x + fw > self.width {
+            self.x = 0;
+            self.y += self.row + 1;
+            self.row = 0;
+        }
+        let at = [self.x, self.y];
+        self.x += fw + 1;
+        self.row = self.row.max(fh);
+        assert!(self.y + fh <= 256, "texture full");
+        at
+    }
+}
+
+/// Red velvet: deep in the folds, bright where the light catches the nap.
+fn velvet(l: f32, i: i32, j: i32, seed: u32) -> Rgba {
+    let nap = (vnoise(i as f32 * 0.35, j as f32 * 0.35, seed) - 0.5) * 0.22;
+    ramp(
+        &[0x5a0a12, 0x8a121c, 0xb31b26, 0xd42a35, 0xea4a52, 0xf47a7e],
+        l + nap + (noise(i, j, seed + 1) - 0.5) * 0.06,
+    )
+}
+
+/// White fur in soft clumps, greyer in the hollows between them.
+fn fur(l: f32, i: i32, j: i32, seed: u32) -> Rgba {
+    let clump = vnoise(i as f32 * 0.5, j as f32 * 0.5, seed);
+    let strand = (noise(i, j, seed + 3) - 0.5) * 0.2;
+    ramp(
+        &[0xa9adb8, 0xcfd3dc, 0xe8eaef, 0xf6f7f9, 0xffffff],
+        l * 0.5 + clump * 0.55 + strand,
+    )
+}
+
+/// Light on a box face: the top brightest, the front lit, the sides and back darker.
+fn face_light(face: usize) -> f32 {
+    match face {
+        0 => 0.82,
+        1 => 0.28,
+        3 => 0.66,
+        5 => 0.46,
+        _ => 0.54,
+    }
+}
+
+/// The hat's cone, base to tip: width, height and its bend from the one below (degrees: x
+/// tips it back, z to the wearer's left), so the tip flops back and over to one side.
+const SANTA_CONE: [(i32, i32, f32, f32); 6] = [
+    (32, 10, -2.0, 0.0),
+    (26, 10, -4.0, 6.0),
+    (20, 9, -4.0, 14.0),
+    (15, 9, -4.0, 24.0),
+    (11, 8, -3.0, 30.0),
+    (8, 8, -2.0, 34.0),
+];
+const SANTA_BRIM: [i32; 3] = [36, 7, 36];
+const SANTA_POMPOM: [i32; 3] = [10, 10, 10];
+
+/// Where each box of the hat sits in the texture: the brim, the cone's segments, the pompom.
+fn santa_hat_uvs() -> (Vec<[i32; 2]>, [i32; 2], [i32; 2]) {
+    let mut shelf = Shelf::new(256);
+    let brim = shelf.place(SANTA_BRIM);
+    let cone = SANTA_CONE
+        .iter()
+        .map(|&(w, h, _, _)| shelf.place([w, h, w]))
+        .collect();
+    let pompom = shelf.place(SANTA_POMPOM);
+    (cone, brim, pompom)
+}
+
+/// The Santa Hat's texture: red velvet, darker towards the tip; white fur brim and pompom.
+fn santa_hat_texture() -> Canvas {
+    let mut c = Canvas::new(256, 256);
+    let (cone, brim, pompom) = santa_hat_uvs();
+    let [w, h, d] = SANTA_BRIM;
+    paint_box(&mut c, brim[0], brim[1], w, h, d, |face, i, j, _, fh| {
+        let roll = if face >= 2 {
+            // The rolled fur is round: lit along its middle.
+            let t = (j as f32 + 0.5) / fh as f32;
+            0.3 + 0.7 * (t * std::f32::consts::PI).sin()
+        } else {
+            face_light(face)
+        };
+        fur(roll, i, j, 601)
+    });
+    for (k, &(w, h, _, _)) in SANTA_CONE.iter().enumerate() {
+        let [u, v] = cone[k];
+        let tip = k as f32 / (SANTA_CONE.len() - 1) as f32;
+        paint_box(&mut c, u, v, w, h, w, |face, i, j, fw, _| {
+            let across = (i as f32 + 0.5) / fw as f32;
+            let mut l = face_light(face) - tip * 0.12;
+            if face >= 2 {
+                l += 0.12 * (across * std::f32::consts::PI).sin() - 0.06;
+            }
+            velvet(l, i + k as i32 * 17, j, 611)
+        });
+    }
+    let [w, h, d] = SANTA_POMPOM;
+    paint_box(&mut c, pompom[0], pompom[1], w, h, d, |face, i, j, _, _| {
+        fur(face_light(face) + 0.15, i, j, 621)
+    });
+    c
+}
+
+/// The Santa Hat: a white fur brim round the head, a red velvet cone flopping back and over to
+/// one side, and a white pompom at its tip that swings as you move.
+fn santa_hat_item(texture: &Canvas) -> Value {
+    let (cone, brim_uv, pompom_uv) = santa_hat_uvs();
+    let mut child: Option<Value> = None;
+    for (k, &(w, h, back, side)) in SANTA_CONE.iter().enumerate().rev() {
+        let (wf, hf) = (w as f32, h as f32);
+        let pivot = if k == 0 {
+            [0.0, -33.0, 0.0]
+        } else {
+            [0.0, -(SANTA_CONE[k - 1].1 as f32) + 1.0, 0.0]
+        };
+        let mut part = json!({
+            "name": format!("cone_{k}"),
+            "pivot": pivot, "rotation": [back, 0.0, side],
+            "cubes": [cube([-wf / 2.0, -hf, -wf / 2.0], [w, h, w], cone[k])],
+        });
+        let mut children = Vec::new();
+        if k == SANTA_CONE.len() - 1 {
+            let [pw, ph, pd] = SANTA_POMPOM;
+            children.push(json!({
+                "name": "pompom", "pivot": [0.0, -hf + 2.0, 0.0],
+                "cubes": [cube([-(pw as f32) / 2.0, -(ph as f32), -(pd as f32) / 2.0], SANTA_POMPOM, pompom_uv)],
+            }));
+        }
+        if let Some(c) = child.take() {
+            children.push(c);
+        }
+        if !children.is_empty() {
+            part["children"] = json!(children);
+        }
+        child = Some(part);
+    }
+    let [bw, bh, bd] = SANTA_BRIM;
+    json!({
+        "format": 1, "id": "santa_hat", "slot": "head", "bone": "head",
+        "attach": { "offset": [0, 0, 0], "rotation": [0, 0, 0], "scale": 1.0 / XMAS_UNIT },
+        "texture": { "png": b64(&texture.png()) },
+        "parts": [
+            {
+                "name": "brim", "pivot": [0, 0, 0],
+                "cubes": [cube([-(bw as f32) / 2.0, -34.0, -(bd as f32) / 2.0], [bw, bh, bd], brim_uv)],
+            },
+            child.unwrap(),
+        ],
+        "animations": [
+            { "part": "cone_3", "motion": "swing", "axis": "x", "amplitude": 5.0, "period": 46 },
+            { "part": "cone_5", "motion": "swing", "axis": "z", "amplitude": 7.0, "period": 34, "phase": 0.3 },
+        ],
+    })
+}
+
+/// What Santa's Sack is made of, for its texture.
+#[derive(Clone, Copy, PartialEq)]
+enum Stuff {
+    Sack,
+    Ruffle,
+    Rope,
+    Gift,
+    Cane,
+}
+
+/// The sack's boxes in 4-unit pixels on the body's back (+z away from it, y down from the
+/// shoulders): (part, origin, size, what it is made of). The sack is a few overlapping boxes so
+/// it bulges; the neck is gathered and tied, the ruffle spills over the rope.
+const SACK: [(&str, [f32; 3], [i32; 3], Stuff); 12] = [
+    ("sack", [-15.0, 6.0, 0.0], [30, 38, 24], Stuff::Sack),
+    ("sack", [-18.0, 11.0, 1.0], [36, 28, 22], Stuff::Sack),
+    ("sack", [-20.0, 16.0, 2.0], [40, 18, 18], Stuff::Sack),
+    ("sack", [-12.0, 40.0, 3.0], [24, 6, 18], Stuff::Sack),
+    ("sack", [-7.0, 0.0, 6.0], [14, 8, 12], Stuff::Sack),
+    ("sack", [-8.0, 2.0, 5.0], [16, 3, 14], Stuff::Rope),
+    ("sack", [-11.0, -5.0, 3.0], [22, 6, 18], Stuff::Ruffle),
+    ("sack", [-8.0, -8.0, 5.0], [16, 3, 14], Stuff::Ruffle),
+    ("gift", [-6.0, -12.0, -6.0], [12, 12, 12], Stuff::Gift),
+    ("cane", [-1.5, -22.0, -1.5], [3, 22, 3], Stuff::Cane),
+    ("cane", [-1.5, -25.0, -1.5], [10, 3, 3], Stuff::Cane),
+    ("cane", [5.5, -22.0, -1.5], [3, 6, 3], Stuff::Cane),
+];
+
+fn sack_uvs() -> Vec<[i32; 2]> {
+    let mut shelf = Shelf::new(256);
+    SACK.iter()
+        .map(|&(_, _, size, _)| shelf.place(size))
+        .collect()
+}
+
+/// Burlap: a weave of threads across and down, each a little different, with darker flecks.
+fn burlap(l: f32, i: i32, j: i32) -> Rgba {
+    let weave = if (i + j) % 2 == 0 { 0.06 } else { -0.06 };
+    let thread = (noise(i, 0, 631) - 0.5) * 0.14 + (noise(0, j, 633) - 0.5) * 0.14;
+    let fleck = if noise(i, j, 635) > 0.985 { -0.25 } else { 0.0 };
+    ramp(
+        &[0x3e2412, 0x5e3a1e, 0x80542c, 0x9f6e3c, 0xbd8c52, 0xd8ac72],
+        l + weave + thread + fleck + (vnoise(i as f32 * 0.12, j as f32 * 0.12, 637) - 0.5) * 0.2,
+    )
+}
+
+/// Santa's Sack's texture: brown burlap, a gold rope with a twist, a green present with a red
+/// ribbon, a red and white candy cane.
+fn sack_texture() -> Canvas {
+    let mut c = Canvas::new(256, 256);
+    for (k, &(_, _, [w, h, d], stuff)) in SACK.iter().enumerate() {
+        let [u, v] = sack_uvs()[k];
+        paint_box(&mut c, u, v, w, h, d, |face, i, j, fw, fh| {
+            let across = (i as f32 + 0.5) / fw as f32;
+            let down = (j as f32 + 0.5) / fh as f32;
+            let light = face_light(face);
+            match stuff {
+                Stuff::Sack => {
+                    // Bulging cloth: lit across its middle, a few creases running down.
+                    let bulge = (across * std::f32::consts::PI).sin() * 0.16;
+                    let crease = if (i * 7 + k as i32 * 13) % 23 == 0 {
+                        -0.12
+                    } else {
+                        0.0
+                    };
+                    burlap(light - 0.1 + bulge + crease, i, j)
+                }
+                Stuff::Ruffle => {
+                    let fold = ((i as f32 * 0.9).sin() * 0.5 + 0.5) * 0.25;
+                    burlap(light + fold - 0.05, i, j + 40)
+                }
+                Stuff::Rope => {
+                    let twist = (((i + j) as f32) / 3.0).fract();
+                    let l = 0.35 + 0.55 * (twist * std::f32::consts::PI).sin();
+                    ramp(
+                        &[0x6a4a10, 0xa8781c, 0xd8a838, 0xf2cc60, 0xfff0b0],
+                        l * light * 1.3,
+                    )
+                }
+                Stuff::Gift => {
+                    // A red ribbon across both ways over green paper; a bow's knot on top.
+                    let ribbon = (across - 0.5).abs() < 0.14
+                        || (face >= 2 && (down - 0.5).abs() < 0.14)
+                        || (face < 2 && (down - 0.5).abs() < 0.14);
+                    if ribbon {
+                        ramp(&[0x7a0e16, 0xc01e2a, 0xee4a52, 0xff8a8e], light + 0.1)
+                    } else {
+                        let dot = (i % 4 == 1 && j % 4 == 1) as i32 as f32 * 0.2;
+                        ramp(&[0x0c3a1c, 0x16602e, 0x1f8a40, 0x3cb862], light + dot)
+                    }
+                }
+                Stuff::Cane => {
+                    let stripe = (((i + j) as f32) / 4.0).floor() as i32 % 2 == 0;
+                    let base = if stripe { 0xd42a35 } else { 0xf7f3ee };
+                    add_light(hex(base), [40.0, 40.0, 40.0], light - 0.6)
+                }
+            }
+        });
+    }
+    c
+}
+
+/// Santa's Sack: a big burlap sack over your back, leaning a little, gathered and tied at the
+/// neck with gold rope, a present and a candy cane poking out of the top. It sways as you walk.
+fn sack_item(texture: &Canvas) -> Value {
+    let uvs = sack_uvs();
+    let cubes = |part: &str| -> Vec<Value> {
+        SACK.iter()
+            .zip(&uvs)
+            .filter(|((p, _, _, _), _)| *p == part)
+            .map(|(&(_, origin, size, _), &uv)| cube(origin, size, uv))
+            .collect()
+    };
+    json!({
+        "format": 1, "id": "santa_sack", "slot": "weapon", "bone": "body",
+        "attach": { "offset": [0.5, 1.0, 2.1], "rotation": [0.0, 0.0, -12.0], "scale": 1.0 / XMAS_UNIT },
+        "texture": { "png": b64(&texture.png()) },
+        "parts": [{
+            "name": "sack", "pivot": [0, 0, 0], "cubes": cubes("sack"),
+            "children": [
+                { "name": "gift", "pivot": [-6.0, -4.0, 12.0], "rotation": [8.0, 24.0, -14.0], "cubes": cubes("gift") },
+                { "name": "cane", "pivot": [7.0, -3.0, 13.0], "rotation": [-6.0, 0.0, 18.0], "cubes": cubes("cane") },
+            ],
+        }],
+        "animations": [
+            { "part": "sack", "motion": "swing", "axis": "z", "amplitude": 2.5, "period": 52 },
+        ],
+    })
+}
+
 // ---------------------------------------------------------------- cards
 
 /// A wearer in dark clothes on a 64×64 skin, so the item stands out.
@@ -1858,6 +2167,22 @@ fn main() {
             2.6,
             0.5,
             [240.0, 210.0, 120.0],
+        ),
+        (
+            "santa_hat",
+            santa_hat_item(&santa_hat_texture()),
+            25.0,
+            2.2,
+            0.62,
+            [220.0, 60.0, 70.0],
+        ),
+        (
+            "santa_sack",
+            sack_item(&sack_texture()),
+            200.0,
+            1.5,
+            0.3,
+            [230.0, 180.0, 90.0],
         ),
     ];
     for (id, value, yaw, zoom, drop, glow) in items {
