@@ -2481,10 +2481,32 @@ impl OptionsUi {
             }
             Page::Wisp => {
                 // Two to a row, as vanilla's OptionsList.addSmall lays out
-                // buttons; each opens one of Wisp's settings pages.
+                // buttons, in sections; each button opens one of Wisp's
+                // settings pages or flips one of its switches.
                 let open =
                     |key: &str, page: Page| button(0.0, 0.0, 150.0, tr(key), Act::Push(page));
+                let extra = |item| self.extra_button(s, item);
+                let split = if self.split_guest {
+                    Page::SplitProfiles
+                } else {
+                    Page::SplitSetup
+                };
+                // No AI hides the AI Agent page and everything AI.
+                let ai = if s.extras.no_ai {
+                    Row::Buttons(extra(crate::extras::Item::NoAi), None)
+                } else {
+                    Row::Buttons(
+                        open("wisp.pages.open.agent", Page::Agent),
+                        Some(extra(crate::extras::Item::NoAi)),
+                    )
+                };
                 vec![
+                    Row::Header("wisp.settings.header.interface"),
+                    Row::Buttons(
+                        extra(crate::extras::Item::MenuStyle),
+                        Some(open("wisp.pages.open.extras", Page::Extras)),
+                    ),
+                    Row::Header("wisp.settings.header.graphics"),
                     Row::Buttons(
                         open("wisp.pages.open.graphics", Page::Graphics),
                         Some(open(
@@ -2494,40 +2516,21 @@ impl OptionsUi {
                     ),
                     Row::Buttons(
                         open("wisp.pages.open.shader_packs", Page::ShaderPacks),
-                        Some(open("wisp.pages.open.controller", Page::Controller)),
-                    ),
-                    Row::Buttons(
-                        open("wisp.pages.open.extras", Page::Extras),
-                        Some(open("wisp.pages.open.mods", Page::Mods)),
-                    ),
-                    Row::Buttons(
-                        open(
-                            "wisp.pages.open.split_setup",
-                            if self.split_guest {
-                                Page::SplitProfiles
-                            } else {
-                                Page::SplitSetup
-                            },
-                        ),
                         None,
                     ),
-                    // No AI hides the AI Agent page and everything AI.
+                    Row::Header("wisp.settings.header.controls"),
                     Row::Buttons(
-                        self.extra_button(s, crate::extras::Item::DiscordPresence),
-                        Some(if s.extras.no_ai {
-                            self.extra_button(s, crate::extras::Item::NoAi)
-                        } else {
-                            open("wisp.pages.open.agent", Page::Agent)
-                        }),
+                        open("wisp.pages.open.controller", Page::Controller),
+                        Some(open("wisp.pages.open.split_setup", split)),
                     ),
+                    Row::Header("wisp.settings.header.online"),
+                    Row::Buttons(
+                        open("wisp.pages.open.mods", Page::Mods),
+                        Some(extra(crate::extras::Item::DiscordPresence)),
+                    ),
+                    Row::Header("wisp.settings.header.ai"),
+                    ai,
                 ]
-                .into_iter()
-                .chain(
-                    (!s.extras.no_ai).then(|| {
-                        Row::Buttons(self.extra_button(s, crate::extras::Item::NoAi), None)
-                    }),
-                )
-                .collect()
             }
             Page::Agent => {
                 let mut rows = vec![Row::Buttons(
@@ -7647,19 +7650,29 @@ mod tests {
             [Page::Wisp, Page::Mods, Page::Credits]
         );
         ui.push(Page::Wisp);
+        // In sections: Interface, Graphics, Controls and players, Mods and online, AI.
         assert_eq!(
             pushes(&mut ui),
             [
+                Page::Extras,
                 Page::Graphics,
                 Page::GraphicsAdvanced,
                 Page::ShaderPacks,
                 Page::Controller,
-                Page::Extras,
-                Page::Mods,
                 Page::SplitSetup,
+                Page::Mods,
                 Page::Agent,
             ]
         );
+        // Interface starts with Menu style: Wisp's home screen or Minecraft's title screen.
+        let (widgets, _, _, _) = ui.layout(&s, 427.0, 240.0);
+        assert!(widgets.iter().any(|w| matches!(
+            &w.kind,
+            WKind::Button {
+                act: Act::Extra(crate::extras::Item::MenuStyle),
+                ..
+            }
+        )));
         // No AI hides the AI Agent page.
         let mut no_ai = Settings::default();
         no_ai.extras.no_ai = true;

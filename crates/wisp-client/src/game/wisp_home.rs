@@ -70,13 +70,15 @@ impl Game<'_> {
         self.title.as_ref().is_some_and(|t| t.shows_main())
             && !matches!(self.screen, Screen::Options | Screen::Win)
             && !self.remote_loading()
-            && Self::wisp_home_on()
+            && self.wisp_home_on()
     }
 
-    /// Wisp's home screen is on: `wisp.txt` doesn't say `titleScreen:vanilla` and
+    /// Wisp's home screen is on: Menu style is Wisp (Wisp Settings, `vanillaMenus` in
+    /// `wisp-extras.txt`), `wisp.txt` doesn't say `titleScreen:vanilla` (the older switch) and
     /// `WISP_VANILLA_TITLE` is not set (for a run that compares the title with vanilla's).
-    fn wisp_home_on() -> bool {
-        wisp_compat::var_os("WISP_VANILLA_TITLE").is_none()
+    fn wisp_home_on(&self) -> bool {
+        !self.settings.extras.vanilla_menus
+            && wisp_compat::var_os("WISP_VANILLA_TITLE").is_none()
             && wisp_client::ui_theme::preference(&Self::options_dir(), "titleScreen").as_deref()
                 != Some("vanilla")
     }
@@ -90,7 +92,7 @@ impl Game<'_> {
     /// The backdrop picture for this frame and its zoom: behind the home screen and every
     /// screen opened from it (worlds, servers, options), in place of the panorama.
     pub(super) fn title_picture(&mut self) -> Option<(Arc<Picture>, f32)> {
-        if self.title.is_none() || self.remote_loading() || !Self::wisp_home_on() {
+        if self.title.is_none() || self.remote_loading() || !self.wisp_home_on() {
             self.home.shown_since = None;
             return None;
         }

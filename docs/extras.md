@@ -364,8 +364,13 @@ Behind it and every screen opened from the title, a picture from the player's ow
 folder (the launcher's, passed as `WISP_BACKGROUNDS`; else `backgrounds/` in the game folder) is
 drawn over the screen in place of the panorama (`gfx/picture.rs`), cropped to cover it, drifting
 in slowly, and blurred (at least radius 8). No picture there: the panorama, blurred. Wisp never
-ships pictures. `titleScreen:vanilla` in `wisp.txt`, or `WISP_VANILLA_TITLE`, brings vanilla's
-title menu and panorama back, for a run that compares the title with vanilla.
+ships pictures. Options › Wisp Settings › Interface › **Menu style** switches between Wisp and
+Minecraft (`vanillaMenus` in `wisp-extras.txt`); Minecraft brings vanilla's title menu and
+panorama back. The older `titleScreen:vanilla` in `wisp.txt`, and `WISP_VANILLA_TITLE` (for a run
+that compares the title with vanilla), still do the same.
+
+**Wisp Settings** (Options › Wisp Settings) is in sections: Interface (Menu style, Extras),
+Graphics, Controls and players, Mods and online, AI.
 
 **Wisp Menu** (Right Shift): a sidebar with the wordmark, Edit HUD and the pages in sections
 (Mods & options, Social, Shop), the player at its foot; the page's title with Back on a module's

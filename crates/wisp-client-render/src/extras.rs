@@ -312,6 +312,9 @@ pub struct Extras {
     /// Modrinth. Off by default: it is Wisp's own and the screen is
     /// otherwise vanilla's (tools/test_pack_screen_parity.py).
     pub pack_browser: bool,
+    /// The title screen in Minecraft's own look instead of Wisp's home screen
+    /// (`vanillaMenus`, off by default).
+    pub vanilla_menus: bool,
     pub apple_skin: bool,
     pub smart_f3: bool,
     pub shulker_preview: bool,
@@ -444,6 +447,7 @@ impl Default for Extras {
     fn default() -> Self {
         Self {
             pack_browser: false,
+            vanilla_menus: false,
             apple_skin: false,
             smart_f3: false,
             shulker_preview: false,
@@ -596,6 +600,7 @@ impl Extras {
                 "agentControl" => e.agent_control = flag(e.agent_control),
                 "reproKeys" => e.repro_keys = flag(e.repro_keys),
                 "discordPresence" => e.discord_presence = flag(e.discord_presence),
+                "vanillaMenus" => e.vanilla_menus = flag(e.vanilla_menus),
                 "splitscreen" => e.splitscreen = flag(e.splitscreen),
                 "splitscreenTwo" => e.splitscreen_two = value.parse().unwrap_or(0).min(2),
                 "splitscreenThree" => e.splitscreen_three = value.parse().unwrap_or(0).min(2),
@@ -678,7 +683,7 @@ impl Extras {
     }
     fn serialize_fields(&self) -> String {
         format!(
-            "apple_skin:{}\nsmart_f3:{}\nshulker_preview:{}\narmor_status:{}\nmod_menu:{}\nfast_items:{}\nhitboxes:{}\nwisp_hud:{}\npackBrowser:{}\nfullbright:{}\ndynamicLights:{}\nzoom:{}\nzoomKey:{}\nzoomLevel:{}\nzoomSmooth:{}\nzoomSensitivity:{}\nlodZoomDetail:{}\nfps:{}\nfpsCorner:{}\nfpsLows:{}\nkeystrokes:{}\nkeystrokesCorner:{}\nkeystrokesCps:{}\nmovedToMods:{}\nminimap:{}\nminimapCorner:{}\nminimapSize:{}\nminimapShape:{}\nminimapZoom:{}\nminimapRotate:{}\nautoReconnect:{}\nuiSoundReserve:{}\nownNameTag:{}\nhideBlockParticles:{}\nmouseTweaks:{}\nmouseTweaksWheel:{}\nsort:{}\nsortKey:{}\nchatAnimation:{}\nchatIndicator:{}\n{}:{}\nagentControl:{}\nreproKeys:{}\ndiscordPresence:{}\nsplitscreen:{}\nsplitscreenTwo:{}\nsplitscreenThree:{}\nsplitscreenNames:{}\nwheelCyclesSettings:{}\nmusicOff:{}\nmusicPage:{}\ncosmeticsMine:{}\ncosmeticsOthers:{}\ncosmeticsAuras:{}\nemotesShared:{}\n{}:{}\n",
+            "apple_skin:{}\nsmart_f3:{}\nshulker_preview:{}\narmor_status:{}\nmod_menu:{}\nfast_items:{}\nhitboxes:{}\nwisp_hud:{}\npackBrowser:{}\nfullbright:{}\ndynamicLights:{}\nzoom:{}\nzoomKey:{}\nzoomLevel:{}\nzoomSmooth:{}\nzoomSensitivity:{}\nlodZoomDetail:{}\nfps:{}\nfpsCorner:{}\nfpsLows:{}\nkeystrokes:{}\nkeystrokesCorner:{}\nkeystrokesCps:{}\nmovedToMods:{}\nminimap:{}\nminimapCorner:{}\nminimapSize:{}\nminimapShape:{}\nminimapZoom:{}\nminimapRotate:{}\nautoReconnect:{}\nuiSoundReserve:{}\nownNameTag:{}\nhideBlockParticles:{}\nmouseTweaks:{}\nmouseTweaksWheel:{}\nsort:{}\nsortKey:{}\nchatAnimation:{}\nchatIndicator:{}\n{}:{}\nagentControl:{}\nreproKeys:{}\ndiscordPresence:{}\nsplitscreen:{}\nsplitscreenTwo:{}\nsplitscreenThree:{}\nsplitscreenNames:{}\nwheelCyclesSettings:{}\nmusicOff:{}\nmusicPage:{}\ncosmeticsMine:{}\ncosmeticsOthers:{}\ncosmeticsAuras:{}\nemotesShared:{}\nvanillaMenus:{}\n{}:{}\n",
             bool_text(self.apple_skin),
             bool_text(self.smart_f3),
             bool_text(self.shulker_preview),
@@ -739,6 +744,7 @@ impl Extras {
             self.cosmetics_others.name(),
             bool_text(self.cosmetics_auras),
             bool_text(self.emotes_shared),
+            bool_text(self.vanilla_menus),
             SKIN_LAYERS_KEY,
             bool_text(self.three_d_skin_layers),
         )
@@ -914,6 +920,8 @@ pub enum Item {
     AgentControl,
     /// On the Wisp Settings page.
     DiscordPresence,
+    /// On the Wisp Settings page: Wisp's home screen or Minecraft's title screen.
+    MenuStyle,
     /// On the AI Agent page, next to Agent Control: the F3 recording shortcuts.
     ReproKeys,
     /// On the Splitscreen settings page.
@@ -1008,6 +1016,7 @@ impl Item {
             Item::AgentControl => "wisp.extras.agent_control",
             Item::ReproKeys => "wisp.extras.repro_keys",
             Item::DiscordPresence => "wisp.extras.discord_presence",
+            Item::MenuStyle => "wisp.extras.menu_style",
             Item::Splitscreen => "wisp.extras.splitscreen",
             Item::ChatAnimation => "wisp.extras.chat_animation",
             Item::ChatIndicator => "wisp.extras.chat_indicator",
@@ -1047,6 +1056,7 @@ impl Item {
             Item::AgentControl => "wisp.extras.agent_control.tooltip",
             Item::ReproKeys => "wisp.extras.repro_keys.tooltip",
             Item::DiscordPresence => "wisp.extras.discord_presence.tooltip",
+            Item::MenuStyle => "wisp.extras.menu_style.tooltip",
             Item::Splitscreen => "wisp.extras.splitscreen.tooltip",
             Item::ChatAnimation => "wisp.extras.chat_animation.tooltip",
             Item::ChatIndicator => "wisp.extras.chat_indicator.tooltip",
@@ -1097,6 +1107,7 @@ impl Item {
             Item::AgentControl => "Agent Control",
             Item::ReproKeys => "Recording shortcuts",
             Item::DiscordPresence => "Discord Rich Presence",
+            Item::MenuStyle => "Menu style",
             Item::Splitscreen => "Splitscreen",
             Item::WheelCyclesSettings => "Scroll wheel changes settings",
             Item::PackBrowser => "Resource pack browser",
@@ -1118,9 +1129,9 @@ impl Item {
             Fps | AppleSkin | SmartF3 | ShulkerPreview | ArmorStatus | ModMenu | FastItems
             | Hitboxes | WispHud | Fullbright | DynamicLights | OwnNameTag | HideBlockParticles
             | MouseTweaks | Sort | AutoReconnect | NoAi | AgentControl | ReproKeys
-            | DiscordPresence | Splitscreen | ChatAnimation | WheelCyclesSettings | MusicPage
-            | PackBrowser | CosmeticsMine | CosmeticsOthers | CosmeticsAuras | Module(_)
-            | HudEditor => {
+            | DiscordPresence | MenuStyle | Splitscreen | ChatAnimation | WheelCyclesSettings
+            | MusicPage | PackBrowser | CosmeticsMine | CosmeticsOthers | CosmeticsAuras
+            | Module(_) | HudEditor => {
                 return None;
             }
         })
@@ -1175,6 +1186,9 @@ impl Item {
             Item::NoAi => {
                 "Hides and turns off every AI feature: agent control, wisp-ctl and the MCP servers. The launcher's switch too."
             }
+            Item::MenuStyle => {
+                "Wisp: the home screen with your skin and your own backgrounds. Minecraft: the classic title screen with the panorama. The buttons do the same either way."
+            }
             Item::DiscordPresence => {
                 "Shows Playing Wisp on your Discord profile while Discord runs: menus, single player or multiplayer, the dimension and the time played. Never a world's name or a server's address."
             }
@@ -1223,6 +1237,7 @@ impl Item {
             | Item::Splitscreen
             | Item::WheelCyclesSettings
             | Item::PackBrowser
+            | Item::MenuStyle
             | Item::Module(_) => Some(Cost::None),
             Item::CosmeticsMine | Item::CosmeticsOthers | Item::CosmeticsAuras => Some(Cost::Low),
             _ => None,
@@ -1283,6 +1298,10 @@ impl Item {
                 }
             }
             Item::HudEditor => crate::lang::get_or("wisp.extras.hud_editor.open", "Open..."),
+            Item::MenuStyle => match e.vanilla_menus {
+                true => crate::lang::get_or("wisp.extras.menu_style.minecraft", "Minecraft"),
+                false => crate::lang::get_or("wisp.extras.menu_style.wisp", "Wisp"),
+            },
             other => match other.switch(e) {
                 Some(true) => crate::lang::get_or("On", "On"),
                 _ => crate::lang::get_or("Off", "Off"),
@@ -1318,6 +1337,7 @@ impl Item {
             Item::AgentControl => e.agent_control = !e.agent_control,
             Item::ReproKeys => e.repro_keys = !e.repro_keys,
             Item::DiscordPresence => e.discord_presence = !e.discord_presence,
+            Item::MenuStyle => e.vanilla_menus = !e.vanilla_menus,
             Item::Splitscreen => e.splitscreen = !e.splitscreen,
             Item::WheelCyclesSettings => e.wheel_cycles_settings = !e.wheel_cycles_settings,
             Item::PackBrowser => e.pack_browser = !e.pack_browser,
@@ -1440,6 +1460,18 @@ hudInfoPos:x",
             Extras::parse("cosmeticsOthers:false").cosmetics_others,
             Others::Hidden
         );
+    }
+
+    #[test]
+    fn menu_style_is_wisp_by_default_and_flips_to_minecraft() {
+        let mut e = Extras::default();
+        assert!(!e.vanilla_menus);
+        assert_eq!(Item::MenuStyle.value(&e), "Wisp");
+        Item::MenuStyle.cycle(&mut e, false);
+        assert!(e.vanilla_menus);
+        assert_eq!(Item::MenuStyle.value(&e), "Minecraft");
+        assert_eq!(Extras::parse(&e.serialize()), e);
+        assert!(Extras::parse("vanillaMenus:true\n").vanilla_menus);
     }
 
     #[test]
