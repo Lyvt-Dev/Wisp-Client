@@ -1,0 +1,119 @@
+{
+  "attach": {
+    "offset": [
+      0.0,
+      6.0,
+      3.0
+    ],
+    "rotation": [
+      0.0,
+      0.0,
+      145.0
+    ],
+    "scale": 0.5
+  },
+  "bone": "body",
+  "format": 1,
+  "id": "crimson_katana",
+  "parts": [
+    {
+      "cubes": [
+        {
+          "origin": [
+            -1.5,
+            -26.0,
+            -1.0
+          ],
+          "size": [
+            3,
+            30,
+            2
+          ],
+          "uv": [
+            0,
+            0
+          ]
+        },
+        {
+          "origin": [
+            -1.5,
+            -28.0,
+            -1.0
+          ],
+          "size": [
+            3,
+            2,
+            2
+          ],
+          "uv": [
+            11,
+            0
+          ]
+        },
+        {
+          "origin": [
+            -3.0,
+            4.0,
+            -2.5
+          ],
+          "size": [
+            6,
+            1,
+            5
+          ],
+          "uv": [
+            22,
+            0
+          ]
+        },
+        {
+          "origin": [
+            -1.0,
+            5.0,
+            -1.0
+          ],
+          "size": [
+            2,
+            12,
+            2
+          ],
+          "uv": [
+            45,
+            0
+          ]
+        },
+        {
+          "origin": [
+            -1.5,
+            17.0,
+            -1.5
+          ],
+          "size": [
+            3,
+            1,
+            3
+          ],
+          "uv": [
+            0,
+            33
+          ]
+        }
+      ],
+      "name": "katana",
+      "pivot": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    }
+  ],
+  "slot": "weapon",
+  "texture": {
+    "png": "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAACuklEQVR42u2aMWvbQBTHn4qmEIwxHUoxbjAlmBCKh1JKB4+lQ6CZiod+jA79BKGfoXMpplNrOmTo5CmUDqKYIEIRrhGlQxBGhKyKn5wnzuc7WRfbIEvvv7zTWZb9fvfu3TufbbiV8+JlRO0v7gU14SQYWSCp03mV3BsElzCZBFCt1mA4/LVwr6hRr5W8z3Em0G5X4/bHz77y/pP+Verz6vVmJF77vpd6v0q2eLHXPoCRcx63n+zswu/rq6UPQOdFmyZ0+nX3edx+1Jr76vDsYHfxDf3ln7+q7F79MKF42v+ROE+2tzN7vesPLRx5HHEa+VrtPjSb+0l7GgUR2sHgNPNI/HVdZf/Pc73zGK1vwwA+VWog2u+Nx3H/skhciIBW4yGQdcf/5tpin+i8aHV9sijkV9XR+M/M3kadbI2ngOwo9YkWZUJWp2+9MyWMtBGXhflGHn3Rtn0v87MsMTGlaa/rGjn/9f2DSHROnuOqviz3Hn/4b8nJT5ZJMtwYgE1KlwPImkSqRUlQngKyMAnmBQBGQBhOoFKpgsqGYZD5u97Li1MmwhwwOHyqtSayaeSxBkhbAfKk8diDDswSnc5mjgBykAoglGoFyJNwlBuNptYaRUAuPVyiddYBW5kDsPqcVn1au1IEYP1PpbDYlyd53gUcUTRo7J0ByM4nfebRtTHdZddXqCmwTsUAxM0QSdVXWACqZS/vS+FaAZR+CjAABsAAGAADYADl1Fb+JrhO2Wfv7Hi396a1Hx+JocXqj3aF9Nq0Jiyi/4u7QVXpW+RyOM4B4lEY7f1VfYUFIEr7e0BZAJRNhczsJppLgpFznCyJdIiJwvO4ogLgSlC8EP+sYHJcvc3KXAmSilYRlj4Jcg5gAAyAATAABsAAGAADYAAMgAEwAAbAABgAA2AADIABMAAGwAAYAAMoi24A5iBjfe6dqQAAAAAASUVORK5CYII="
+  }
+}

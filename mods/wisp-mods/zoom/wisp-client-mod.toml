@@ -1,0 +1,15 @@
+format = "wisp-client-mod"
+api = 1
+id = "zoom"
+name = "Zoom"
+version = "1.0.0"
+description = "Hold Z to zoom. Scroll while holding it to zoom further in or out."
+module = "zoom"
+capabilities = ["camera-zoom"]
+
+[zoom]
+key = "key.keyboard.z"
+initial_factor = 4.0
+scroll_step = 1.25
+smooth = true
+scale_sensitivity = true

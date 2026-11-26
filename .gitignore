@@ -1,0 +1,40 @@
+/.local/
+/target/
+**/__pycache__/
+*.py[cod]
+/.venv/
+# Downloaded/decompiled game content and private profiling artifacts.
+*.jar
+*.class
+*.jfr
+*.hprof
+/decompiled/
+/minecraft/
+/assets/
+/run/
+/logs/
+/dist/
+/mods/wisp/build/
+/saves/
+/backups/
+/tools/logs/
+.DS_Store
+# What the client writes to its working directory when run from the repo root.
+/options.txt
+/debug-profile.json
+/wisp.txt
+/wisp-graphics.txt
+/wisp-controller.txt
+/wisp-extras.txt
+/wisp-player.txt
+/servers.dat
+/screenshots/
+/.wisp-cache/
+/crash-reports/
+/debug/
+
+# Release-only compiled original exporter bundle.
+/exporters/
+
+/launcher/target/
+/crates/wisp-cosmetics-server/target/

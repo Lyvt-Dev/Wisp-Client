@@ -1,0 +1,46 @@
+[package]
+name = "wisp-cosmetics-server"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+rust-version = "1.90"
+publish = false
+description = "Lets Wisp players see each other's cosmetics and emotes: Mojang-verified sign-in, what each player wears, and the emotes they are playing"
+
+# Its own workspace, as the telemetry server's: the game's workspace never builds a web server.
+[workspace]
+
+[workspace.lints.clippy]
+too_many_arguments = "allow"
+type_complexity = "allow"
+needless_range_loop = "allow"
+large_enum_variant = "allow"
+
+[dependencies]
+wisp-compat = { path = "../wisp-compat" }
+# Every uploaded item is checked exactly as the game checks it.
+wisp-cosmetics = { path = "../wisp-cosmetics" }
+# The Shop's items, prices and rules: wallets are kept here so nobody makes coins up.
+wisp-shop = { path = "../wisp-shop" }
+axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "json", "query"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal", "time", "sync"] }
+rusqlite = { version = "0.37", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+getrandom = "0.3"
+# Mojang's session server (blocking, run off the async workers; rustls).
+ureq = { version = "2.12", features = ["json"] }
+# The `badge` command reads a PNG file into a badge item.
+base64 = "0.22"
+
+[dev-dependencies]
+# Made-up items with prices, to test buying while the shop sells little.
+wisp-shop = { path = "../wisp-shop", features = ["test-items"] }
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"
+png = "0.18"
+
+[profile.release]
+strip = true
+lto = "thin"

@@ -1,0 +1,235 @@
+{
+  "animations": [
+    {
+      "amplitude": 2.5,
+      "axis": "z",
+      "motion": "swing",
+      "part": "sack",
+      "period": 52
+    }
+  ],
+  "attach": {
+    "offset": [
+      0.5,
+      1.0,
+      2.1
+    ],
+    "rotation": [
+      0.0,
+      0.0,
+      -12.0
+    ],
+    "scale": 1.0
+  },
+  "bone": "body",
+  "format": 1,
+  "id": "santa_sack",
+  "parts": [
+    {
+      "children": [
+        {
+          "cubes": [
+            {
+              "origin": [
+                -1.5,
+                -3.0,
+                -1.5
+              ],
+              "size": [
+                3,
+                3,
+                3
+              ],
+              "uv": [
+                21,
+                21
+              ]
+            }
+          ],
+          "name": "gift",
+          "pivot": [
+            -1.0,
+            -1.5,
+            2.5
+          ],
+          "rotation": [
+            8.0,
+            24.0,
+            -14.0
+          ]
+        },
+        {
+          "cubes": [
+            {
+              "origin": [
+                -0.5,
+                -5.0,
+                -0.5
+              ],
+              "size": [
+                1,
+                5,
+                1
+              ],
+              "uv": [
+                34,
+                21
+              ]
+            },
+            {
+              "origin": [
+                -0.5,
+                -6.0,
+                -0.5
+              ],
+              "size": [
+                3,
+                1,
+                1
+              ],
+              "uv": [
+                39,
+                21
+              ]
+            },
+            {
+              "origin": [
+                1.5,
+                -5.0,
+                -0.5
+              ],
+              "size": [
+                1,
+                2,
+                1
+              ],
+              "uv": [
+                48,
+                21
+              ]
+            }
+          ],
+          "name": "cane",
+          "pivot": [
+            1.5,
+            -1.5,
+            3.0
+          ],
+          "rotation": [
+            -6.0,
+            0.0,
+            18.0
+          ]
+        }
+      ],
+      "cubes": [
+        {
+          "origin": [
+            -4.0,
+            1.0,
+            0.0
+          ],
+          "size": [
+            8,
+            9,
+            5
+          ],
+          "uv": [
+            0,
+            0
+          ]
+        },
+        {
+          "origin": [
+            -5.0,
+            3.0,
+            0.5
+          ],
+          "size": [
+            10,
+            5,
+            4
+          ],
+          "uv": [
+            27,
+            0
+          ]
+        },
+        {
+          "origin": [
+            -3.0,
+            10.0,
+            0.5
+          ],
+          "size": [
+            6,
+            1,
+            4
+          ],
+          "uv": [
+            0,
+            15
+          ]
+        },
+        {
+          "origin": [
+            -2.0,
+            -1.0,
+            1.0
+          ],
+          "size": [
+            4,
+            2,
+            3
+          ],
+          "uv": [
+            21,
+            15
+          ]
+        },
+        {
+          "origin": [
+            -2.5,
+            0.0,
+            0.5
+          ],
+          "size": [
+            5,
+            1,
+            4
+          ],
+          "uv": [
+            36,
+            15
+          ]
+        },
+        {
+          "origin": [
+            -3.0,
+            -2.0,
+            0.5
+          ],
+          "size": [
+            6,
+            1,
+            4
+          ],
+          "uv": [
+            0,
+            21
+          ]
+        }
+      ],
+      "name": "sack",
+      "pivot": [
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "slot": "weapon",
+  "texture": {
+    "png": "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAEAElEQVR42u1ZPWgUQRSePQ40MYnJqUhi0KAi8RSb+NNYXCEKlpaaQhAsrNQyGBDENIJapQgoFrFUBCFgt2AKo6YJGsU/TokJQUlijEabrPvGvMvbd7O7s3uJnvI+ON7s7Lyded/72Zm9rDKg+9hOr3n9Gt2e+PxNQRslYPjVJ9WSq9Xt8anvuo0ScOnuC0dZoPf0Xo9e0zl4PwWdi8J2XoqMqZMazxfWsrExYDxfkMmAOOA8oAvPL82z+KOG63v+XDgPSPylQSbqZseuTYGHw0LHJ2eW7u/YoBdDCeHeigI1Dq/h+Sj1M33JjaMRSZ2UBtkoj5R53v8NP/8Y6nn4QXrYAo1Ez5uMp+tBzy+X8QDHJjfpopAEk0ewfabvqRNWWyIJCcntWCIrqAnZU4UtHi9ovMihV6FPpwGZkEcD3IdnlsgzFEa+YLzmHuYRmVTPqgZEFTTsm5j6GQj1NDpU0sixye20eolqABQ0rsT70Li0OqZctsnttHpWBER5Ma7IJdWhewb6SqPXw2+mVcf2psBY0zhbvdgiyAsTZfLE+XNqoOe6Otp1Vt2+eq3sfhKdsML4t1EiwFRJm34srXl6tWf0uq3ODfd9VRKQQQ9Rb6IELwJQmsYl0alKAvg7nBaUKxcuq9WttVqGhbytTrXCoe/sMMArrTm3KlFx4TrVmgJVuag/ibKzwL3uQ7+Lor/1NW1C+E4wbrtpOvJSxOl7xYvel6Kr1rYVFJUvR9+p9vzWkmwsuKmcWXYapHt+ejwNHFnJcdQG/NSXRNfGeJBpYTwO6xMfO5npfn9Dw3ddtjB91LABNx4kNx7ksqUAjwbT6Q9JCDv60s0VjDVtbTGF6FhTOqx0BGQxRzG3MUTxmoY+7Yf24gcRz1QTTK9KmgJh92bcgscNGxq4qa9RmiLgUa/y0tQEeQvwDngL0PyndYDmP3wug9SIq+L5vsPe4K0FdfBkRs0WZ1R//5zq7KxTYz2Py/Se5ffpaNw9+sShfduGHqi3B47oa2zzMVyvoiJI858WwUD+s7oQBjAeJRgPQGkynrZpHwKMBxJMY0zjE0cAGgkepkUQjIZcx/M+3L//8HXsBHsKs2rEbdARMOkuqDuDGR0Bqic4DowKoD635FG/ze9F6VVMgOmLCxChq/ei1OSEfL9r7drvYagDRsbG/fCvUzVtDX4ozJWNgXTAEE+KmvpcRXXMgbcA//PDlOth9001wd2cTxSKhQ+jzvzXKW85DbMmYCUeuu54u4ehPl+cVXFtiACev2kKWtUQ8C8hIwQIAUKAECAECAFCgBAgBAgBQoAQIAQIAUKAECAECAFCgBAgBAgBQoAQIAQIAUKAECAECAFCgBAgBAgBQsB/jV+jU3m+lfSVVQAAAABJRU5ErkJggg=="
+  }
+}

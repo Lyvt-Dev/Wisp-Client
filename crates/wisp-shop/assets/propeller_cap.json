@@ -1,0 +1,129 @@
+{
+  "animations": [
+    {
+      "amplitude": 0,
+      "axis": "y",
+      "motion": "spin",
+      "part": "propeller",
+      "period": 10
+    }
+  ],
+  "attach": {
+    "offset": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "rotation": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "scale": 0.5
+  },
+  "bone": "head",
+  "format": 1,
+  "id": "propeller_cap",
+  "parts": [
+    {
+      "children": [
+        {
+          "cubes": [
+            {
+              "origin": [
+                -9.0,
+                -1.0,
+                -1.5
+              ],
+              "size": [
+                18,
+                1,
+                3
+              ],
+              "uv": [
+                155,
+                0
+              ]
+            }
+          ],
+          "name": "propeller",
+          "pivot": [
+            0.0,
+            -28.0,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        }
+      ],
+      "cubes": [
+        {
+          "origin": [
+            -10.0,
+            -24.0,
+            -10.0
+          ],
+          "size": [
+            20,
+            8,
+            20
+          ],
+          "uv": [
+            0,
+            0
+          ]
+        },
+        {
+          "origin": [
+            -10.0,
+            -17.0,
+            -22.0
+          ],
+          "size": [
+            20,
+            1,
+            12
+          ],
+          "uv": [
+            81,
+            0
+          ]
+        },
+        {
+          "origin": [
+            -1.0,
+            -28.0,
+            -1.0
+          ],
+          "size": [
+            2,
+            4,
+            2
+          ],
+          "uv": [
+            146,
+            0
+          ]
+        }
+      ],
+      "name": "hat",
+      "pivot": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    }
+  ],
+  "slot": "head",
+  "texture": {
+    "png": "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EwAIJgAQTAAgmABAMAGAYAIAwQQAggkABBMACCYAEEwAIJgAQDABgGACAMEEAIIJAAQTAAgmABBMACCYAEAwAYBgAgDBBACCCQAEEwAIJgAQTAAgmABAMAGAYAIAwQQAggkABBMACCYAEEwAIJgAQDABgGACAMEEAIIJAAQTAAgmABBMACCYAEAwAYBgAgDBBACCCQAEEwAIJgAQTAAgmABAMAGAYAIAwQQAggkABBMACCYAEEwAIJgAQDABgGACAMEEAIIJAAQTAAgmABBMACCYAEAwAYBgAgDBBACCCQAEEwAIJgAQTAAgmABAMAGAYAIAwQQAggkABBMACCYAEEwAIJgAQDABgGACAMEEAIIJAAQTAAgmABBMACCYAEAwAYBgAgDBBACCCQAEEwAIJgAQTAAgmABAMAGAYAIAwQQAggkABBMACCYAEEwAIJgAQDABgGACAMEEAIIJAAQTAAgmABBMACCYAEAwAYBgAgDBBACCCQAEEwAIJgAQTAAgmABAMAGAYAIAwQQAggkABBMACCYAEEwAIJgAQDABgGACAMEEAIIJAAQTAAgmABBMACCYAEAwAYBgAgDBBACCCQAEEwAIJgAQTAAgmABAMAGAYAIAwQQAggkABBMACCYAEEwAIJgAQDABgGACAMEEAIIJAAQTAAgmABBMACCYAEAwAYBgAgDBBACCCQAEEwAIJgAQTAAgmABAMAGAYAIAwQQAggkABBMACCYAEEwAIJgAQLD/A/mGrR2hNBF4AAAAAElFTkSuQmCC"
+  }
+}

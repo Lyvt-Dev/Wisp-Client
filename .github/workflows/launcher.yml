@@ -1,0 +1,151 @@
+name: local-launcher
+on:
+  push:
+    paths: ['launcher/**', 'crates/**', 'third_party/**', 'mods/wisp/src/test/java/**', 'mods/wisp-mods/**', 'shaders/wisp/**', 'Cargo.toml', 'Cargo.lock', 'research-lock.json', 'packaging/windows/**', 'packaging/linux/**', 'packaging/icons/**', 'LICENSE', 'THIRD_PARTY_NOTICES.md', '.github/workflows/launcher.yml']
+  pull_request:
+    paths: ['launcher/**', 'crates/**', 'third_party/**', 'mods/wisp/src/test/java/**', 'mods/wisp-mods/**', 'shaders/wisp/**', 'Cargo.toml', 'Cargo.lock', 'research-lock.json', 'packaging/windows/**', 'packaging/linux/**', 'packaging/icons/**', 'LICENSE', 'THIRD_PARTY_NOTICES.md', '.github/workflows/launcher.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - run: sudo apt-get update && sudo apt-get install -y libxkbcommon-dev libxkbcommon-x11-dev libx11-xcb-dev libwayland-dev libfontconfig1-dev libx11-dev libxcb1-dev libxcursor-dev libxrandr-dev libxi-dev libvulkan-dev
+      - run: cargo fmt --manifest-path launcher/Cargo.toml --check
+      - run: cargo test --manifest-path launcher/Cargo.toml --locked --no-default-features
+      - run: cargo clippy --manifest-path launcher/Cargo.toml --locked --all-targets -- -D warnings
+  windows-installer:
+    runs-on: windows-latest
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/launcher/target/installer
+      RUSTFLAGS: '-C target-feature=+crt-static'
+      CARGO_BUILD_JOBS: '2'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target/installer-game
+            launcher -> target/installer
+          cache-on-failure: true
+      - run: cargo fmt --manifest-path launcher/Cargo.toml --check
+      - run: cargo test --manifest-path launcher/Cargo.toml --locked --release --target x86_64-pc-windows-msvc --all-targets
+      - run: cargo clippy --manifest-path launcher/Cargo.toml --locked --release --target x86_64-pc-windows-msvc --all-targets -- -D warnings
+      - name: Check resource-pack loading and custom skies
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/target/installer-game
+        run: |
+          $manifest = Get-Content launcher/Cargo.toml -Raw
+          $env:WISP_VERSION = [regex]::Match($manifest, '(?m)^version\s*=\s*"([^"]+)"').Groups[1].Value
+          cargo test --locked --profile fast --target x86_64-pc-windows-msvc -p wisp-core --lib prepared_files::tests
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # Keep test bodies unoptimized; the installer still builds the optimized engine.
+          cargo test --locked --profile fast --config 'profile.fast.package.wisp-client-render.opt-level=0' --target x86_64-pc-windows-msvc -p wisp-client-render --lib packs::
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo test --locked --profile fast --config 'profile.fast.package.wisp-client-render.opt-level=0' --target x86_64-pc-windows-msvc -p wisp-client-render --lib custom_sky::tests
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build Windows setup
+        shell: pwsh
+        env:
+          WISP_MSA_CLIENT_ID: ${{ vars.WISP_MSA_CLIENT_ID }}
+        run: ./packaging/windows/build-installer.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Wisp-Client-Windows-Installer
+          path: |
+            dist/Wisp-Client-*-Setup-x64.exe
+            dist/Wisp-Client-*-Setup-x64.exe.sha256
+            dist/Wisp-*.hshader
+            dist/Wisp-*.hshader.sha256
+          if-no-files-found: error
+  linux-appimage:
+    # 22.04: the AppImage runs where glibc is at least 2.35 (packaging/linux/appimage.sh).
+    runs-on: ubuntu-22.04
+    env:
+      CARGO_BUILD_JOBS: '2'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target/appimage-game
+            launcher -> launcher/target/appimage
+          cache-on-failure: true
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libasound2-dev libudev-dev libxkbcommon-dev libxkbcommon-x11-dev libx11-xcb-dev libwayland-dev libfontconfig1-dev libx11-dev libxcb1-dev libxcursor-dev libxrandr-dev libxi-dev libvulkan-dev patchelf file
+      - name: Build the engine and the launcher
+        env:
+          WISP_MSA_CLIENT_ID: ${{ vars.WISP_MSA_CLIENT_ID }}
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"/\1/p' launcher/Cargo.toml | head -1)
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          WISP_VERSION=$version CARGO_TARGET_DIR=target/appimage-game             cargo build --locked --profile fast -p wisp-client -p wisp-prepare
+          CARGO_TARGET_DIR=launcher/target/appimage             cargo build --manifest-path launcher/Cargo.toml --locked --release
+      - name: Stage the engine as the Windows setup does
+        run: |
+          stage=target/appimage-engine
+          rm -rf "$stage" && mkdir -p "$stage/kit"
+          cp target/appimage-game/fast/wisp-client target/appimage-game/fast/wisp-prepare "$stage/"
+          cp research-lock.json LICENSE "$stage/kit/"
+          git ls-files -- 'mods/wisp/src/test/java/*.java' crates/wisp-prepare/src/exporters.rs | while read -r f; do
+            mkdir -p "$stage/kit/$(dirname "$f")" && cp "$f" "$stage/kit/$f"
+          done
+      - name: Package the AppImage
+        run: |
+          packaging/linux/appimage.sh launcher/target/appimage/release/wisp-launcher "$VERSION" dist target/appimage-engine
+          cd dist && sha256sum "Wisp-Client-$VERSION-x86_64.AppImage" > "Wisp-Client-$VERSION-x86_64.AppImage.sha256"
+      - name: Package the Max Render and voice chat client modules
+        run: |
+          CARGO_TARGET_DIR=target/appimage-game cargo build --locked -p cargo-wisp-mod
+          for m in max_render voicechat; do
+            (cd mods/wisp-mods/$m && ../../../target/appimage-game/debug/cargo-wisp-mod wisp-mod build)
+            cp mods/wisp-mods/$m/target/wisp-mod/$m.amod dist/
+            (cd dist && sha256sum $m.amod > $m.amod.sha256)
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Wisp-Client-Linux-AppImage
+          path: |
+            dist/Wisp-Client-*-x86_64.AppImage
+            dist/Wisp-Client-*-x86_64.AppImage.sha256
+            dist/max_render.amod
+            dist/max_render.amod.sha256
+            dist/voicechat.amod
+            dist/voicechat.amod.sha256
+          if-no-files-found: error
+  publish-release:
+    needs: [check, windows-installer, linux-appimage]
+    if: github.event_name != 'pull_request' && github.repository == 'Lyvt-Dev/Wisp-Client' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    concurrency:
+      group: wisp-launcher-release
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: Wisp-Client-Windows-Installer
+          path: dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: Wisp-Client-Linux-AppImage
+          path: dist
+      - name: Publish versioned Windows installer
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $manifest = Get-Content launcher/Cargo.toml -Raw
+          $version = [regex]::Match($manifest, '(?m)^version\s*=\s*"([^"]+)"').Groups[1].Value
+          ./packaging/windows/publish-release.ps1 -Version $version -Commit $env:GITHUB_SHA -Repository $env:GITHUB_REPOSITORY

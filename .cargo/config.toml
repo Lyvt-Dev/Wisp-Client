@@ -1,0 +1,4 @@
+[env]
+# libopus (wisp-voicechat, through audiopus_sys) ships a CMakeLists from before CMake 3.5;
+# CMake 4 only configures it with this floor.
+CMAKE_POLICY_VERSION_MINIMUM = "3.5"

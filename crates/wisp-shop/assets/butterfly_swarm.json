@@ -1,0 +1,677 @@
+{
+  "animations": [
+    {
+      "amplitude": 35.0,
+      "axis": "z",
+      "motion": "swing",
+      "part": "fly00_l",
+      "period": 8,
+      "phase": 0.0
+    },
+    {
+      "amplitude": -35.0,
+      "axis": "z",
+      "motion": "swing",
+      "part": "fly00_r",
+      "period": 8,
+      "phase": 0.0
+    },
+    {
+      "amplitude": 35.0,
+      "axis": "z",
+      "motion": "swing",
+      "part": "fly01_l",
+      "period": 8,
+      "phase": 0.17000000178813934
+    },
+    {
+      "amplitude": -35.0,
+      "axis": "z",
+      "motion": "swing",
+      "part": "fly01_r",
+      "period": 8,
+      "phase": 0.17000000178813934
+    },
+    {
+      "amplitude": 0,
+      "axis": "y",
+      "motion": "spin",
+      "part": "ring0",
+      "period": 150.0
+    },
+    {
+      "amplitude": 2.0,
+      "axis": "y",
+      "motion": "bob",
+      "part": "ring0",
+      "period": 50
+    },
+    {
+      "amplitude": 35.0,
+      "axis": "z",
+      "motion": "swing",
+      "part": "fly10_l",
+      "period": 8,
+      "phase": 0.3400000035762787
+    },
+    {
+      "amplitude": -35.0,
+      "axis": "z",
+      "motion": "swing",
+      "part": "fly10_r",
+      "period": 8,
+      "phase": 0.3400000035762787
+    },
+    {
+      "amplitude": 35.0,
+      "axis": "z",
+      "motion": "swing",
+      "part": "fly11_l",
+      "period": 8,
+      "phase": 0.5099999904632568
+    },
+    {
+      "amplitude": -35.0,
+      "axis": "z",
+      "motion": "swing",
+      "part": "fly11_r",
+      "period": 8,
+      "phase": 0.5099999904632568
+    },
+    {
+      "amplitude": 0,
+      "axis": "y",
+      "motion": "spin",
+      "part": "ring1",
+      "period": 190.0
+    },
+    {
+      "amplitude": 2.0,
+      "axis": "y",
+      "motion": "bob",
+      "part": "ring1",
+      "period": 63
+    },
+    {
+      "amplitude": 35.0,
+      "axis": "z",
+      "motion": "swing",
+      "part": "fly20_l",
+      "period": 8,
+      "phase": 0.6800000071525574
+    },
+    {
+      "amplitude": -35.0,
+      "axis": "z",
+      "motion": "swing",
+      "part": "fly20_r",
+      "period": 8,
+      "phase": 0.6800000071525574
+    },
+    {
+      "amplitude": 35.0,
+      "axis": "z",
+      "motion": "swing",
+      "part": "fly21_l",
+      "period": 8,
+      "phase": 0.8500000238418579
+    },
+    {
+      "amplitude": -35.0,
+      "axis": "z",
+      "motion": "swing",
+      "part": "fly21_r",
+      "period": 8,
+      "phase": 0.8500000238418579
+    },
+    {
+      "amplitude": 0,
+      "axis": "y",
+      "motion": "spin",
+      "part": "ring2",
+      "period": 130.0
+    },
+    {
+      "amplitude": 2.0,
+      "axis": "y",
+      "motion": "bob",
+      "part": "ring2",
+      "period": 76
+    }
+  ],
+  "attach": {
+    "offset": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "rotation": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "scale": 0.5
+  },
+  "bone": "body",
+  "format": 1,
+  "id": "butterfly_swarm",
+  "parts": [
+    {
+      "children": [
+        {
+          "cubes": [
+            {
+              "origin": [
+                0.0,
+                -0.5,
+                -4.5
+              ],
+              "size": [
+                8,
+                1,
+                9
+              ],
+              "uv": [
+                0,
+                0
+              ]
+            },
+            {
+              "origin": [
+                -0.5,
+                -0.5,
+                -3.0
+              ],
+              "size": [
+                1,
+                1,
+                6
+              ],
+              "uv": [
+                35,
+                0
+              ]
+            }
+          ],
+          "name": "fly00_l",
+          "pivot": [
+            27.0,
+            0.0,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            -25.0
+          ]
+        },
+        {
+          "cubes": [
+            {
+              "origin": [
+                -8.0,
+                -0.5,
+                -4.5
+              ],
+              "size": [
+                8,
+                1,
+                9
+              ],
+              "uv": [
+                50,
+                0
+              ]
+            }
+          ],
+          "name": "fly00_r",
+          "pivot": [
+            27.0,
+            0.0,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            25.0
+          ]
+        },
+        {
+          "cubes": [
+            {
+              "origin": [
+                0.0,
+                -0.5,
+                -4.5
+              ],
+              "size": [
+                8,
+                1,
+                9
+              ],
+              "uv": [
+                85,
+                0
+              ]
+            },
+            {
+              "origin": [
+                -0.5,
+                -0.5,
+                -3.0
+              ],
+              "size": [
+                1,
+                1,
+                6
+              ],
+              "uv": [
+                0,
+                11
+              ]
+            }
+          ],
+          "name": "fly01_l",
+          "pivot": [
+            -27.0,
+            0.0,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            -25.0
+          ]
+        },
+        {
+          "cubes": [
+            {
+              "origin": [
+                -8.0,
+                -0.5,
+                -4.5
+              ],
+              "size": [
+                8,
+                1,
+                9
+              ],
+              "uv": [
+                15,
+                11
+              ]
+            }
+          ],
+          "name": "fly01_r",
+          "pivot": [
+            -27.0,
+            0.0,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            25.0
+          ]
+        }
+      ],
+      "name": "ring0",
+      "pivot": [
+        0.0,
+        -4.0,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "children": [
+        {
+          "cubes": [
+            {
+              "origin": [
+                0.0,
+                -0.5,
+                -4.5
+              ],
+              "size": [
+                8,
+                1,
+                9
+              ],
+              "uv": [
+                50,
+                11
+              ]
+            },
+            {
+              "origin": [
+                -0.5,
+                -0.5,
+                -3.0
+              ],
+              "size": [
+                1,
+                1,
+                6
+              ],
+              "uv": [
+                85,
+                11
+              ]
+            }
+          ],
+          "name": "fly10_l",
+          "pivot": [
+            28.0,
+            0.0,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            -25.0
+          ]
+        },
+        {
+          "cubes": [
+            {
+              "origin": [
+                -8.0,
+                -0.5,
+                -4.5
+              ],
+              "size": [
+                8,
+                1,
+                9
+              ],
+              "uv": [
+                0,
+                22
+              ]
+            }
+          ],
+          "name": "fly10_r",
+          "pivot": [
+            28.0,
+            0.0,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            25.0
+          ]
+        },
+        {
+          "cubes": [
+            {
+              "origin": [
+                0.0,
+                -0.5,
+                -4.5
+              ],
+              "size": [
+                8,
+                1,
+                9
+              ],
+              "uv": [
+                35,
+                22
+              ]
+            },
+            {
+              "origin": [
+                -0.5,
+                -0.5,
+                -3.0
+              ],
+              "size": [
+                1,
+                1,
+                6
+              ],
+              "uv": [
+                70,
+                22
+              ]
+            }
+          ],
+          "name": "fly11_l",
+          "pivot": [
+            -28.0,
+            0.0,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            -25.0
+          ]
+        },
+        {
+          "cubes": [
+            {
+              "origin": [
+                -8.0,
+                -0.5,
+                -4.5
+              ],
+              "size": [
+                8,
+                1,
+                9
+              ],
+              "uv": [
+                85,
+                22
+              ]
+            }
+          ],
+          "name": "fly11_r",
+          "pivot": [
+            -28.0,
+            0.0,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            25.0
+          ]
+        }
+      ],
+      "name": "ring1",
+      "pivot": [
+        0.0,
+        8.0,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        60.0,
+        0.0
+      ]
+    },
+    {
+      "children": [
+        {
+          "cubes": [
+            {
+              "origin": [
+                0.0,
+                -0.5,
+                -4.5
+              ],
+              "size": [
+                8,
+                1,
+                9
+              ],
+              "uv": [
+                0,
+                33
+              ]
+            },
+            {
+              "origin": [
+                -0.5,
+                -0.5,
+                -3.0
+              ],
+              "size": [
+                1,
+                1,
+                6
+              ],
+              "uv": [
+                35,
+                33
+              ]
+            }
+          ],
+          "name": "fly20_l",
+          "pivot": [
+            26.0,
+            0.0,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            -25.0
+          ]
+        },
+        {
+          "cubes": [
+            {
+              "origin": [
+                -8.0,
+                -0.5,
+                -4.5
+              ],
+              "size": [
+                8,
+                1,
+                9
+              ],
+              "uv": [
+                50,
+                33
+              ]
+            }
+          ],
+          "name": "fly20_r",
+          "pivot": [
+            26.0,
+            0.0,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            25.0
+          ]
+        },
+        {
+          "cubes": [
+            {
+              "origin": [
+                0.0,
+                -0.5,
+                -4.5
+              ],
+              "size": [
+                8,
+                1,
+                9
+              ],
+              "uv": [
+                85,
+                33
+              ]
+            },
+            {
+              "origin": [
+                -0.5,
+                -0.5,
+                -3.0
+              ],
+              "size": [
+                1,
+                1,
+                6
+              ],
+              "uv": [
+                0,
+                44
+              ]
+            }
+          ],
+          "name": "fly21_l",
+          "pivot": [
+            -26.0,
+            0.0,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            -25.0
+          ]
+        },
+        {
+          "cubes": [
+            {
+              "origin": [
+                -8.0,
+                -0.5,
+                -4.5
+              ],
+              "size": [
+                8,
+                1,
+                9
+              ],
+              "uv": [
+                15,
+                44
+              ]
+            }
+          ],
+          "name": "fly21_r",
+          "pivot": [
+            -26.0,
+            0.0,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            25.0
+          ]
+        }
+      ],
+      "name": "ring2",
+      "pivot": [
+        0.0,
+        20.0,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        120.0,
+        0.0
+      ]
+    }
+  ],
+  "slot": "shoulder",
+  "texture": {
+    "png": "iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAADDPmHLAAAErElEQVR42u2cQWsTQRSAJ6V48BBDUApSivQiaI+C4KFnDz35C/QPiCAeBcGjCKV/wJ48eupvEASPtaCHIKUIRQlpDh68xLzU0e1mN7Mz+zI7Md8HS1qf3Z2d+WY7eXmdFVODy+v3RnKExquyvX1/tL6+Wfs8sdpbh+vtSyM5QuO+rNTpyBtP3gXFfen3f5jhcKByLmnTrIF2xec98EeP20HxUFZ9B952kvBwZ8282K0eTwFp0745b9/X3QeT9v48ed+qGp/HwMurHdgrOzvG7L2tHI8iQNHAPrtpzO3Xp5XiKbF/cGo+PV0zrz6bqYF2xTVFKBzYu2/M2fNrleJaVLqhssf5uGMmneKK123k1tad0fFxb/xroF/7XE3fS1aAosf5rb2h+Tb81XLFtdrhtQaQmW07o6hDXPEUkDbZ9mXbXDWuzWRm/xnYosF1xaMKII9HoWxx54q7kJkuq337ar+W2MbGpimK2bgvto22zb5xLc4ODiavZYs7VzyaAK4ZoTFjDg8/tk5Oei37ar+2R1ks9HrZJ1ZIvC4yo7Oz3DeuQeXOy78tyj/eXfHUSOF+8u/n8493VzyqAPB/smIAAYqQxVW73a2dDYud2ky5jVp9GkUATWQFO6sTXfF5D3ys9Gu3e9W02x2TEqWZwMGgr3YRWcUemfO3M+OV7WSQswsaV3weA2/Fs9ePkX7V/Exj7gJ0Ol21xsp72Ssvvxvz4dHUQLvimiKkkn5NidLO1Uy/ppL2bLodmn2qRZQ1gHSeTWX+nVkecW2aTr+mRCtbaCGP/LJFSj4mmTifCxXNrmznuuIaxGqD9KlPX4b2qQar+YuOH0+l/3lWzGf2ye98O9t943WR88og2+v4xqtg+3TefalBVONSSH2m0IaUIBW85JAKRgA3i5DOjVXxq5XOTaVCufITINV0buwKZc10bgoVypWrglNL5zZVodzrfVHLkKZQoVxZgFTSuVQo64pQ+SSppHOpUNatUK68BkgtndtUhbLmGiCFCuVV3x+ws7wsS+aKa5GtQC4q2nTFXeT/FtGmb2UNkI9nU7sh6dwmK5SD8gDZD0tC4nWJUaFsK4/tIY/8/L8VxUKv11SFsneDU0ilUqGsdz+kgpccUsEIEA7pV33YIKIAzQJVNoi4yEJsEKFZoMoGEQECkH5lgwjSr2wQwQYR86DpCmWvNUDs9KtFFoGSah0fhfFFS79myW4AUZQ5dcXrktQGEWWpVtcRej02iGCDiEbvhw0ioHFIBSNAMVr78y5CRTECFKD5t+ypVhRDQEVQCKlVFENkAVKpKIZplmqDCJhmKTeIgH+sykyXVKt85Jr/3F325x0MOqN8TL4P2aI1lYpiyAhgB3KcUr0QyH4/K+ZL0xtEwEWWboMIaFAASA9SwQgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgAVfgNFEaGGliL1XgAAAAASUVORK5CYII="
+  }
+}

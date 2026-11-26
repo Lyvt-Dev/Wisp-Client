@@ -1,0 +1,20 @@
+[package]
+name = "wisp-voicechat"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version = "1.85"
+description = "Proximity voice chat that talks to Simple Voice Chat servers (clean-room, docs/voicechat-protocol.md)"
+
+[dependencies]
+log = "0.4"
+# AES-128-GCM for the UDP packets (RustCrypto, MIT/Apache-2.0).
+aes-gcm = "0.10"
+getrandom = "0.2"
+# The Opus codec: libopus (BSD) built from its bundled source.
+opus = "0.3"
+# Microphone and speaker.
+cpal = "0.16"
+
+[lints]
+workspace = true

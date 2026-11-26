@@ -1,0 +1,153 @@
+schema = 1
+id = "wisp_aurora"
+name = "Wisp Aurora"
+version = "1.0.0"
+api = "0.1"
+description = "A cinematic, vanilla-friendly Wisp shader with soft shadows, animated water, blocky clouds and warm lighting."
+authors = ["Wisp"]
+license = "MIT"
+shared = ["common.wgsl"]
+
+[sky]
+file = "sky.wgsl"
+clouds = false
+sun = false
+stars = false
+
+[material]
+file = "material.wgsl"
+
+[vertex]
+file = "vertex.wgsl"
+
+[weather]
+file = "weather.wgsl"
+
+[reflection]
+option = "water_reflections"
+
+[shadow]
+resolution = 1024
+distance = 96.0
+option = "shadows"
+resolution_option = "shadow_resolution"
+
+[[post]]
+file = "bloom.wgsl"
+name = "Bloom extraction"
+scale = 0.25
+output = "aurora_bloom"
+
+[[post]]
+file = "atmosphere.wgsl"
+name = "Atmosphere and light shafts"
+
+[[post]]
+file = "finish.wgsl"
+name = "Colour and edge smoothing"
+
+[[materials]]
+id = 1
+sprites = ["minecraft:block/*_leaves"]
+
+[[materials]]
+id = 2
+sprites = ["minecraft:block/short_grass", "minecraft:block/tall_grass_*", "minecraft:block/fern", "minecraft:block/large_fern_*", "minecraft:block/wheat_stage*", "minecraft:block/*_tulip", "minecraft:block/poppy", "minecraft:block/dandelion"]
+
+[[lights]]
+blocks = ["minecraft:torch", "minecraft:wall_torch", "minecraft:lantern", "minecraft:campfire", "minecraft:fire", "minecraft:lava"]
+color = [1.0, 0.58, 0.25]
+
+[[lights]]
+blocks = ["minecraft:soul_torch", "minecraft:soul_wall_torch", "minecraft:soul_lantern", "minecraft:soul_campfire", "minecraft:soul_fire"]
+color = [0.22, 0.75, 1.0]
+
+[[lights]]
+blocks = ["minecraft:sea_lantern", "minecraft:glowstone", "minecraft:shroomlight"]
+color = [1.0, 0.86, 0.62]
+
+[[options]]
+id = "quality"
+name = "Quality"
+type = "choice"
+values = ["Low", "Balanced", "High"]
+default = "Balanced"
+
+[[options]]
+id = "shadows"
+name = "Real-time shadows"
+type = "bool"
+default = true
+
+[[options]]
+id = "shadow_resolution"
+name = "Shadow resolution"
+type = "choice"
+values = ["512", "1024", "2048"]
+default = "1024"
+
+[[options]]
+id = "water_reflections"
+name = "Water reflections"
+type = "bool"
+default = true
+
+[[options]]
+id = "clouds"
+name = "Volumetric blocky clouds"
+type = "bool"
+default = true
+
+[[options]]
+id = "cloud_density"
+name = "Cloud coverage"
+type = "float"
+default = 0.55
+min = 0.2
+max = 0.85
+step = 0.05
+
+[[options]]
+id = "foliage_wind"
+name = "Waving foliage"
+type = "bool"
+default = true
+
+[[options]]
+id = "bloom_strength"
+name = "Bloom"
+type = "float"
+default = 0.18
+min = 0.0
+max = 0.6
+step = 0.02
+
+[[options]]
+id = "sun_shafts"
+name = "Volumetric light shafts"
+type = "float"
+default = 0.28
+min = 0.0
+max = 0.7
+step = 0.02
+
+[[options]]
+id = "exposure"
+name = "Exposure"
+type = "float"
+default = 1.0
+min = 0.5
+max = 1.8
+step = 0.05
+
+[[options]]
+id = "saturation"
+name = "Colour saturation"
+type = "float"
+default = 1.08
+min = 0.7
+max = 1.4
+step = 0.02
+
+[budget]
+gpu_ms = 4.0

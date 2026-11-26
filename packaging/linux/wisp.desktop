@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Wisp
+Comment=Minecraft: Java Edition 26.3, rewritten in Rust
+Exec=wisp-client
+Icon=wisp
+Terminal=false
+Categories=Game;
+StartupWMClass=wisp
+NoDisplay=true

@@ -1,0 +1,8 @@
+format = "wisp-client-mod"
+api = 1
+id = "max_render"
+name = "Max Render"
+version = "1.0.0"
+description = "Removes the render distance cap of 128 chunks. Set any distance up to 2,147,483,647 chunks in Options, the launcher or options.txt. Far distances need a lot of memory and processing power; servers still send only their own view distance."
+module = "max_render"
+capabilities = ["render-distance"]

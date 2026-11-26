@@ -1,0 +1,58 @@
+# Wisp APIs
+
+Wisp has seven surfaces that other programs and people build on. Each one has an **API** (the contract: what you
+may call, read or write, and what Wisp promises about it) and an **SDK** (the tools that help you use it). This
+section has one page per surface, plus the rules every surface follows:
+[stability and versioning](stability.md).
+
+| Surface | For | API today | Stability | Reference |
+| --- | --- | --- | --- | --- |
+| [Mods](../mods.md) | mod authors | content mods: manifest `api` 0.2; native mods: a wisp-mixins bundle ([native-mods.md](../native-mods.md)) | preview (content), experimental (native) | [mods.md](../mods.md) |
+| [Shaders](shaders.md) | shader authors | API 0.1 (sky, vertex, material, weather and post stages, coloured block light, options, hot reload) | experimental | [shaders-reference.md](shaders-reference.md) |
+| [Agent control](agent-control.md) | agents, scripts, tests | `wisp-ctl`, its MCP server, the game's control socket | preview | [wisp-ctl-commands.md](../wisp-ctl-commands.md) (generated) |
+| [Servers](server.md) | hosts, panels, bots | `wisp-server` commands, `server.toml`, control API `/api/v1` | stable | [server-reference.md](server-reference.md) (generated) |
+| [Launcher](launcher.md) | players' agents, pack makers | `wisp-launcher` commands and its MCP server | preview | [launcher-commands.md](../launcher-commands.md) (generated) |
+| [Launch](launch.md) | other launchers | `wisp-client`'s launch options, the session JSON, exit codes; `wisp-prepare`'s output, `--check` and `--progress json` | experimental | [launch-reference.md](launch-reference.md) (generated) |
+| [Data formats](data-formats.md) | tools that read Wisp's files | benchmark reports, telemetry, settings files, signed checksums | stable or preview, per format | on that page |
+
+## How these APIs are designed
+
+- **From the people who use them.** Each API starts from what a mod author, a pack author, a server host or an agent
+  needs to do, written down as tasks ("a host backs up the world from a script"), and from how Wisp is built:
+  Rust, wgpu and a server thread that runs every world. A function exists because a task
+  needs it.
+- **Our own design.** Wisp's APIs are not modelled on any other project's. Contributors may know other mod
+  loaders, renderers and server platforms exist, but their source and API references are never read, copied or
+  paraphrased here, and our names, shapes and docs are not taken from theirs. Vanilla Minecraft 26.3 is the reference for game
+  concepts: ids, commands, `server.properties`, data packs and resource packs.
+- **Safe by default.** A content mod is data and runs no code; a native mod runs with the player's rights, so it is
+  off by default, behind a warning and reviewed before the registry lists it; the control
+  sockets listen on this computer only, behind a token; nothing here is on by default where it would change vanilla's
+  look or behaviour.
+- **Free when unused.** An API nobody uses costs nothing per tick or per frame: no engine, no thread, no allocation.
+- **One contract for every mode.** In-frame single player, the server thread, LAN and the dedicated server run the
+  same gameplay code ([AGENTS.md](../../AGENTS.md)), so a server-side API serves all of them.
+
+## References are generated
+
+A reference page is written by code from the source it describes, and a test fails when the two differ:
+
+| Page | Generated from | Update it with |
+| --- | --- | --- |
+| [server-reference.md](server-reference.md) | `wisp-server`'s help, `config::TEMPLATE`, `api::ROUTES` | `WISP_WRITE_DOCS=1 cargo test -p wisp-server reference` |
+| [wisp-ctl-commands.md](../wisp-ctl-commands.md) | the command table in `crates/wisp-client/src/bin/wisp-ctl/commands.rs` | `wisp-ctl help --markdown > docs/wisp-ctl-commands.md` |
+| [launcher-commands.md](../launcher-commands.md) | `launcher/src/cli.rs` | `WISP_WRITE_DOCS=1 cargo test --manifest-path launcher/Cargo.toml the_launcher_reference` |
+| [launch-reference.md](launch-reference.md) | `crates/wisp-client/src/game/launch_api.rs` | `WISP_WRITE_DOCS=1 cargo test -p wisp-client --lib launch_api` |
+
+So a pull request that changes an API also changes its reference, and the reviewer sees the API's diff in the
+reference's diff. The guides (overview, how-to, examples) are written by hand.
+
+## Each surface's page
+
+Every page has the same parts: **Overview** (what you can build), **Guide** (where to start), **Reference**,
+**Examples**, **Stability** (the level of each part, per [stability.md](stability.md)), **Changelog** and
+**Not there yet** (what is planned, so nobody builds on a guess).
+
+The website shows these pages at [github.com/Lyvt-Dev/Wisp-Client/docs/api](https://github.com/Lyvt-Dev/Wisp-Client/tree/main/docs/api), built from this
+folder, and a summary for players and authors at [github.com/Lyvt-Dev/Wisp-Client/docs/apis](https://github.com/Lyvt-Dev/Wisp-Client/tree/main/docs/api)
+(in the website's repository, Lyvt-Dev/Wisp-Client).
