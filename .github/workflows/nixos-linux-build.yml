@@ -12,7 +12,9 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    # ubuntu-22.04 ships glibc 2.35, below NixOS 26.05's 2.42, so the binaries
+    # run there. ubuntu-latest's newer glibc made them need GLIBC_2.43.
+    runs-on: ubuntu-22.04
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
