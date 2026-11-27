@@ -1,0 +1,49 @@
+# Builds the Linux x64 game binaries on a GitHub-hosted runner and uploads them
+# as a downloadable artifact. Added so the binaries can be built off-machine
+# (a local build OOM-killed the final crate on an 8 GB box). Mirrors the Linux
+# steps of game-build.yml, but needs no self-hosted runner or Minecraft data:
+# it only compiles and uploads, it does not prepare resources or smoke-test.
+name: NixOS Linux build
+
+on:
+  push:
+    branches: [ci/nixos-linux-build]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: ALSA and udev headers
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libasound2-dev libudev-dev
+
+      - name: Build the client, wisp-ctl, wisp-prepare and wisp-server
+        run: >-
+          cargo build --release --locked
+          -p wisp-client -p wisp-client-lib --bin wisp-client --bin wisp-ctl
+          -p wisp-prepare --bin wisp-prepare
+          -p wisp-server --bin wisp-server
+
+      - name: Every program was built
+        run: |
+          for binary in wisp-client wisp-ctl wisp-prepare wisp-server; do
+            test -f "target/release/$binary" || { echo "::error::target/release/$binary is missing"; exit 1; }
+          done
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wisp-linux-x64
+          path: |
+            target/release/wisp-client
+            target/release/wisp-ctl
+            target/release/wisp-prepare
+            target/release/wisp-server
+          if-no-files-found: error
+          retention-days: 7
