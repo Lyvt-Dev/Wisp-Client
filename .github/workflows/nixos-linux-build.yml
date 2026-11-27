@@ -23,8 +23,13 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
-      - name: ALSA and udev headers
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libasound2-dev libudev-dev
+      - name: Native build dependencies (engine + GPUI launcher)
+        run: >-
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends
+          libasound2-dev libudev-dev
+          libxkbcommon-dev libxkbcommon-x11-dev libx11-xcb-dev libwayland-dev
+          libfontconfig1-dev libx11-dev libxcb1-dev libxcursor-dev libxrandr-dev
+          libxi-dev libvulkan-dev
 
       - name: Build the client, wisp-ctl, wisp-prepare and wisp-server
         run: >-
@@ -33,19 +38,25 @@ jobs:
           -p wisp-prepare --bin wisp-prepare
           -p wisp-server --bin wisp-server
 
+      - name: Build the Wisp launcher (GPUI)
+        run: cargo build --manifest-path launcher/Cargo.toml --locked --release
+
       - name: Every program was built
         run: |
           for binary in wisp-client wisp-ctl wisp-prepare wisp-server; do
             test -f "target/release/$binary" || { echo "::error::target/release/$binary is missing"; exit 1; }
           done
+          test -f "launcher/target/release/wisp-launcher" || { echo "::error::wisp-launcher is missing"; exit 1; }
+
+      - name: Collect binaries
+        run: |
+          mkdir -p out
+          cp target/release/wisp-client target/release/wisp-ctl target/release/wisp-prepare target/release/wisp-server out/
+          cp launcher/target/release/wisp-launcher out/
 
       - uses: actions/upload-artifact@v4
         with:
           name: wisp-linux-x64
-          path: |
-            target/release/wisp-client
-            target/release/wisp-ctl
-            target/release/wisp-prepare
-            target/release/wisp-server
+          path: out/*
           if-no-files-found: error
           retention-days: 7
